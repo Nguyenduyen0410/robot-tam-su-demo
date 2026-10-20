@@ -63,12 +63,58 @@
       if (!text.trim()) return;
       const userMsg = { id: RTS.genId(), sender: 'user', text: text.trim(), time: new Date().toISOString() };
       setMessages(prev => [...prev, userMsg]);
+      
+      // Đồng bộ tin nhắn của người già vào RTS Chat History (từ thiết bị Robot về App)
+      RTS.addChatHistory({
+        id: RTS.genId(),
+        elderId: 'E001',
+        text: text.trim(),
+        timestamp: new Date().toISOString(),
+        sender: 'elder'
+      });
+
+      // Phát hiện dấu hiệu tâm lý hoặc sức khỏe qua lời nói để cảnh báo
+      const lower = text.toLowerCase();
+      const distressWords = ['đau', 'mệt', 'chóng mặt', 'khó chịu', 'buồn', 'cô đơn', 'ngã', 'sốt'];
+      if (distressWords.some(w => lower.includes(w))) {
+        RTS.addNotification({
+          id: RTS.genId(),
+          toUserId: 'U002',
+          type: 'chat_summary',
+          title: '💬 Robot ghi nhận chia sẻ từ Bà Hoa',
+          detail: `Bà vừa tâm sự với Robot: "${text.trim()}". Người thân nên gọi điện hoặc ghé thăm.`,
+          elderId: 'E001',
+          timestamp: new Date().toISOString(),
+          read: false
+        });
+        RTS.addNotification({
+          id: RTS.genId(),
+          toUserId: 'U003',
+          type: 'chat_summary',
+          title: '💬 Dấu hiệu sức khỏe từ lời nói - P101',
+          detail: `Bà Nguyễn Thị Hoa chia sẻ với Robot: "${text.trim()}". Điều dưỡng lưu ý thăm khám.`,
+          elderId: 'E001',
+          timestamp: new Date().toISOString(),
+          read: false
+        });
+      }
+
       setInput('');
       setIsTyping(true);
       setTimeout(() => {
         const response = getRobotResponse(text);
         const botMsg = { id: RTS.genId(), sender: 'robot', text: response, time: new Date().toISOString() };
         setMessages(prev => [...prev, botMsg]);
+        
+        // Lưu phản hồi của Robot vào lịch sử
+        RTS.addChatHistory({
+          id: RTS.genId(),
+          elderId: 'E001',
+          text: response,
+          timestamp: new Date().toISOString(),
+          sender: 'robot'
+        });
+
         setIsTyping(false);
       }, 1200 + Math.random() * 800);
     }

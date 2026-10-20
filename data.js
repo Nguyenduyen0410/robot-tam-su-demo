@@ -213,6 +213,27 @@
     { id: 'CH004', type: 'Email', name: 'Báo cáo hàng tuần', status: 'Inactive', linked: 'Bác sĩ & Quản trị', messages: 12 },
   ];
 
+  // ---- robot chat history (synced from device) ----
+  const CHAT_HISTORY = [
+    { id: 'RCH001', elderId: 'E001', text: 'Robot ơi, hôm nay Ngoại thấy hơi mệt.', timestamp: minutesAgo(60), sender: 'elder' },
+    { id: 'RCH002', elderId: 'E001', text: 'Dạ, Ngoại mệt ở đâu ạ? Ngoại đã uống thuốc sáng nay chưa?', timestamp: minutesAgo(59), sender: 'robot' },
+    { id: 'RCH003', elderId: 'E001', text: 'Ngoại uống rồi. Ngoại hơi đau đầu.', timestamp: minutesAgo(58), sender: 'elder' },
+    { id: 'RCH004', elderId: 'E001', text: 'Ngoại nghỉ ngơi một chút nhé. Nếu đau đầu nhiều hơn, Ngoại nhấn nút SOS để gọi hỗ trợ ngay ạ.', timestamp: minutesAgo(57), sender: 'robot' },
+    { id: 'RCH005', elderId: 'E001', text: 'Robot kể chuyện vui cho Ngoại nghe đi.', timestamp: minutesAgo(40), sender: 'elder' },
+    { id: 'RCH006', elderId: 'E001', text: 'Dạ, hôm nay con kể câu chuyện này nhé: Một ngày mùa xuân đẹp trời, đàn ong nhỏ bay từ hoa này sang hoa khác... Ngoại thích hoa gì nhất ạ? 🌸', timestamp: minutesAgo(39), sender: 'robot' },
+    { id: 'RCH007', elderId: 'E002', text: 'Tôi muốn đo huyết áp.', timestamp: minutesAgo(130), sender: 'elder' },
+    { id: 'RCH008', elderId: 'E002', text: 'Dạ, mời ông đặt tay lên thiết bị và nhấn nút đo ạ.', timestamp: minutesAgo(129), sender: 'robot' },
+  ];
+
+  // ---- notifications: BP results + SOS + chat events pushed to family/caregiver/doctor ----
+  const NOTIFICATIONS = [
+    { id: 'NTF001', toUserId: 'U002', type: 'bp_result', title: 'Kết quả đo huyết áp mới', detail: 'Bà Nguyễn Thị Hoa: 128/78 mmHg, nhịp tim 72 - Bình thường', elderId: 'E001', timestamp: minutesAgo(45), read: false },
+    { id: 'NTF002', toUserId: 'U003', type: 'sos',       title: '🚨 SOS từ Bà Nguyễn Thị Hoa', detail: 'Kích hoạt lúc ' + new Date(Date.now() - 30*60000).toLocaleTimeString('vi-VN'), elderId: 'E001', timestamp: minutesAgo(30), read: true },
+    { id: 'NTF003', toUserId: 'U004', type: 'bp_alert',  title: '⚠️ Huyết áp cao bất thường', detail: 'Ông Trần Văn Nam: 158/96 mmHg - Vượt ngưỡng an toàn, cần đánh giá', elderId: 'E002', timestamp: daysAgo(1), read: false },
+    { id: 'NTF004', toUserId: 'U002', type: 'chat_summary', title: '💬 Robot ghi nhận bất thường', detail: 'Bà Hoa đề cập đau đầu nhẹ lúc 10:30. Robot đã hướng dẫn nghỉ ngơi.', elderId: 'E001', timestamp: minutesAgo(55), read: false },
+    { id: 'NTF005', toUserId: 'U003', type: 'schedule_missed', title: '📋 Chưa xác nhận uống thuốc', detail: 'Bà Nguyễn Thị Hoa chưa xác nhận uống Amlodipine 5mg lúc 08:00', elderId: 'E001', timestamp: minutesAgo(200), read: false },
+  ];
+
   // ---- seed if not already done ----
   function seedData() {
     if (LS.get('rts_seeded')) return;
@@ -235,6 +256,8 @@
     LS.set('rts_audit_log', AUDIT_LOG);
     LS.set('rts_operator_tasks', OPERATOR_TASKS);
     LS.set('rts_channels', CHANNELS);
+    LS.set('rts_chat_history', CHAT_HISTORY);
+    LS.set('rts_notifications', NOTIFICATIONS);
     LS.set('rts_seeded', true);
   }
 
@@ -246,6 +269,7 @@
     // helpers
     getUsers:    () => LS.get('rts_users')    || [],
     getElders:   () => LS.get('rts_elders')   || [],
+    resetSeed:   () => { localStorage.removeItem('rts_seeded'); seedData(); location.reload(); },
     getBP:       (elderId) => (LS.get('rts_bp_readings') || []).filter(r => r.elderId === elderId),
     getAllBP:    () => LS.get('rts_bp_readings') || [],
     addBP:      (r) => { const all = LS.get('rts_bp_readings') || []; all.push(r); LS.set('rts_bp_readings', all); },
@@ -279,6 +303,21 @@
     addAuditLog: (entry) => { const all = LS.get('rts_audit_log') || []; all.unshift(entry); LS.set('rts_audit_log', all); },
     getOperatorTasks: () => LS.get('rts_operator_tasks') || [],
     getChannels: () => LS.get('rts_channels') || [],
+    getChatHistory: (elderId) => (LS.get('rts_chat_history') || []).filter(c => c.elderId === elderId),
+    addChatHistory: (msg) => { const all = LS.get('rts_chat_history') || []; all.push(msg); LS.set('rts_chat_history', all); },
+    getNotifications: (userId) => (LS.get('rts_notifications') || []).filter(n => !userId || n.toUserId === userId || n.toRole === userId),
+    addNotification: (notif) => { const all = LS.get('rts_notifications') || []; all.unshift(notif); LS.set('rts_notifications', all); },
+    // Role-based elder access: returns array of elders this user can see
+    getAccessibleElders: (user) => {
+      const allElders = LS.get('rts_elders') || [];
+      if (!user) return [];
+      if (user.role === 'elder') return allElders.filter(e => e.id === user.elderId);
+      if (user.role === 'family') return allElders.filter(e => e.id === user.elderId);
+      if (user.role === 'caregiver') return allElders.filter(e => e.assignedNurse === user.nurseId);
+      if (user.role === 'doctor') return allElders.filter(e => e.assignedDoctor === user.doctorId);
+      if (user.role === 'admin' || user.role === 'operator') return allElders;
+      return [];
+    },
     // format helpers
     formatTime: (iso) => {
       if (!iso) return '-';

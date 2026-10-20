@@ -1,12 +1,10 @@
 // ============================================================
-// pages/family.js - Family Dashboard
+// pages/family.js - Family Dashboard (fixed Recharts access)
 // ============================================================
 (function () {
-  const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
 
   function AddScheduleModal({ onClose, onAdd }) {
     const [form, setForm] = React.useState({ type: 'medication', title: '', detail: '', time: '08:00', icon: '💊' });
-
     function handleSubmit(e) {
       e.preventDefault();
       const today = new Date();
@@ -17,7 +15,6 @@
       onAdd();
       onClose();
     }
-
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 fade-in">
@@ -25,14 +22,10 @@
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Loại</label>
-              <select
-                value={form.type}
-                onChange={e => {
-                  const icons = { medication: '💊', bp: '💓', appointment: '🏥', activity: '🏃' };
-                  setForm(f => ({ ...f, type: e.target.value, icon: icons[e.target.value] || '📌' }));
-                }}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:border-blue-400"
-              >
+              <select value={form.type} onChange={e => {
+                const icons = { medication: '💊', bp: '💓', appointment: '🏥', activity: '🏃' };
+                setForm(f => ({ ...f, type: e.target.value, icon: icons[e.target.value] || '📌' }));
+              }} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:border-blue-400">
                 <option value="medication">💊 Uống thuốc</option>
                 <option value="bp">💓 Đo huyết áp</option>
                 <option value="appointment">🏥 Lịch hẹn khám</option>
@@ -42,17 +35,17 @@
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Tiêu đề</label>
               <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="Tên hoạt động..." className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:border-blue-400" required />
+                placeholder="Tên hoạt động..." className="w-full px-3 py-2 border border-slate-200 rounded-lg" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Chi tiết</label>
               <input type="text" value={form.detail} onChange={e => setForm(f => ({ ...f, detail: e.target.value }))}
-                placeholder="Liều lượng, địa điểm..." className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:border-blue-400" />
+                placeholder="Liều lượng, địa điểm..." className="w-full px-3 py-2 border border-slate-200 rounded-lg" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Giờ</label>
               <input type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:border-blue-400" required />
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg" required />
             </div>
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50">Huỷ</button>
@@ -90,44 +83,56 @@
   }
 
   function FamilyDashboard({ user, onLogout }) {
+    // Recharts accessed inside component - safe
+    const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = window.Recharts || {};
+
+    // Use elderId from logged-in user (1:1 relationship)
+    const myElderId = user.elderId || 'E001';
+
     const [activeTab, setActiveTab] = React.useState('overview');
     const [bpData, setBpData] = React.useState([]);
     const [schedules, setSchedules] = React.useState([]);
     const [alerts, setAlerts] = React.useState([]);
     const [sos, setSos] = React.useState([]);
+    const [notifications, setNotifications] = React.useState([]);
+    const [chatHistory, setChatHistory] = React.useState([]);
     const [showAddSchedule, setShowAddSchedule] = React.useState(false);
     const [showService, setShowService] = React.useState(false);
     const [showCall, setShowCall] = React.useState(false);
 
     React.useEffect(() => {
-      const bp = RTS.getBP('E001').slice(-7).map(r => ({
+      const bp = RTS.getBP(myElderId).slice(-7).map(r => ({
         date: new Date(r.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
         'Tâm thu': r.systolic,
         'Tâm trương': r.diastolic,
         'Nhịp tim': r.heartRate,
       }));
       setBpData(bp);
-      setSchedules(RTS.getSchedules('E001'));
-      setAlerts(RTS.getAlerts().filter(a => a.elderId === 'E001'));
-      setSos(RTS.getSOS().filter(s => s.elderId === 'E001'));
+      setSchedules(RTS.getSchedules(myElderId));
+      setAlerts(RTS.getAlerts().filter(a => a.elderId === myElderId));
+      setSos(RTS.getSOS().filter(s => s.elderId === myElderId));
+      setNotifications(RTS.getNotifications(user.id));
+      setChatHistory(RTS.getChatHistory(myElderId));
     }, []);
 
-    function refreshSchedules() { setSchedules(RTS.getSchedules('E001')); }
+    function refreshSchedules() { setSchedules(RTS.getSchedules(myElderId)); }
 
-    const latestBP = RTS.getBP('E001').slice(-1)[0];
-    const elder = RTS.getElders().find(e => e.id === 'E001');
+    const latestBP = RTS.getBP(myElderId).slice(-1)[0];
+    const elder = RTS.getElders().find(e => e.id === myElderId);
+    const unreadNotifs = notifications.filter(n => !n.read).length;
 
     const TABS = [
       { id: 'overview', label: '🏠 Tổng quan' },
-      { id: 'health', label: '💓 Sức khỏe' },
+      { id: 'health',   label: '💓 Sức khỏe' },
       { id: 'schedule', label: '📅 Lịch' },
-      { id: 'alerts', label: `⚠️ Cảnh báo${alerts.length > 0 ? ` (${alerts.length})` : ''}` },
-      { id: 'caregroup', label: '👥 Nhóm chăm sóc' },
+      { id: 'alerts',   label: `⚠️ Cảnh báo${alerts.length > 0 ? ` (${alerts.length})` : ''}` },
+      { id: 'robot_chat', label: `💬 Chat Robot${chatHistory.length > 0 ? ` (${chatHistory.length})` : ''}` },
+      { id: 'notifications', label: `🔔 Thông báo${unreadNotifs > 0 ? ` (${unreadNotifs})` : ''}` },
+      { id: 'caregroup',label: '👥 Nhóm chăm sóc' },
     ];
 
     return (
       <div className="min-h-screen bg-slate-100">
-        {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{user.avatar}</span>
@@ -139,7 +144,6 @@
           <button onClick={onLogout} className="text-purple-200 hover:text-white text-sm px-3 py-1 rounded-lg hover:bg-purple-600">Thoát</button>
         </div>
 
-        {/* Tab bar */}
         <div className="bg-white border-b border-slate-200 px-4 overflow-x-auto">
           <div className="flex gap-1 min-w-max">
             {TABS.map(t => (
@@ -154,7 +158,6 @@
         <div className="max-w-5xl mx-auto px-4 py-6">
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Elder status card */}
               <div className="bg-white rounded-2xl shadow-sm p-5 col-span-full">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center text-3xl">{elder ? elder.avatar : '👵'}</div>
@@ -165,17 +168,13 @@
                       <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
                         <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>Robot Online
                       </span>
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">💓 Pin: 82%</span>
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">🔋 Pin: 82%</span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowCall(true)}
-                    className="px-4 py-2 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 text-sm"
-                  >📞 Gọi điện</button>
+                  <button onClick={() => setShowCall(true)} className="px-4 py-2 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 text-sm">📞 Gọi điện</button>
                 </div>
               </div>
 
-              {/* Latest BP */}
               <div className="bg-white rounded-2xl shadow-sm p-5">
                 <div className="text-slate-500 text-sm mb-2">💓 Huyết áp gần nhất</div>
                 {latestBP ? (
@@ -191,7 +190,6 @@
                 ) : <div className="text-slate-400">Chưa có dữ liệu</div>}
               </div>
 
-              {/* Today tasks */}
               <div className="bg-white rounded-2xl shadow-sm p-5">
                 <div className="text-slate-500 text-sm mb-2">📅 Lịch hôm nay</div>
                 <div className="space-y-2">
@@ -206,7 +204,6 @@
                 </div>
               </div>
 
-              {/* SOS events */}
               {sos.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
                   <div className="text-red-700 font-bold mb-2">🆘 Sự kiện SOS gần đây</div>
@@ -220,14 +217,11 @@
                 </div>
               )}
 
-              {/* Service package */}
               <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5">
                 <div className="text-blue-200 text-sm mb-1">Gói dịch vụ hiện tại</div>
                 <div className="text-2xl font-bold mb-1">📦 Gói Nâng cao</div>
                 <div className="text-blue-200 text-sm mb-4">Hết hạn: 31/12/2024</div>
-                <button onClick={() => setShowService(true)} className="w-full py-2 bg-white text-blue-700 rounded-xl font-bold text-sm hover:bg-blue-50">
-                  ⬆️ Nâng cấp gói
-                </button>
+                <button onClick={() => setShowService(true)} className="w-full py-2 bg-white text-blue-700 rounded-xl font-bold text-sm hover:bg-blue-50">⬆️ Nâng cấp gói</button>
               </div>
             </div>
           )}
@@ -236,32 +230,32 @@
             <div className="space-y-4">
               <div className="bg-white rounded-2xl shadow-sm p-5">
                 <h3 className="font-bold text-slate-800 text-lg mb-4">📈 Biểu đồ Huyết áp 7 ngày</h3>
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={bpData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                    <YAxis domain={[60, 160]} tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="Tâm thu" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="Tâm trương" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="Nhịp tim" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} strokeDasharray="5 5" />
-                  </LineChart>
-                </ResponsiveContainer>
+                {LineChart ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={bpData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                      <YAxis domain={[60, 160]} tick={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="Tâm thu" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="Tâm trương" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="Nhịp tim" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} strokeDasharray="5 5" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : <div className="text-slate-400 text-center py-10">Đang tải biểu đồ...</div>}
               </div>
-
-              {/* BP History Table */}
               <div className="bg-white rounded-2xl shadow-sm p-5">
                 <h3 className="font-bold text-slate-800 text-lg mb-4">📋 Lịch sử đo huyết áp</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-100">
-                        <th className="text-left py-2 text-slate-500 font-medium">Thời gian</th>
-                        <th className="text-center py-2 text-slate-500 font-medium">Tâm thu</th>
-                        <th className="text-center py-2 text-slate-500 font-medium">Tâm trương</th>
-                        <th className="text-center py-2 text-slate-500 font-medium">Nhịp tim</th>
-                        <th className="text-center py-2 text-slate-500 font-medium">Trạng thái</th>
+                      <tr className="border-b border-slate-100 text-slate-500 text-left">
+                        <th className="py-2 font-medium">Thời gian</th>
+                        <th className="py-2 font-medium text-center">Tâm thu</th>
+                        <th className="py-2 font-medium text-center">Tâm trương</th>
+                        <th className="py-2 font-medium text-center">Nhịp tim</th>
+                        <th className="py-2 font-medium text-center">Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -289,9 +283,7 @@
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-bold text-slate-800 text-lg">📅 Lịch chăm sóc</h2>
-                <button onClick={() => setShowAddSchedule(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
-                  ➕ Thêm lịch
-                </button>
+                <button onClick={() => setShowAddSchedule(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">➕ Thêm lịch</button>
               </div>
               {schedules.map(s => (
                 <div key={s.id} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${s.confirmed ? 'border-green-500' : 'border-blue-500'}`}>
@@ -305,7 +297,7 @@
                       </div>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${s.confirmed ? 'status-badge-normal' : 'status-badge-warning'}`}>
-                      {s.confirmed ? '✓ Đã thực hiện' : '⏳ Chờ thực hiện'}
+                      {s.confirmed ? '✓ Đã thực hiện' : '⏳ Chờ'}
                     </span>
                   </div>
                 </div>
@@ -353,14 +345,67 @@
             </div>
           )}
 
+          {activeTab === 'robot_chat' && (
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
+                <span className="text-2xl">🤖</span>
+                <div>
+                  <div className="font-bold text-slate-800">Lịch sử trò chuyện Robot</div>
+                  <div className="text-slate-500 text-xs">Cuộc hội thoại giữa Robot và {elder ? elder.name : 'Người cao tuổi'} — đồng bộ từ thiết bị</div>
+                </div>
+              </div>
+              <div className="p-5 space-y-3 max-h-96 overflow-y-auto scrollbar-thin">
+                {chatHistory.length === 0 && (
+                  <div className="text-center text-slate-400 py-8">Chưa có lịch sử trò chuyện</div>
+                )}
+                {chatHistory.map(msg => (
+                  <div key={msg.id} className={`flex ${msg.sender === 'elder' ? 'justify-end' : 'justify-start'} gap-2`}>
+                    {msg.sender === 'robot' && <span className="text-xl flex-shrink-0 mt-1">🤖</span>}
+                    <div className={`max-w-xs px-4 py-2.5 rounded-2xl text-sm ${msg.sender === 'elder' ? 'chat-bubble-user' : 'chat-bubble-robot'}`}>
+                      <div>{msg.text}</div>
+                      <div className={`text-xs mt-1 ${msg.sender === 'elder' ? 'text-blue-200' : 'text-slate-400'}`}>{RTS.timeAgo(msg.timestamp)}</div>
+                    </div>
+                    {msg.sender === 'elder' && <span className="text-xl flex-shrink-0 mt-1">{elder ? elder.avatar : '👵'}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-700">🔔 Thông báo từ hệ thống</h3>
+                <span className="text-xs text-slate-400">Cập nhật tự động khi Robot ghi nhận dữ liệu</span>
+              </div>
+              {notifications.length === 0 && (
+                <div className="bg-white rounded-xl p-8 text-center text-slate-400">Không có thông báo</div>
+              )}
+              {notifications.map(n => {
+                const icons = { bp_result: '💓', sos: '🚨', bp_alert: '⚠️', chat_summary: '💬', schedule_missed: '📋' };
+                const colors = { bp_result: 'border-blue-200 bg-blue-50', sos: 'border-red-200 bg-red-50', bp_alert: 'border-orange-200 bg-orange-50', chat_summary: 'border-purple-200 bg-purple-50', schedule_missed: 'border-yellow-200 bg-yellow-50' };
+                return (
+                  <div key={n.id} className={`rounded-xl p-4 border flex items-start gap-3 ${colors[n.type] || 'border-slate-200 bg-white'} ${!n.read ? 'ring-2 ring-blue-300' : ''}`}>
+                    <span className="text-2xl flex-shrink-0">{icons[n.type] || '🔔'}</span>
+                    <div className="flex-1">
+                      <div className="font-semibold text-slate-800 text-sm">{n.title}</div>
+                      <div className="text-slate-600 text-sm mt-0.5">{n.detail}</div>
+                      <div className="text-slate-400 text-xs mt-1">{RTS.timeAgo(n.timestamp)}</div>
+                    </div>
+                    {!n.read && <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></span>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {activeTab === 'caregroup' && (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <CareGroup elderId="E001" currentUser={user} />
+              <CareGroup elderId={myElderId} currentUser={user} />
             </div>
           )}
         </div>
 
-        {/* Call modal */}
         {showCall && (
           <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl p-8 text-center max-w-xs w-full">

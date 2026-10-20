@@ -2,11 +2,12 @@
 // pages/caregiver.js - Caregiver / Nurse Dashboard
 // ============================================================
 (function () {
-  const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = Recharts;
 
   function Sidebar({ activeTab, setActiveTab, user, onLogout }) {
     const tabs = [
       { id: 'patients', icon: '👥', label: 'Bệnh nhân' },
+      { id: 'notifications', icon: '🔔', label: 'Thông báo Robot' },
+      { id: 'robot_chat', icon: '🤖', label: 'Trò chuyện Robot' },
       { id: 'alerts', icon: '⚠️', label: 'Cảnh báo' },
       { id: 'schedule', icon: '📅', label: 'Lịch chăm sóc' },
       { id: 'caregroup', icon: '💬', label: 'Nhóm chăm sóc' },
@@ -69,6 +70,7 @@
   }
 
   function CaregiverDashboard({ user, onLogout }) {
+    const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = window.Recharts || {};
     const [activeTab, setActiveTab] = React.useState('patients');
     const [selectedElder, setSelectedElder] = React.useState('E001');
     const [alerts, setAlerts] = React.useState([]);
@@ -111,10 +113,12 @@
             <div>
               <h1 className="text-xl font-bold text-slate-800">
                 {activeTab === 'patients' ? '👥 Danh sách Bệnh nhân' :
+                 activeTab === 'notifications' ? '🔔 Thông báo trực tiếp từ Robot' :
+                 activeTab === 'robot_chat' ? '🤖 Lịch sử Trò chuyện Robot' :
                  activeTab === 'alerts' ? '⚠️ Quản lý Cảnh báo' :
                  activeTab === 'schedule' ? '📅 Lịch Chăm sóc' : '💬 Nhóm Chăm sóc'}
               </h1>
-              <div className="text-slate-400 text-sm">{user.department}</div>
+              <div className="text-slate-400 text-sm">{user.department} • Gắn trực tiếp 1-1 với: Bà Nguyễn Thị Hoa (P101)</div>
             </div>
             <div className="text-sm text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg">
               {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' })}
@@ -233,6 +237,84 @@
                       </div>
                     </>
                   )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'notifications' && (
+              <div className="space-y-4 max-w-4xl">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">📡</span>
+                    <div>
+                      <div className="font-bold text-blue-900 text-sm">Đồng bộ dữ liệu thời gian thực từ Robot Companion</div>
+                      <div className="text-blue-700 text-xs">Các sự kiện đo huyết áp, SOS, bỏ lỡ lịch thuốc và lời nói của người già được chuyển tức thì về đây.</div>
+                    </div>
+                  </div>
+                  <button onClick={() => location.reload()} className="px-3 py-1 bg-white text-blue-600 rounded-lg text-xs font-semibold shadow-sm hover:bg-blue-50">Làm mới</button>
+                </div>
+
+                <div className="space-y-3">
+                  {RTS.getNotifications(user.id).length === 0 ? (
+                    <div className="bg-white rounded-xl p-8 text-center text-slate-400">Chưa có thông báo nào</div>
+                  ) : RTS.getNotifications(user.id).map(n => {
+                    const icons = { bp_result: '💓', sos: '🚨', bp_alert: '⚠️', chat_summary: '💬', schedule_missed: '📋' };
+                    const bg = n.type === 'sos' ? 'bg-red-50 border-red-300' : n.type === 'bp_alert' ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200';
+                    return (
+                      <div key={n.id} className={`p-4 rounded-xl border shadow-sm flex items-start gap-3 ${bg}`}>
+                        <span className="text-2xl flex-shrink-0">{icons[n.type] || '🔔'}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-800 text-sm">{n.title}</span>
+                            <span className="text-xs text-slate-400">{RTS.timeAgo(n.timestamp)}</span>
+                          </div>
+                          <div className="text-slate-600 text-sm mt-1">{n.detail}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'robot_chat' && (
+              <div className="space-y-4 max-w-4xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium text-slate-600">Xem trò chuyện của người già:</span>
+                  {elders.map(e => (
+                    <button key={e.id} onClick={() => setSelectedElder(e.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${selectedElder === e.id ? 'bg-blue-600 text-white' : 'bg-white border text-slate-600 hover:bg-slate-50'}`}>
+                      {e.avatar} {e.name}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">🤖</span>
+                      <div>
+                        <div className="font-bold text-slate-800 text-sm">Nhật ký trò chuyện với Robot Companion</div>
+                        <div className="text-slate-500 text-xs">Dữ liệu ghi âm / chuyển thành văn bản từ micro Robot tại phòng {currentElder ? currentElder.room : ''}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-5 space-y-3 max-h-96 overflow-y-auto scrollbar-thin bg-slate-50">
+                    {RTS.getChatHistory(selectedElder).length === 0 ? (
+                      <div className="text-center text-slate-400 py-8">Chưa có bản ghi trò chuyện cho {currentElder ? currentElder.name : 'người này'}</div>
+                    ) : RTS.getChatHistory(selectedElder).map(c => (
+                      <div key={c.id} className={`flex ${c.sender === 'elder' ? 'justify-end' : 'justify-start'} gap-2`}>
+                        {c.sender === 'robot' && <span className="text-xl flex-shrink-0 mt-1">🤖</span>}
+                        <div className={`max-w-md px-4 py-2.5 rounded-2xl text-sm ${c.sender === 'elder' ? 'chat-bubble-user' : 'chat-bubble-robot'}`}>
+                          <div className="font-semibold text-xs mb-1 opacity-75">{c.sender === 'elder' ? (currentElder ? currentElder.name : 'Người cao tuổi') : 'Robot Tâm Sự'}</div>
+                          <div>{c.text}</div>
+                          <div className={`text-xs mt-1 ${c.sender === 'elder' ? 'text-blue-200' : 'text-slate-400'}`}>{RTS.timeAgo(c.timestamp)}</div>
+                        </div>
+                        {c.sender === 'elder' && <span className="text-xl flex-shrink-0 mt-1">{currentElder ? currentElder.avatar : '👵'}</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

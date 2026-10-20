@@ -25,6 +25,55 @@
             // save
             RTS.addBP({ ...res, elderId: 'E001', recordedBy: 'device' });
             RTS.addAuditLog({ id: RTS.genId(), userId: 'U001', userName: 'Bà Nguyễn Thị Hoa', action: 'Đo huyết áp', detail: `Kết quả: ${systolic}/${diastolic} mmHg, nhịp tim: ${heartRate} bpm`, timestamp: new Date().toISOString() });
+            
+            // Đồng bộ kết quả từ Robot về App cho Người thân, Điều dưỡng & Bác sĩ
+            const label = RTS.bpLabel(systolic);
+            RTS.addNotification({
+              id: RTS.genId(),
+              toUserId: 'U002',
+              type: 'bp_result',
+              title: '💓 Kết quả đo huyết áp mới',
+              detail: `Bà Nguyễn Thị Hoa vừa hoàn thành đo: ${systolic}/${diastolic} mmHg, nhịp tim ${heartRate} bpm (${label})`,
+              elderId: 'E001',
+              timestamp: new Date().toISOString(),
+              read: false
+            });
+
+            if (status === 'critical' || status === 'warning') {
+              // Cảnh báo gửi tới Điều dưỡng và Bác sĩ
+              RTS.addNotification({
+                id: RTS.genId(),
+                toUserId: 'U003',
+                type: 'bp_alert',
+                title: status === 'critical' ? '🚨 Cảnh báo huyết áp nguy hiểm' : '⚠️ Cảnh báo huyết áp cần theo dõi',
+                detail: `Bà Nguyễn Thị Hoa: ${systolic}/${diastolic} mmHg, nhịp tim ${heartRate} bpm. Cần kiểm tra tại phòng P101.`,
+                elderId: 'E001',
+                timestamp: new Date().toISOString(),
+                read: false
+              });
+              RTS.addNotification({
+                id: RTS.genId(),
+                toUserId: 'U004',
+                type: 'bp_alert',
+                title: status === 'critical' ? '🚨 Bệnh nhân HA cao khẩn cấp' : '⚠️ Bệnh nhân có chỉ số HA dao động',
+                detail: `Bà Nguyễn Thị Hoa: ${systolic}/${diastolic} mmHg (${label}). Bác sĩ xem xét phác đồ điều trị.`,
+                elderId: 'E001',
+                timestamp: new Date().toISOString(),
+                read: false
+              });
+              RTS.addAlert({
+                id: RTS.genId(),
+                elderId: 'E001',
+                elderName: 'Bà Nguyễn Thị Hoa',
+                type: 'bp_high',
+                title: status === 'critical' ? 'Huyết áp nguy hiểm từ thiết bị' : 'Huyết áp vượt ngưỡng an toàn',
+                detail: `Kết quả đo: ${systolic}/${diastolic} mmHg lúc ${new Date().toLocaleTimeString('vi-VN')}`,
+                timestamp: new Date().toISOString(),
+                severity: status === 'critical' ? 'critical' : 'warning',
+                status: 'pending',
+                riskLevel: status === 'critical' ? 'Cao' : 'Trung bình'
+              });
+            }
             return 100;
           }
           return p + 3;
@@ -127,10 +176,41 @@
         elderName: 'Bà Nguyễn Thị Hoa',
         type: 'sos',
         title: '🆘 SOS - Cần trợ giúp khẩn cấp',
-        detail: 'Người cao tuổi bấm nút SOS',
+        detail: 'Người cao tuổi bấm nút SOS trên thiết bị Robot lúc ' + new Date().toLocaleTimeString('vi-VN'),
         timestamp: new Date().toISOString(),
         severity: 'critical',
         status: 'pending',
+      });
+      // Gửi thông báo khẩn cấp đồng thời tới Người thân, Điều dưỡng và Bác sĩ
+      RTS.addNotification({
+        id: RTS.genId(),
+        toUserId: 'U002',
+        type: 'sos',
+        title: '🚨 KHẨN CẤP: SOS từ Bà Nguyễn Thị Hoa',
+        detail: 'Bà vừa kích hoạt nút SOS khẩn cấp trên Robot Tâm Sự! Đang kết nối điều dưỡng.',
+        elderId: 'E001',
+        timestamp: new Date().toISOString(),
+        read: false
+      });
+      RTS.addNotification({
+        id: RTS.genId(),
+        toUserId: 'U003',
+        type: 'sos',
+        title: '🚨 KHẨN CẤP: SOS từ Bà Nguyễn Thị Hoa (P101)',
+        detail: 'Bà Hoa bấm nút SOS khẩn cấp tại phòng P101. Điều dưỡng cần đến hỗ trợ ngay!',
+        elderId: 'E001',
+        timestamp: new Date().toISOString(),
+        read: false
+      });
+      RTS.addNotification({
+        id: RTS.genId(),
+        toUserId: 'U004',
+        type: 'sos',
+        title: '🚨 KHẨN CẤP: Sự kiện SOS - Bà Nguyễn Thị Hoa',
+        detail: 'Kích hoạt SOS lúc ' + new Date().toLocaleTimeString('vi-VN') + '. Điều dưỡng đang xử lý.',
+        elderId: 'E001',
+        timestamp: new Date().toISOString(),
+        read: false
       });
       setPhase('sent');
     }
