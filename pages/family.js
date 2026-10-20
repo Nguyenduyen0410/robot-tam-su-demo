@@ -100,12 +100,19 @@
     const [showService, setShowService] = React.useState(false);
     const [showCall, setShowCall] = React.useState(false);
 
+    const [calls, setCalls] = React.useState([]);
+    const [messagesLog, setMessagesLog] = React.useState([]);
+    const [newMsgText, setNewMsgText] = React.useState('');
+
     React.useEffect(() => {
       const bp = RTS.getBP(myElderId).slice(-7).map(r => ({
         date: new Date(r.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
         'Tâm thu': r.systolic,
         'Tâm trương': r.diastolic,
         'Nhịp tim': r.heartRate,
+        status: r.status,
+        tcRef: r.tcRef,
+        note: r.note,
       }));
       setBpData(bp);
       setSchedules(RTS.getSchedules(myElderId));
@@ -113,9 +120,36 @@
       setSos(RTS.getSOS().filter(s => s.elderId === myElderId));
       setNotifications(RTS.getNotifications(user.id));
       setChatHistory(RTS.getChatHistory(myElderId));
+      setCalls(RTS.getCalls(myElderId));
+      setMessagesLog(RTS.getMessages(myElderId));
     }, []);
 
     function refreshSchedules() { setSchedules(RTS.getSchedules(myElderId)); }
+    function refreshCalls() { setCalls(RTS.getCalls(myElderId)); }
+    function refreshMessages() { setMessagesLog(RTS.getMessages(myElderId)); }
+
+    function handleSendMsgToRobot(e) {
+      e.preventDefault();
+      if (!newMsgText.trim()) return;
+      const m = {
+        id: RTS.genId(),
+        elderId: myElderId,
+        sender: 'Chị Duyên',
+        receiver: 'Ngoại (qua Robot Myka)',
+        channel: 'Telegram / Zalo',
+        type: 'text',
+        text: `“${newMsgText.trim()}”`,
+        timestamp: new Date().toISOString(),
+        status: 'read_by_robot',
+        statusLabel: 'Myka đã phát âm cho Ngoại',
+        tcRef: 'TC-048, TC-052',
+        note: 'Tin nhắn gửi từ App Chị Duyên. Robot Myka phát âm: “Ngoại ơi, Chị Duyên vừa gửi tin nhắn, con đọc Ngoại nghe nhé!”'
+      };
+      RTS.addMessage(m);
+      setNewMsgText('');
+      refreshMessages();
+      alert('Đã gửi tin nhắn tới Robot Myka! Myka sẽ đọc to cho Ngoại nghe.');
+    }
 
     const latestBP = RTS.getBP(myElderId).slice(-1)[0];
     const elder = RTS.getElders().find(e => e.id === myElderId);
@@ -123,10 +157,12 @@
 
     const TABS = [
       { id: 'overview', label: '🏠 Tổng quan' },
-      { id: 'health',   label: '💓 Sức khỏe' },
+      { id: 'calls', label: `📞 Cuộc gọi Myka (${calls.length})` },
+      { id: 'messages', label: `✉️ Tin nhắn & Thoại (${messagesLog.length})` },
+      { id: 'health',   label: '💓 Sức khỏe & HA' },
       { id: 'schedule', label: '📅 Lịch' },
       { id: 'alerts',   label: `⚠️ Cảnh báo${alerts.length > 0 ? ` (${alerts.length})` : ''}` },
-      { id: 'robot_chat', label: `💬 Chat Robot${chatHistory.length > 0 ? ` (${chatHistory.length})` : ''}` },
+      { id: 'robot_chat', label: `💬 Chat Robot (${chatHistory.length})` },
       { id: 'notifications', label: `🔔 Thông báo${unreadNotifs > 0 ? ` (${unreadNotifs})` : ''}` },
       { id: 'caregroup',label: '👥 Nhóm chăm sóc' },
     ];
@@ -222,6 +258,223 @@
                 <div className="text-2xl font-bold mb-1">📦 Gói Nâng cao</div>
                 <div className="text-blue-200 text-sm mb-4">Hết hạn: 31/12/2024</div>
                 <button onClick={() => setShowService(true)} className="w-full py-2 bg-white text-blue-700 rounded-xl font-bold text-sm hover:bg-blue-50">⬆️ Nâng cấp gói</button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'calls' && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl shadow-sm p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    📞 Lịch sử cuộc gọi qua Robot Myka
+                    <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2.5 py-0.5 rounded-full">TC-034 ~ TC-053</span>
+                  </h2>
+                  <p className="text-slate-500 text-sm mt-1">Cuộc gọi thoại hai chiều giữa Ngoại (Bà Hoa) và Gia đình (Chị Duyên, Anh Trà) thông qua Robot Myka.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowCall(true);
+                    RTS.addCall({
+                      elderId: 'E001',
+                      direction: 'outgoing',
+                      caller: 'Chị Duyên (Con gái)',
+                      receiver: 'Ngoại (Bà Nguyễn Thị Hoa)',
+                      phone: '0903.123.456',
+                      duration: 'Đang kết nối...',
+                      status: 'completed',
+                      note: '[TC-042/TC-044] Chị Duyên gọi tới Robot Myka nói chuyện với Ngoại',
+                      testcase: 'TC-042',
+                      timestamp: new Date().toISOString()
+                    });
+                    refreshCalls();
+                  }}
+                  className="px-4 py-2.5 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 shadow-sm flex items-center gap-2"
+                >
+                  📞 Gọi cho Ngoại qua Myka
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
+                  <div className="text-2xl font-bold text-slate-800">{calls.length}</div>
+                  <div className="text-slate-500 text-xs mt-1">Tổng cuộc gọi</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
+                  <div className="text-2xl font-bold text-green-600">{calls.filter(c => c.status === 'completed').length}</div>
+                  <div className="text-slate-500 text-xs mt-1">Kết nối thành công</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-center">
+                  <div className="text-2xl font-bold text-orange-500">{calls.filter(c => c.status !== 'completed').length}</div>
+                  <div className="text-slate-500 text-xs mt-1">Nhỡ / Máy bận</div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 font-bold text-slate-700">
+                  Danh sách cuộc gọi gần đây
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {calls.map(c => {
+                    const isOutgoing = c.direction === 'outgoing';
+                    const isCompleted = c.status === 'completed';
+                    const isMissed = c.status === 'missed';
+                    return (
+                      <div key={c.id} className="p-4 hover:bg-slate-50 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${
+                            isCompleted ? (isOutgoing ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600') : 'bg-red-100 text-red-600'
+                          }`}>
+                            {isOutgoing ? '↗️' : '↙️'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-slate-800 text-sm">
+                                {isOutgoing ? `Bạn ➔ ${c.receiver}` : `${c.caller} ➔ Bạn`}
+                              </span>
+                              {c.testcase && (
+                                <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono font-medium">
+                                  {c.testcase}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-slate-500 text-xs mt-0.5">{c.note}</div>
+                            <div className="text-slate-400 text-xs mt-1">
+                              {RTS.formatDateTime(c.timestamp)} • Thời lượng: <span className="font-medium text-slate-600">{c.duration}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <span className={`inline-block text-xs px-2.5 py-1 rounded-full font-medium ${
+                            isCompleted ? 'bg-green-100 text-green-700' :
+                            isMissed ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {isCompleted ? 'Thành công' : isMissed ? 'Cuộc gọi nhỡ' : 'Từ chối / Bận'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'messages' && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl shadow-sm p-5">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 mb-4">
+                  <div>
+                    <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                      ✉️ Tin nhắn & Tin nhắn thoại qua Robot Myka
+                      <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2.5 py-0.5 rounded-full">TC-025 ~ TC-052</span>
+                    </h2>
+                    <p className="text-slate-500 text-sm mt-1">Tin nhắn văn bản của người thân gửi tới Robot Myka để đọc cho Ngoại nghe, hoặc lời nhắn thoại Ngoại gửi qua Myka.</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSendMsgToRobot} className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                  <div className="font-semibold text-purple-900 text-sm mb-2 flex items-center gap-2">
+                    <span>📢 Gửi lời nhắn đến Robot Myka (Myka sẽ phát giọng nói cho Ngoại nghe)</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newMsgText}
+                      onChange={(e) => setNewMsgText(e.target.value)}
+                      placeholder="Ví dụ: Ngoại ơi trưa nay con về ăn cơm với Ngoại nha! (TC-048)..."
+                      className="flex-1 px-4 py-2.5 text-sm border border-purple-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                    />
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 flex-shrink-0"
+                    >
+                      🚀 Gửi tới Myka
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3 items-center">
+                    <span className="text-xs text-purple-700 font-medium">Mẫu testcase nhanh:</span>
+                    <button
+                      type="button"
+                      onClick={() => setNewMsgText('Ngoại ơi trưa nay con về ăn cơm với Ngoại nha!')}
+                      className="text-xs bg-white text-purple-800 border border-purple-200 px-2.5 py-1 rounded-lg hover:bg-purple-100"
+                    >
+                      [TC-048] Báo về ăn trưa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewMsgText('Ngoại nhớ uống thuốc huyết áp lúc 2 giờ nha Ngoại!')}
+                      className="text-xs bg-white text-purple-800 border border-purple-200 px-2.5 py-1 rounded-lg hover:bg-purple-100"
+                    >
+                      [TC-049] Nhắc uống thuốc
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewMsgText('Con đã đặt sữa chua gửi về phòng P101 cho Ngoại rồi nha!')}
+                      className="text-xs bg-white text-purple-800 border border-purple-200 px-2.5 py-1 rounded-lg hover:bg-purple-100"
+                    >
+                      [TC-050] Gửi quà vặt
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 font-bold text-slate-700 flex items-center justify-between">
+                  <span>Hộp thư thoại & Tin nhắn ({messagesLog.length})</span>
+                  <span className="text-xs text-slate-400">Đồng bộ hai chiều với Robot Myka</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {messagesLog.map(m => {
+                    const isElderSender = m.sender === 'elder';
+                    return (
+                      <div key={m.id} className="p-4 hover:bg-slate-50 flex items-start gap-3">
+                        <div className="text-2xl flex-shrink-0 mt-0.5">
+                          {isElderSender ? '👵' : '👩'}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-slate-800 text-sm">
+                              {m.senderName} ➔ {m.receiverName}
+                            </span>
+                            <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${
+                              m.type === 'voice' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {m.type === 'voice' ? '🎙️ Tin nhắn thoại' : '📝 Tin nhắn văn bản'}
+                            </span>
+                            {m.testcase && (
+                              <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono font-medium">
+                                {m.testcase}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 my-2 text-sm text-slate-800">
+                            {m.type === 'voice' && (
+                              <div className="flex items-center gap-2 text-xs text-orange-600 font-semibold mb-1">
+                                <span>▶️ 0:12 / 0:12</span>
+                                <div className="h-1.5 bg-orange-200 rounded-full flex-1 overflow-hidden">
+                                  <div className="w-full h-full bg-orange-500"></div>
+                                </div>
+                                <span>Đã chuyển văn bản (STT)</span>
+                              </div>
+                            )}
+                            <div className="italic">"{m.content}"</div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>{m.note}</span>
+                            <div className="flex items-center gap-2">
+                              <span>{RTS.formatDateTime(m.timestamp)}</span>
+                              <span className="text-green-600 font-medium">✓ Đã chuyển phát</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

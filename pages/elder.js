@@ -253,27 +253,188 @@
   }
 
   function CallModal({ onClose }) {
-    const [calling, setCalling] = React.useState(true);
+    const [step, setStep] = React.useState('confirm'); // confirm | calling | connected
+    const [seconds, setSeconds] = React.useState(0);
+
     React.useEffect(() => {
-      const t = setTimeout(() => setCalling(false), 3000);
-      return () => clearTimeout(t);
-    }, []);
+      let interval;
+      if (step === 'connected') {
+        interval = setInterval(() => setSeconds(s => s + 1), 1000);
+      }
+      return () => clearInterval(interval);
+    }, [step]);
+
+    function startCalling() {
+      setStep('calling');
+      setTimeout(() => {
+        setStep('connected');
+        // Record call in RTS
+        RTS.addCall({
+          elderId: 'E001',
+          direction: 'incoming',
+          caller: 'Bà Nguyễn Thị Hoa (Ngoại)',
+          receiver: 'Chị Duyên (Con gái)',
+          phone: '0903.123.456',
+          duration: '01:25',
+          status: 'completed',
+          note: '[TC-034~TC-036] Ngoại gọi Chị Duyên qua khẩu lệnh Myka. Kết nối thành công.',
+          testcase: 'TC-034',
+          timestamp: new Date().toISOString()
+        });
+      }, 2500);
+    }
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xs p-8 text-center fade-in">
-          <div className={`text-7xl mb-4 ${calling ? 'animate-pulse' : ''}`}>📞</div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">{calling ? 'Đang gọi...' : 'Đang kết nối'}</h2>
-          <p className="text-slate-500 text-lg mb-2">Chị Nguyễn Thu Hương</p>
-          {calling ? (
-            <p className="text-blue-500 animate-pulse text-base mb-6">Đang chờ bắt máy...</p>
-          ) : (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-6 text-green-700 text-sm">
-              ✅ Đã kết nối! (Mô phỏng demo)
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center fade-in">
+          {step === 'confirm' && (
+            <div>
+              <div className="text-6xl mb-3">🤖📞</div>
+              <h2 className="text-xl font-bold text-slate-800 mb-2">Lệnh thoại gọi điện (TC-034)</h2>
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 text-left mb-4 text-sm space-y-2">
+                <div className="text-purple-900">
+                  <span className="font-bold">👵 Ngoại nói:</span> "Myka, gọi cho Duyên"
+                </div>
+                <div className="text-purple-700">
+                  <span className="font-bold">🤖 Robot Myka:</span> "Ngoại muốn gọi cho Chị Duyên (Con gái) đúng không ạ?"
+                </div>
+              </div>
+              <button
+                onClick={startCalling}
+                className="w-full py-3.5 bg-green-600 text-white text-lg font-bold rounded-2xl hover:bg-green-700 shadow-md mb-2 flex items-center justify-center gap-2"
+              >
+                📞 Đúng rồi, gọi ngay!
+              </button>
+              <button onClick={onClose} className="w-full py-2.5 text-slate-500 hover:text-slate-700 text-sm">
+                Huỷ bỏ
+              </button>
             </div>
           )}
-          <button onClick={onClose} className="w-full py-3.5 bg-red-500 text-white text-lg font-bold rounded-2xl hover:bg-red-600">
-            📵 Kết thúc cuộc gọi
-          </button>
+
+          {step === 'calling' && (
+            <div>
+              <div className="text-6xl mb-3 animate-pulse">📲</div>
+              <h2 className="text-2xl font-bold text-slate-800 mb-1">Đang kết nối...</h2>
+              <p className="text-purple-600 font-semibold mb-2">Chị Duyên (Con gái)</p>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-6 text-slate-500 text-sm animate-pulse">
+                Robot Myka đang gọi tới điện thoại Chị Duyên qua tổng đài...
+              </div>
+              <button onClick={onClose} className="w-full py-3 bg-red-500 text-white font-bold rounded-2xl hover:bg-red-600">
+                Huỷ cuộc gọi
+              </button>
+            </div>
+          )}
+
+          {step === 'connected' && (
+            <div>
+              <div className="text-6xl mb-3 text-green-600">👩🎙️</div>
+              <h2 className="text-2xl font-bold text-green-700 mb-1">Đang đàm thoại</h2>
+              <p className="text-slate-600 font-medium mb-1">Chị Duyên (Con gái)</p>
+              <div className="text-2xl font-mono font-bold text-slate-800 mb-4">
+                00:{seconds < 10 ? `0${seconds}` : seconds}
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-5 text-green-800 text-sm text-left">
+                <div className="font-semibold mb-1">💬 Âm thanh phát qua loa Myka:</div>
+                <div className="italic">"Dạ con nghe đây Ngoại ơi! Ngoại ăn sáng chưa, con vừa xong việc chuẩn bị ghé Ngoại đây..."</div>
+              </div>
+              <button onClick={onClose} className="w-full py-3.5 bg-red-500 text-white text-lg font-bold rounded-2xl hover:bg-red-600">
+                📵 Kết thúc cuộc gọi
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function VoiceMsgModal({ onClose }) {
+    const [step, setStep] = React.useState('record'); // record | sent
+    const [msgText, setMsgText] = React.useState('Trưa nay nhớ về ăn cơm nha con! (TC-025)');
+
+    function sendVoice() {
+      // Save message
+      RTS.addMessage({
+        elderId: 'E001',
+        sender: 'elder',
+        senderName: 'Ngoại (Bà Nguyễn Thị Hoa)',
+        receiverName: 'Chị Duyên (Con gái)',
+        type: 'voice',
+        content: msgText,
+        status: 'delivered',
+        note: '[TC-025] Lời nhắn thoại từ Ngoại qua Robot Myka',
+        testcase: 'TC-025',
+        timestamp: new Date().toISOString()
+      });
+      // Push notification to family
+      RTS.addNotification({
+        id: RTS.genId(),
+        toUserId: 'U002',
+        type: 'chat_summary',
+        title: '🎙️ Tin nhắn thoại mới từ Ngoại',
+        detail: `Ngoại vừa gửi lời nhắn qua Myka: "${msgText}"`,
+        elderId: 'E001',
+        timestamp: new Date().toISOString(),
+        read: false
+      });
+      setStep('sent');
+    }
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center fade-in">
+          {step === 'record' ? (
+            <div>
+              <div className="text-6xl mb-3">🎙️🤖</div>
+              <h2 className="text-xl font-bold text-slate-800 mb-2">Gửi tin nhắn thoại (TC-025)</h2>
+              <p className="text-slate-500 text-sm mb-4">Ngoại ra lệnh cho Myka để gửi lời nhắn thoại tới Chị Duyên</p>
+              
+              <div className="space-y-2 mb-4 text-left">
+                <div className="text-xs font-semibold text-slate-600">Chọn hoặc đọc câu mẫu:</div>
+                {[
+                  'Trưa nay nhớ về ăn cơm nha con! (TC-025)',
+                  'Ngoại thấy hơi mệt, con rảnh ghé thăm Ngoại nha.',
+                  'Hôm nay trời đẹp, Ngoại muốn đi dạo với con.'
+                ].map((txt, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setMsgText(txt)}
+                    className={`w-full text-left p-3 rounded-xl border text-sm transition ${
+                      msgText === txt ? 'border-orange-500 bg-orange-50 font-semibold text-orange-900' : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    "{txt}"
+                  </button>
+                ))}
+              </div>
+
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4 text-left text-xs text-orange-800">
+                <span className="font-bold">🤖 Robot Myka:</span> "Myka đã ghi âm lời nhắn của Ngoại. Đang chuyển tới Chị Duyên..."
+              </div>
+
+              <button
+                onClick={sendVoice}
+                className="w-full py-3.5 bg-orange-600 text-white text-lg font-bold rounded-2xl hover:bg-orange-700 shadow-md mb-2 flex items-center justify-center gap-2"
+              >
+                🚀 Gửi tin nhắn cho Duyên
+              </button>
+              <button onClick={onClose} className="w-full py-2.5 text-slate-500 hover:text-slate-700 text-sm">
+                Huỷ bỏ
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div className="text-6xl mb-3">✅</div>
+              <h2 className="text-2xl font-bold text-green-700 mb-2">Đã gửi tin nhắn!</h2>
+              <p className="text-slate-600 text-sm mb-4">Robot Myka đã gửi tin nhắn thoại tới điện thoại của Chị Duyên.</p>
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-5 text-green-800 text-sm">
+                🤖 "Ngoại yên tâm nhé, Myka đã gửi lời nhắn cho Chị Duyên rồi ạ!"
+              </div>
+              <button onClick={onClose} className="w-full py-3 bg-green-600 text-white font-bold rounded-2xl hover:bg-green-700">
+                ✓ Xong
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -284,6 +445,7 @@
     const [showSOS, setShowSOS] = React.useState(false);
     const [showChat, setShowChat] = React.useState(false);
     const [showCall, setShowCall] = React.useState(false);
+    const [showVoiceMsg, setShowVoiceMsg] = React.useState(false);
     const [activeTab, setActiveTab] = React.useState('home');
     const [schedules, setSchedules] = React.useState([]);
     const [bpHistory, setBpHistory] = React.useState([]);
@@ -362,24 +524,40 @@
                   className="bg-white border-2 border-purple-200 rounded-2xl p-5 flex flex-col items-center gap-2 hover:bg-purple-50 hover:border-purple-400 transition shadow-sm"
                 >
                   <span className="text-4xl">🤖</span>
-                  <span className="text-purple-700 font-bold text-lg text-center">Chat với Robot</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('schedule')}
-                  className="bg-white border-2 border-green-200 rounded-2xl p-5 flex flex-col items-center gap-2 hover:bg-green-50 hover:border-green-400 transition shadow-sm"
-                >
-                  <span className="text-4xl">📅</span>
-                  <span className="text-green-700 font-bold text-lg text-center">Lịch hôm nay</span>
-                  <span className="text-sm text-slate-500">{schedules.filter(s => !s.confirmed).length} việc cần làm</span>
+                  <span className="text-purple-700 font-bold text-lg text-center">Chat với Myka</span>
                 </button>
                 <button
                   onClick={() => setShowCall(true)}
-                  className="bg-white border-2 border-orange-200 rounded-2xl p-5 flex flex-col items-center gap-2 hover:bg-orange-50 hover:border-orange-400 transition shadow-sm"
+                  className="bg-white border-2 border-green-200 rounded-2xl p-5 flex flex-col items-center gap-2 hover:bg-green-50 hover:border-green-400 transition shadow-sm"
                 >
                   <span className="text-4xl">📞</span>
-                  <span className="text-orange-700 font-bold text-lg text-center">Gọi Người thân</span>
+                  <span className="text-green-700 font-bold text-lg text-center">Gọi Chị Duyên</span>
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">TC-034</span>
+                </button>
+                <button
+                  onClick={() => setShowVoiceMsg(true)}
+                  className="bg-white border-2 border-orange-200 rounded-2xl p-5 flex flex-col items-center gap-2 hover:bg-orange-50 hover:border-orange-400 transition shadow-sm"
+                >
+                  <span className="text-4xl">🎙️</span>
+                  <span className="text-orange-700 font-bold text-lg text-center">Nhắn tin Duyên</span>
+                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">TC-025</span>
                 </button>
               </div>
+
+              {/* Schedule button */}
+              <button
+                onClick={() => setActiveTab('schedule')}
+                className="w-full bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-50 transition shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">📅</span>
+                  <div className="text-left">
+                    <div className="font-bold text-slate-800 text-base">Lịch hôm nay</div>
+                    <div className="text-sm text-slate-500">{schedules.filter(s => !s.confirmed).length} việc cần làm (uống thuốc, đo HA)</div>
+                  </div>
+                </div>
+                <span className="text-slate-400 font-bold text-lg">→</span>
+              </button>
 
               {/* Health snapshot */}
               <div className="bg-white rounded-2xl shadow-sm p-5">
@@ -408,8 +586,8 @@
                   <div className="flex gap-3 items-start">
                     <span className="text-xl">👩</span>
                     <div className="bg-blue-50 rounded-xl px-3 py-2 text-base flex-1">
-                      <div className="font-semibold text-blue-700 text-sm">Chị Hương</div>
-                      Mẹ ơi, mẹ uống thuốc chưa? Con nhớ mẹ lắm! ❤️
+                      <div className="font-semibold text-blue-700 text-sm">Chị Duyên (Con gái)</div>
+                      Ngoại ơi trưa nay con về ăn cơm với Ngoại nha! ❤️ (TC-048)
                     </div>
                   </div>
                 </div>
@@ -490,6 +668,7 @@
         {showBP && <BPModal onClose={() => { setShowBP(false); refreshData(); }} />}
         {showSOS && <SOSModal onClose={() => setShowSOS(false)} />}
         {showCall && <CallModal onClose={() => setShowCall(false)} />}
+        {showVoiceMsg && <VoiceMsgModal onClose={() => setShowVoiceMsg(false)} />}
         {showChat && <RobotChat onClose={() => setShowChat(false)} elderName={user.name} />}
       </div>
     );
