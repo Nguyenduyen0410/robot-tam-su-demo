@@ -652,11 +652,64 @@
       if (systolic >= 130) return 'warning';
       return 'normal';
     },
-    bpLabel: (systolic) => {
-      if (systolic >= 140) return 'Cao - Cần can thiệp';
-      if (systolic >= 130) return 'Dao động - Cần theo dõi';
-      return 'Bình thường';
+    // ---- Backend API & Configuration ----
+    API_URL: 'http://127.0.0.1:8000/api',
+
+    // Connectivity state helper (Bluetooth & Wi-Fi RUD)
+    getConnectivity: (elderId) => {
+      const saved = LS.get('rts_connectivity_' + elderId);
+      if (saved) return saved;
+      return {
+        wifi_ssid: 'Nha_Ngoai_2.4G',
+        wifi_password: '••••••••',
+        wifi_ip: '192.168.1.88',
+        wifi_signal: 95,
+        wifi_frequency: '2.4GHz',
+        wifi_status: 'connected',
+        bluetooth_status: 'connected',
+        paired_devices: [
+          { id: 'DEV-BLE-01', name: 'Robot Myka Companion #P101', type: 'robot', status: 'connected', signal: -52 },
+          { id: 'DEV-BLE-02', name: 'Máy đo Huyết Áp Omron BLE-8821', type: 'sphygmomanometer', status: 'connected', signal: -64 }
+        ],
+        last_updated: new Date().toISOString()
+      };
     },
+    saveConnectivity: (elderId, data) => {
+      LS.set('rts_connectivity_' + elderId, data);
+    },
+
+    // Telegram chat history helper (synced from Telegram)
+    getTelegramChatHistory: (elderId) => {
+      const saved = LS.get('rts_telegram_chats_' + elderId);
+      if (saved) return saved;
+      return [
+        { id: "TGC-001", sender: "elder", sender_name: "Bà Hoa (Ngoại)", message: "Myka ơi, hôm nay thời tiết thế nào con?", source: "telegram_voice_stt", timestamp: "2026-10-20T08:00:00Z" },
+        { id: "TGC-002", sender: "robot", sender_name: "Robot Myka", message: "Dạ chào Ngoại! Hôm nay trời mát mẻ 27 độ C, gió nhẹ. Ngoại nhớ ăn sáng và uống đủ nước nha Ngoại! 😊", source: "telegram_bot", timestamp: "2026-10-20T08:00:15Z" },
+        { id: "TGC-003", sender: "elder", sender_name: "Bà Hoa (Ngoại)", message: "Trưa nay con Duyên có ghé ăn cơm với Ngoại không?", source: "telegram_voice_stt", timestamp: "2026-10-20T09:30:00Z" },
+        { id: "TGC-004", sender: "robot", sender_name: "Robot Myka", message: "Dạ có ạ! Chị Duyên vừa gửi tin nhắn qua kênh Telegram báo trưa nay 11h30 sẽ về ăn cơm và mang bánh cho Ngoại ạ! ❤️", source: "telegram_bot", timestamp: "2026-10-20T09:30:20Z" },
+        { id: "TGC-005", sender: "elder", sender_name: "Bà Hoa (Ngoại)", message: "Hôm nay Ngoại hơi mệt trong người, chóng mặt nhẹ...", source: "telegram_voice_stt", timestamp: "2026-10-20T10:15:00Z" },
+        { id: "TGC-006", sender: "robot", sender_name: "Robot Myka", message: "Dạ Ngoại ơi, Ngoại ngồi nghỉ ngơi trên giường giúp Myka nhé! Myka đã gửi thông báo đến Chị Duyên và Điều dưỡng Lan rồi ạ. Nếu Ngoại cần gấp, bấm nút SOS đỏ ngay nha Ngoại!", source: "telegram_bot", timestamp: "2026-10-20T10:15:25Z" },
+        { id: "TGC-007", sender: "elder", sender_name: "Bà Hoa (Ngoại)", message: "Kể chuyện vui ngày xưa cho Ngoại nghe đỡ buồn đi Myka.", source: "telegram_voice_stt", timestamp: "2026-10-21T08:30:00Z" },
+        { id: "TGC-008", sender: "robot", sender_name: "Robot Myka", message: "Dạ, để Myka kể chuyện ngày mùa ở quê cho Ngoại nghe nhé... Ngoại thấy vui hơn chưa ạ? 😊", source: "telegram_bot", timestamp: "2026-10-21T08:30:30Z" }
+      ];
+    },
+
+    // Telegram medical consultation info (Official Telegram Channel)
+    getTelegramConsultation: () => {
+      return {
+        group_name: "Kênh Tư Vấn Y Tế - Bà Nguyễn Thị Hoa (P101)",
+        telegram_link: "https://t.me/myka_care_p101_bot",
+        qr_code_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://t.me/myka_care_p101_bot",
+        bot_username: "@myka_care_p101_bot",
+        members: [
+          { role: "Bác sĩ tim mạch", name: "BS. Phạm Minh Tuấn", avatar: "👨‍⚕️" },
+          { role: "Điều dưỡng P101", name: "ĐD. Nguyễn Thị Lan", avatar: "👩‍⚕️" },
+          { role: "Người thân trực tiếp", name: "Chị Duyên", avatar: "👩" }
+        ],
+        guidelines: "Kênh tư vấn y khoa chính thức. Không trao đổi riêng tư trong app nhằm bảo đảm bảo mật hồ sơ và quy định pháp lý y tế."
+      };
+    },
+
     genId: () => 'ID' + Math.random().toString(36).substr(2, 9).toUpperCase(),
   };
 })();

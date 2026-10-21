@@ -10,7 +10,7 @@
       { id: 'robot_chat', icon: '🤖', label: 'Trò chuyện Robot' },
       { id: 'alerts', icon: '⚠️', label: 'Cảnh báo AI' },
       { id: 'schedule', icon: '📅', label: 'Lịch điều trị' },
-      { id: 'caregroup', icon: '💬', label: 'Nhóm chăm sóc' },
+      { id: 'telegram_consult', icon: '💬', label: 'Tư vấn Telegram' },
     ];
     return (
       <div className="w-56 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0">
@@ -438,18 +438,33 @@
               </div>
             )}
 
-            {activeTab === 'caregroup' && (
-              <div className="space-y-4 max-w-3xl">
-                {elders.map(e => (
-                  <div key={e.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                    <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center gap-2">
-                      <span>{e.avatar}</span>
-                      <span className="font-semibold text-slate-700">{e.name}</span>
-                      <RiskBadge level={getRiskLevel(e.id)} />
-                    </div>
-                    <CareGroup elderId={e.id} currentUser={user} />
+            {activeTab === 'telegram_consult' && (
+              <div className="bg-white rounded-2xl shadow-sm p-6 max-w-2xl border border-slate-200">
+                <div className="text-center space-y-4">
+                  <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl mx-auto">💬</div>
+                  <h3 className="text-xl font-bold text-slate-800">Kênh Tư Vấn Y Tế Chính Thức qua Telegram</h3>
+                  <div className="bg-blue-50 border border-blue-200 text-blue-900 rounded-xl p-3 text-xs text-left leading-relaxed">
+                    <span className="font-bold">⚠️ Quy định bảo mật & Y tế: </span>
+                    Ứng dụng hoạt động ở chế độ <b>Chỉ Giám sát (Read-Only)</b> đối với chỉ số lâm sàng. 
+                    Nhằm tuân thủ quy chuẩn pháp lý và lưu trữ hồ sơ y tế, Bác sĩ không trao đổi riêng lẻ với người thân trong ứng dụng này. 
+                    Mọi hoạt động tư vấn, hướng dẫn phác đồ thuốc hoặc hội chẩn cùng Điều dưỡng được thực hiện qua Nhóm Telegram chính thức.
                   </div>
-                ))}
+                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-left text-xs space-y-2">
+                    <div><b>Bệnh nhân phụ trách:</b> Bà Nguyễn Thị Hoa (72 tuổi, phòng P101)</div>
+                    <div><b>Kênh Telegram:</b> @myka_care_p101_bot</div>
+                    <div><b>Thành viên nhóm:</b> BS. Phạm Minh Tuấn, ĐD. Nguyễn Thị Lan, Chị Duyên</div>
+                  </div>
+                  <div className="pt-2">
+                    <a
+                      href="https://t.me/myka_care_p101_bot"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md transition"
+                    >
+                      🚀 Mở Kênh Tư Vấn Telegram (@myka_care_p101_bot)
+                    </a>
+                  </div>
+                </div>
               </div>
             )}
           </div>

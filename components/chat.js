@@ -4,20 +4,43 @@
 (function () {
   const ROBOT_RESPONSES = {
     keywords: [
-      { keys: ['huyết áp', 'blood pressure', 'đo'], response: '💓 Huyết áp của bà hôm nay đang ở mức bình thường. Bà nhớ đo huyết áp lúc 9 giờ sáng và 2 giờ chiều theo lịch nhé! Nếu bà cảm thấy đau đầu hoặc chóng mặt, hãy bấm nút SOS ngay ạ.' },
-      { keys: ['thuốc', 'uống thuốc', 'medication'], response: '💊 Lịch uống thuốc hôm nay của bà:\n• 8:00 - Amlodipine 5mg (thuốc huyết áp)\n• 12:00 - Metformin 500mg (thuốc tiểu đường)\n• 20:00 - Melatonin 3mg (thuốc ngủ)\n\nBà đã uống thuốc buổi sáng chưa ạ? 😊' },
-      { keys: ['gọi', 'con', 'gia đình', 'người thân'], response: '📞 Bà muốn gọi cho gia đình ạ? Tôi sẽ kết nối ngay! Bấm nút "Gọi người thân" màu xanh trên màn hình để gọi cho con gái Hương nhé. Gia đình luôn yêu thương bà! ❤️' },
-      { keys: ['buồn', 'cô đơn', 'nhớ', 'sad', 'lonely'], response: '🤗 Bà ơi, con robot này luôn ở bên bà! Bà không bao giờ cô đơn đâu ạ. Con gái Hương và gia đình rất yêu bà và luôn nghĩ đến bà. Bà có muốn nghe một câu chuyện vui không? Hay bà kể cho tôi nghe hôm nay bà đã làm gì nhé! 😊' },
-      { keys: ['đau', 'khó chịu', 'mệt', 'chóng mặt'], response: '🏥 Bà đang cảm thấy không khỏe ạ? Nếu bà đau hoặc rất khó chịu, xin bà bấm nút SOS đỏ ngay để được trợ giúp khẩn cấp! Điều dưỡng Lan sẽ đến ngay. Tôi sẽ thông báo cho gia đình bà biết.' },
-      { keys: ['kể chuyện', 'chuyện vui', 'hài'], response: '😄 Ồ bà thích nghe chuyện vui à! Để tôi kể:\n\nMột ông cụ đi khám bệnh, bác sĩ hỏi: "Ông có hút thuốc không?"\nÔng cụ đáp: "Không bao giờ!"\nBác sĩ: "Uống rượu không?"\n"Không ạ!"\nBác sĩ: "Ông sống lâu thế này nhờ đâu vậy?"\nÔng cụ cười: "Nhờ không đi gặp bác sĩ thường xuyên!" 😂\n\nBà thấy vui hơn chưa ạ?' },
-      { keys: ['ăn', 'bữa ăn', 'đói', 'ăn gì'], response: '🍲 Hôm nay bà ăn gì rồi ạ? Với người cao tuổi có huyết áp, bà nên ăn nhiều rau xanh, trái cây tươi, hạn chế muối và thức ăn dầu mỡ. Bữa trưa có canh rau ngon không ạ? 😊' },
-      { keys: ['thời tiết', 'trời', 'nóng', 'lạnh'], response: '☀️ Thời tiết hôm nay khá mát mẻ, khoảng 25-28 độ C. Bà nhớ mặc đủ ấm khi ra ngoài nhé! Với huyết áp, thời tiết thay đổi có thể ảnh hưởng - bà theo dõi cẩn thận ạ.' },
-      { keys: ['chào', 'hello', 'hi', 'xin chào', 'bạn tên'], response: '🤖 Xin chào bà Hoa! Tôi là Robot Tâm Sự, người bạn đồng hành của bà. Tôi luôn ở đây để trò chuyện, nhắc nhở thuốc và hỗ trợ bà 24/7. Hôm nay bà khỏe không ạ?' },
+      {
+        keys: ['huyết áp', 'blood pressure', 'chẩn đoán', 'uống thuốc gì', 'bệnh gì', 'chữa bệnh', 'có nguy hiểm không'],
+        response: '⚠️ QUY ĐỊNH PHÁP LÝ Y TẾ:\nCháu là Robot Tâm Sự, không có chức năng tư vấn y khoa hay chẩn đoán bệnh tật. Chỉ số huyết áp của Ngoại được máy đo lưu trữ tự động để Bác sĩ theo dõi.\n\n👉 Nếu Ngoại thấy không khỏe hoặc cần tư vấn điều trị, xin vui lòng liên hệ nhóm Bác sĩ qua Kênh Telegram chính thức (@myka_care_p101_bot) hoặc bấm nút SOS khẩn cấp ạ!'
+      },
+      {
+        keys: ['thuốc', 'uống thuốc', 'lịch thuốc'],
+        response: '💊 Dạ Ngoại ơi, Myka chỉ nhắc giờ uống thuốc theo đúng lịch bác sĩ đã kê sẵn thôi ạ (không tự ý đổi hay tư vấn thuốc). Ngoại nhớ uống thuốc đúng giờ và uống kèm nước ấm nhé!'
+      },
+      {
+        keys: ['gọi', 'duyên', 'con gái', 'người thân'],
+        response: '📞 Ngoại muốn gọi cho Chị Duyên đúng không ạ? Ngoại có thể bấm nút "Gọi Chị Duyên" hoặc nói "Myka, gọi cho Duyên" để Myka kết nối qua loa ngoài cho Ngoại ngay nhé! ❤️'
+      },
+      {
+        keys: ['buồn', 'cô đơn', 'nhớ', 'chán'],
+        response: '🤗 Ngoại ơi, Myka luôn ở bên cạnh trò chuyện với Ngoại mà! Chị Duyên và cả nhà luôn thương Ngoại lắm. Ngoại có muốn Myka kể một câu chuyện vui ngày xưa cho Ngoại nghe không ạ? 😊'
+      },
+      {
+        keys: ['đau', 'mệt', 'chóng mặt', 'khó chịu'],
+        response: '🚨 Ngoại đang thấy mệt trong người ạ? Ngoại ngồi nghỉ ngơi trên giường giúp Myka nhé! Myka đã gửi thông báo đến Chị Duyên và Điều dưỡng Lan rồi ạ. Nếu Ngoại cần gấp, bấm nút SOS đỏ ngay nha Ngoại!'
+      },
+      {
+        keys: ['kể chuyện', 'chuyện vui', 'hài'],
+        response: '😄 Dạ, để Myka kể chuyện này cho Ngoại nghe vui nhé:\nCó một ông cụ đi dạo gặp bạn, bạn khen: "Dạo này trông bác khỏe ra đấy!". Cụ cười bảo: "Bí quyết là mỗi sáng nghe robot chào một câu và ăn cơm đúng bữa đấy bác ạ!" 😂\nNgoại thấy vui hơn chưa ạ?'
+      },
+      {
+        keys: ['thời tiết', 'trời', 'nóng', 'lạnh', 'mưa', 'nắng'],
+        response: '☀️ Thời tiết hôm nay khá mát mẻ, khoảng 26-28 độ C, gió nhẹ. Ngoại nhớ mặc áo ấm khi ra ban công và uống đủ nước ấm nhé! 😊'
+      },
+      {
+        keys: ['chào', 'hello', 'hi', 'xin chào', 'bạn tên'],
+        response: '🤖 Dạ con chào Ngoại ạ! Con là Myka - Robot tâm sự cùng Ngoại. Hôm nay Ngoại ăn cơm có ngon miệng không ạ?'
+      },
     ],
     default: [
-      '🤖 Bà ơi, tôi rất vui khi được nói chuyện với bà! Bà có thể hỏi tôi về huyết áp, lịch uống thuốc, hay chúng ta cùng trò chuyện nhé. Tôi luôn ở đây bên bà! 😊',
-      '💙 Cảm ơn bà đã chia sẻ với tôi! Bà có muốn tôi kể một câu chuyện vui, hay bà cần hỗ trợ gì không ạ?',
-      '🌸 Hôm nay bà trông rất vui! Cuộc sống luôn có những điều tốt đẹp xung quanh chúng ta phải không bà? Bà có muốn nói về điều gì đó không ạ?',
+      '🤖 Dạ Ngoại ơi, Myka rất vui khi được nói chuyện với Ngoại! Myka luôn ở đây lắng nghe Ngoại tâm sự chuyện ngày xưa, kể chuyện vui cho Ngoại nghe nhé! 😊',
+      '💙 Cảm ơn Ngoại đã chia sẻ với Myka! Ngoại có muốn nghe một bài hát ru quen thuộc không ạ?',
+      '🌸 Cuộc sống luôn có những điều vui vẻ bình dị. Myka luôn ở bên đồng hành cùng Ngoại 24/7!',
     ],
   };
 
@@ -32,12 +55,12 @@
   }
 
   const QUICK_REPLIES = [
-    'Tôi muốn nói chuyện',
+    'Tôi muốn tâm sự',
     'Kể chuyện vui cho tôi',
-    'Huyết áp của tôi thế nào?',
-    'Gọi con gái tôi',
-    'Lịch thuốc hôm nay',
-    'Tôi cảm thấy mệt',
+    'Thời tiết hôm nay thế nào?',
+    'Mở bài hát ru',
+    'Gọi Chị Duyên',
+    'Nhắc lịch hôm nay'
   ];
 
   function RobotChat({ onClose, elderName }) {

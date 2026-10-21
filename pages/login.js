@@ -3,12 +3,12 @@
 // ============================================================
 (function () {
   const DEMO_ACCOUNTS = [
-    { role: 'elder',    roleLabel: 'Người cao tuổi',  email: 'nguoicaotuoi@demo.com', password: '123456', icon: '👵', color: 'bg-orange-50 border-orange-200 text-orange-700' },
-    { role: 'family',   roleLabel: 'Người thân',       email: 'nguoithan@demo.com',    password: '123456', icon: '👩', color: 'bg-purple-50 border-purple-200 text-purple-700' },
-    { role: 'caregiver',roleLabel: 'Điều dưỡng',       email: 'dieuduong@demo.com',    password: '123456', icon: '👩‍⚕️', color: 'bg-green-50 border-green-200 text-green-700' },
-    { role: 'doctor',   roleLabel: 'Bác sĩ',           email: 'bacsi@demo.com',        password: '123456', icon: '👨‍⚕️', color: 'bg-blue-50 border-blue-200 text-blue-700' },
-    { role: 'admin',    roleLabel: 'Quản trị viên',    email: 'admin@demo.com',        password: '123456', icon: '🧑‍💼', color: 'bg-slate-50 border-slate-300 text-slate-700' },
-    { role: 'operator', roleLabel: 'Điều hành viên',   email: 'operator@demo.com',     password: '123456', icon: '🧑‍💻', color: 'bg-teal-50 border-teal-200 text-teal-700' },
+    { role: 'elder',    roleLabel: 'Mô phỏng Robot (Tại nhà)',  email: 'nguoicaotuoi@demo.com', password: '123456', icon: '🤖', color: 'bg-orange-50 border-orange-200 text-orange-700' },
+    { role: 'family',   roleLabel: 'Người thân (App Theo dõi)', email: 'nguoithan@demo.com',    password: '123456', icon: '👩', color: 'bg-purple-50 border-purple-200 text-purple-700' },
+    { role: 'caregiver',roleLabel: 'Điều dưỡng',               email: 'dieuduong@demo.com',    password: '123456', icon: '👩‍⚕️', color: 'bg-green-50 border-green-200 text-green-700' },
+    { role: 'doctor',   roleLabel: 'Bác sĩ',                   email: 'bacsi@demo.com',        password: '123456', icon: '👨‍⚕️', color: 'bg-blue-50 border-blue-200 text-blue-700' },
+    { role: 'admin',    roleLabel: 'Quản trị viên',            email: 'admin@demo.com',        password: '123456', icon: '🧑‍💼', color: 'bg-slate-50 border-slate-300 text-slate-700' },
+    { role: 'operator', roleLabel: 'Điều hành viên',           email: 'operator@demo.com',     password: '123456', icon: '🧑‍💻', color: 'bg-teal-50 border-teal-200 text-teal-700' },
   ];
 
   function LoginPage({ onLogin, onNavigate }) {
@@ -142,11 +142,11 @@
                 ))}
               </div>
 
-              <div className="mt-5 bg-white bg-opacity-10 rounded-xl p-4">
-                <p className="text-blue-100 text-sm">
-                  <strong className="text-white">ℹ️ Hướng dẫn demo:</strong> Mỗi vai trò có giao diện và tính năng riêng.
-                  Thử trải nghiệm từ góc nhìn của Người cao tuổi, Người thân, Điều dưỡng, Bác sĩ, Quản trị viên và Điều hành viên.
-                </p>
+              <div className="mt-5 bg-white bg-opacity-10 rounded-xl p-4 text-xs space-y-1.5 text-blue-100">
+                <div className="text-white font-bold text-sm mb-1">ℹ️ Kiến trúc hệ thống & Quy định y tế:</div>
+                <p>• <strong className="text-white">Người cao tuổi:</strong> Không dùng app; giao tiếp trực tiếp qua Robot Myka bằng giọng nói & vòng bít đo huyết áp cơ học tại nhà.</p>
+                <p>• <strong className="text-white">Người thân:</strong> Đăng nhập app để theo dõi (chỉ đọc), xem bảng tổng hợp sức khỏe, đọc lịch sử trò chuyện đẩy từ Telegram, cấu hình RUD Wi-Fi/Bluetooth cho Robot.</p>
+                <p>• <strong className="text-white">Tư vấn y tế:</strong> Tuân thủ pháp lý - không tư vấn bệnh qua AI hay chat kín nội bộ; mọi tư vấn bác sĩ được chuyển hướng đến kênh Telegram chính thức.</p>
               </div>
             </div>
           </div>
