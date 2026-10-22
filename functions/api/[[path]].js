@@ -53,7 +53,8 @@ export async function onRequest({ request, env, params }) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
   if (!env.MYKA_DB) return json(request, { error: 'Thiếu binding cơ sở dữ liệu MYKA_DB trong Cloudflare Pages.' }, 503);
 
-  const parts = String(params.path || '').split('/').filter(Boolean).map(decodeURIComponent);
+  const rawPath = Array.isArray(params.path) ? params.path : [params.path || ''];
+  const parts = rawPath.flatMap(segment => String(segment).split('/')).filter(Boolean).map(decodeURIComponent);
   const [area, section, resource, extra] = parts;
   const db = env.MYKA_DB;
   const elderId = resource;
