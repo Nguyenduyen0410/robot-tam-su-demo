@@ -2,11 +2,9 @@
 // app.js - Main App (fixed auth guards, no conditional hooks)
 // ============================================================
 (function () {
-  const ROLE_ROUTES = {
-    elder: 'elder', family: 'family', caregiver: 'caregiver',
-    doctor: 'doctor', admin: 'admin', operator: 'operator',
-  };
-  const PROTECTED = ['elder', 'family', 'caregiver', 'doctor', 'admin', 'operator'];
+  const ROLE_ROUTES = { family: 'family' };
+  const PROTECTED = ['family'];
+  const APP_ROUTES = ['landing', 'login', 'family'];
 
   function useHashRoute() {
     const getRoute = () => {
@@ -35,18 +33,26 @@
 
     // ---- Auth guard (NO hooks inside conditionals) ----
     React.useEffect(() => {
+      if (currentUser && currentUser.role !== 'family') {
+        RTS.LS.set('rts_current_user', null);
+        setCurrentUser(null);
+        navigate('login');
+        return;
+      }
       if (!currentUser && PROTECTED.includes(route)) {
         navigate('login');
       }
       if (currentUser && route === 'login') {
-        navigate(ROLE_ROUTES[currentUser.role] || 'landing');
+        navigate('family');
       }
+      if (!APP_ROUTES.includes(route)) navigate(currentUser ? 'family' : 'login');
     }, [route, currentUser]);
 
     function login(user) {
+      if (!user || user.role !== 'family') return;
       setCurrentUser(user);
       RTS.LS.set('rts_current_user', user);
-      navigate(ROLE_ROUTES[user.role] || 'landing');
+      navigate('family');
     }
 
     function logout() {
@@ -90,23 +96,8 @@
         case 'login':
           return React.createElement(LoginPage, { onLogin: login, onNavigate: navigate });
 
-        case 'elder':
-          return React.createElement(ElderDashboard, { user: currentUser, onLogout: logout });
-
         case 'family':
           return React.createElement(FamilyDashboard, { user: currentUser, onLogout: logout });
-
-        case 'caregiver':
-          return React.createElement(CaregiverDashboard, { user: currentUser, onLogout: logout });
-
-        case 'doctor':
-          return React.createElement(DoctorDashboard, { user: currentUser, onLogout: logout });
-
-        case 'admin':
-          return React.createElement(AdminDashboard, { user: currentUser, onLogout: logout });
-
-        case 'operator':
-          return React.createElement(OperatorDashboard, { user: currentUser, onLogout: logout });
 
         default:
           return React.createElement('div', {

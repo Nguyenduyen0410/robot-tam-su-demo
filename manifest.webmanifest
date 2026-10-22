@@ -1,0 +1,11 @@
+{
+  "name": "Myka Care Companion",
+  "short_name": "Myka Care",
+  "description": "Ứng dụng theo dõi sức khỏe dành cho người thân.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563EB",
+  "icons": [{ "src": "myka-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

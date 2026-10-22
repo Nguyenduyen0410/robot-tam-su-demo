@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Robot Tâm Sự - Hệ thống Chăm sóc Người cao tuổi</title>
+  <meta name="theme-color" content="#2563EB" />
+  <meta name="description" content="Myka Care Companion — ứng dụng dành cho người thân theo dõi sức khỏe và lịch chăm sóc." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="myka-icon.svg" type="image/svg+xml" />
+  <title>Myka Care Companion</title>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -65,24 +69,18 @@
 <body>
   <div id="root"></div>
 
+  <!-- On localhost, use the development API. Set MYKA_API_BASE to the deployed API URL for production. -->
+  <script src="api-config.js"></script>
+
   <!-- 1. Data & helpers -->
   <script type="text/babel" src="data.js"></script>
 
-  <!-- 2. Components -->
-  <script type="text/babel" src="components/chat.js"></script>
-  <script type="text/babel" src="components/caregroup.js"></script>
-
-  <!-- 3. Pages -->
+  <!-- Myka Care Companion is the family-facing app. -->
   <script type="text/babel" src="pages/landing.js"></script>
   <script type="text/babel" src="pages/login.js"></script>
-  <script type="text/babel" src="pages/elder.js"></script>
   <script type="text/babel" src="pages/family.js"></script>
-  <script type="text/babel" src="pages/caregiver.js"></script>
-  <script type="text/babel" src="pages/doctor.js"></script>
-  <script type="text/babel" src="pages/admin.js"></script>
-  <script type="text/babel" src="pages/operator.js"></script>
 
-  <!-- 4. App (last) -->
+  <!-- App (last) -->
   <script type="text/babel" src="app.js"></script>
 </body>
 </html>

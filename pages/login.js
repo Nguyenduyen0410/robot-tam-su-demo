@@ -1,14 +1,9 @@
 // ============================================================
-// pages/login.js - Multi-role Login Page
+// pages/login.js - Myka Care Companion login for family members only
 // ============================================================
 (function () {
   const DEMO_ACCOUNTS = [
-    { role: 'elder',    roleLabel: 'Mô phỏng Robot (Tại nhà)',  email: 'nguoicaotuoi@demo.com', password: '123456', icon: '🤖', color: 'bg-orange-50 border-orange-200 text-orange-700' },
     { role: 'family',   roleLabel: 'Người thân (App Theo dõi)', email: 'nguoithan@demo.com',    password: '123456', icon: '👩', color: 'bg-purple-50 border-purple-200 text-purple-700' },
-    { role: 'caregiver',roleLabel: 'Điều dưỡng',               email: 'dieuduong@demo.com',    password: '123456', icon: '👩‍⚕️', color: 'bg-green-50 border-green-200 text-green-700' },
-    { role: 'doctor',   roleLabel: 'Bác sĩ',                   email: 'bacsi@demo.com',        password: '123456', icon: '👨‍⚕️', color: 'bg-blue-50 border-blue-200 text-blue-700' },
-    { role: 'admin',    roleLabel: 'Quản trị viên',            email: 'admin@demo.com',        password: '123456', icon: '🧑‍💼', color: 'bg-slate-50 border-slate-300 text-slate-700' },
-    { role: 'operator', roleLabel: 'Điều hành viên',           email: 'operator@demo.com',     password: '123456', icon: '🧑‍💻', color: 'bg-teal-50 border-teal-200 text-teal-700' },
   ];
 
   function LoginPage({ onLogin, onNavigate }) {
@@ -30,11 +25,11 @@
       setLoading(true);
       setTimeout(() => {
         const users = RTS.getUsers();
-        const user = users.find(u => u.email === email.trim() && u.password === password);
+        const user = users.find(u => u.role === 'family' && u.email === email.trim() && u.password === password);
         if (user) {
           onLogin(user);
         } else {
-          setError('Email hoặc mật khẩu không đúng. Hãy chọn tài khoản demo bên dưới.');
+          setError('Thông tin đăng nhập không hợp lệ. Ứng dụng này chỉ dành cho tài khoản Người thân.');
         }
         setLoading(false);
       }, 800);
@@ -116,7 +111,7 @@
           <div className="flex-1 w-full">
             <div className="bg-white bg-opacity-10 backdrop-blur rounded-2xl p-6 border border-white border-opacity-20">
               <h3 className="text-white font-bold text-lg mb-1">🎯 Tài khoản Demo</h3>
-              <p className="text-blue-200 text-sm mb-5">Nhấn vào tài khoản bên dưới để điền thông tin tự động, sau đó bấm Đăng nhập</p>
+              <p className="text-blue-200 text-sm mb-5">Myka Care Companion chỉ dành cho người thân. Nhấn tài khoản demo bên dưới để điền thông tin.</p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {DEMO_ACCOUNTS.map(acc => (
@@ -143,10 +138,11 @@
               </div>
 
               <div className="mt-5 bg-white bg-opacity-10 rounded-xl p-4 text-xs space-y-1.5 text-blue-100">
-                <div className="text-white font-bold text-sm mb-1">ℹ️ Kiến trúc hệ thống & Quy định y tế:</div>
-                <p>• <strong className="text-white">Người cao tuổi:</strong> Không dùng app; giao tiếp trực tiếp qua Robot Myka bằng giọng nói & vòng bít đo huyết áp cơ học tại nhà.</p>
-                <p>• <strong className="text-white">Người thân:</strong> Đăng nhập app để theo dõi (chỉ đọc), xem bảng tổng hợp sức khỏe, đọc lịch sử trò chuyện đẩy từ Telegram, cấu hình RUD Wi-Fi/Bluetooth cho Robot.</p>
-                <p>• <strong className="text-white">Tư vấn y tế:</strong> Tuân thủ pháp lý - không tư vấn bệnh qua AI hay chat kín nội bộ; mọi tư vấn bác sĩ được chuyển hướng đến kênh Telegram chính thức.</p>
+                <div className="text-white font-bold text-sm mb-1">ℹ️ Phạm vi ứng dụng:</div>
+                <p>• <strong className="text-white">Người dùng:</strong> Chỉ người thân đăng nhập và sử dụng Myka Care Companion.</p>
+                <p>• <strong className="text-white">Chức năng:</strong> Theo dõi huyết áp/nhịp tim, lịch chăm sóc, bảo trì thiết bị và gói dịch vụ/thanh toán.</p>
+                <p>• <strong className="text-white">Inbox mô phỏng:</strong> Bác sĩ, điều dưỡng và người thân khác chỉ là liên hệ giả lập; tin nhắn không gửi đến người thật.</p>
+                <p>• <strong className="text-white">Liên hệ thật:</strong> Dùng các liên kết Telegram đã được cấu hình.</p>
               </div>
             </div>
           </div>

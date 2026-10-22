@@ -653,7 +653,7 @@
       return 'normal';
     },
     // ---- Backend API & Configuration ----
-    API_URL: 'http://127.0.0.1:8000/api',
+    API_URL: `${window.MYKA_API_BASE || (['localhost', '127.0.0.1'].includes(window.location.hostname) ? 'http://127.0.0.1:8000' : '')}/api`,
 
     // Connectivity state helper (Bluetooth & Wi-Fi RUD)
     getConnectivity: (elderId) => {

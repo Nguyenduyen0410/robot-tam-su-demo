@@ -1,770 +1,198 @@
-// ============================================================
-// pages/family.js - Family Dashboard (Chị Duyên)
-// Tuân thủ nghiêm ngặt quy định y tế:
-// 1. App dùng để MÔ TẢ & LƯU DỮ LIỆU (Read-only cho người thân xem kết quả)
-// 2. Lịch sử trò chuyện giữa người già và AI được đồng bộ từ Telegram
-// 3. Tư vấn y khoa qua Kênh Telegram chính thức (Không chat riêng bác sĩ trong app)
-// 4. Quản lý RUD kết nối Bluetooth và Wi-Fi trong nhà cho Robot
-// 5. Trợ lý AI Gia đình hỗ trợ tra cứu (Có miễn trừ trách nhiệm y tế)
-// ============================================================
-
+// Myka Care Companion App — family-facing views defined by the approved report.
 (function () {
   function FamilyDashboard({ user, onLogout }) {
-    const myElderId = 'E001';
-    const [activeTab, setActiveTab] = React.useState('health_summary');
-    const [alerts, setAlerts] = React.useState([]);
-    const [connectivity, setConnectivity] = React.useState(() => RTS.getConnectivity(myElderId));
-    const [telegramChats, setTelegramChats] = React.useState(() => RTS.getTelegramChatHistory(myElderId));
-    const [telegramConsult, setTelegramConsult] = React.useState(() => RTS.getTelegramConsultation());
-    const [calls, setCalls] = React.useState([]);
-    const [messagesLog, setMessagesLog] = React.useState([]);
-
-    // Wi-Fi RUD state
-    const [wifiSSID, setWifiSSID] = React.useState(connectivity.wifi_ssid || 'Nha_Ngoai_2.4G');
-    const [wifiPass, setWifiPass] = React.useState('');
-    const [wifiMsg, setWifiMsg] = React.useState('');
-
-    // Bluetooth Pair modal
-    const [showPairModal, setShowPairModal] = React.useState(false);
-    const [newDeviceName, setNewDeviceName] = React.useState('');
-
-    // Family AI Assistant state
-    const [aiQuery, setAiQuery] = React.useState('');
-    const [aiChatHistory, setAiChatHistory] = React.useState([
-      {
-        sender: 'ai',
-        text: '👋 Chào Chị Duyên! Tôi là Trợ lý AI Chăm sóc Gia đình. Tôi có thể giúp chị tóm tắt kết quả đo huyết áp của Ngoại, xem lịch sử trò chuyện trên Telegram, hoặc hướng dẫn cài đặt Wi-Fi/Bluetooth cho Robot. (Lưu ý: Tôi không có thẩm quyền tư vấn y khoa hay chẩn đoán bệnh theo quy định pháp lý).'
-      }
+    const elderId = 'E001';
+    const apiBase = String(window.MYKA_API_BASE || '').replace(/\/$/, '');
+    const apiUrl = path => `${apiBase}/api${path}`;
+    const [tab, setTab] = React.useState('health');
+    const [days, setDays] = React.useState(7);
+    const [readings, setReadings] = React.useState(() => RTS.getBP(elderId) || []);
+    const [schedules, setSchedules] = React.useState(() => RTS.getSchedules(elderId) || []);
+    const [maintenance, setMaintenance] = React.useState([
+      { id: 'MNT-DEMO-01', title: 'Kiểm tra máy đo huyết áp', detail: 'Đến hạn kiểm tra định kỳ thiết bị đo huyết áp.', status: 'pending', due_at: '2026-10-30' },
     ]);
-    const [aiLoading, setAiLoading] = React.useState(false);
+    const [connectivity, setConnectivity] = React.useState(null);
+    const [wifiForm, setWifiForm] = React.useState({ ssid: '', password: '' });
+    const [newDeviceName, setNewDeviceName] = React.useState('');
+    const [deviceMessage, setDeviceMessage] = React.useState('');
+    const demoPayment = { id: 'PAY-DEMO-01', service_name: 'Myka Care · Gói tháng', amount: 299000, currency: 'VND', status: 'paid', period_start: '2026-09-22', period_end: '2026-10-22', paid_at: '2026-09-22' };
+    const [subscription, setSubscription] = React.useState({ current_plan: demoPayment, payments: [] });
+    const [agentStatus, setAgentStatus] = React.useState(null);
+    const [telegramLinks, setTelegramLinks] = React.useState({ group_chat_url: '' });
+    const [apiAvailable, setApiAvailable] = React.useState(false);
 
     React.useEffect(() => {
-      setAlerts(RTS.getAlerts().filter(a => a.elderId === myElderId));
-      setCalls(RTS.getCalls(myElderId));
-      setMessagesLog(RTS.getMessages(myElderId));
+      let active = true;
+      Promise.all([
+        fetch(apiUrl(`/family/health-summary/${elderId}?days=${days}`)).then(r => r.ok ? r.json() : Promise.reject()),
+        fetch(apiUrl(`/family/schedules/${elderId}`)).then(r => r.ok ? r.json() : Promise.reject()),
+        fetch(apiUrl(`/family/maintenance-notifications/${elderId}`)).then(r => r.ok ? r.json() : Promise.reject()),
+        fetch(apiUrl(`/family/subscription/${elderId}`)).then(r => r.ok ? r.json() : Promise.reject()),
+      ]).then(([health, plan, notices, payments]) => {
+        if (!active) return;
+        setReadings((health.daily_readings || []).slice().reverse());
+        setSchedules(plan);
+        setMaintenance(notices);
+        setSubscription(payments);
+        setApiAvailable(true);
+      }).catch(() => {
+        if (active) setApiAvailable(false);
+      });
+      fetch(apiUrl(`/family/telegram-consultation/${elderId}`))
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => {
+          if (active) setTelegramLinks({
+            group_chat_url: data.group_chat_url || '',
+          });
+        }).catch(() => {});
+      fetch(apiUrl(`/family/agent-status/${elderId}`))
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => { if (active) setAgentStatus(data); })
+        .catch(() => { if (active) setAgentStatus(null); });
+      fetch(apiUrl(`/device/connectivity/${elderId}`))
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => { if (active) setConnectivity(data); })
+        .catch(() => { if (active) setConnectivity(null); });
+      return () => { active = false; };
+    }, [days]);
 
-      // Try fetching live data from FastAPI backend if online
-      fetch('http://127.0.0.1:8000/api/device/connectivity/' + myElderId)
-        .then(res => res.json())
-        .then(data => { if (data && data.wifi_ssid) setConnectivity(data); })
-        .catch(() => {});
-
-      fetch('http://127.0.0.1:8000/api/family/telegram-chat-history/' + myElderId)
-        .then(res => res.json())
-        .then(data => { if (data && data.messages) setTelegramChats(data.messages); })
-        .catch(() => {});
-    }, []);
-
-    const elder = RTS.getElders().find(e => e.id === myElderId);
-    const bpList = RTS.getBP(myElderId) || [];
-    const latestBP = bpList[bpList.length - 1];
-
-    // Calculate health summary stats
-    const avgSys = bpList.length ? Math.round(bpList.reduce((acc, r) => acc + r.systolic, 0) / bpList.length) : 0;
-    const avgDia = bpList.length ? Math.round(bpList.reduce((acc, r) => acc + r.diastolic, 0) / bpList.length) : 0;
-    const avgHR = bpList.length ? Math.round(bpList.reduce((acc, r) => acc + r.heartRate, 0) / bpList.length) : 0;
-
-    // Chart setup
-    const { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } = window.Recharts || {};
-    const chartData = bpList.slice(-7).map(r => ({
-      date: RTS.formatTime(r.timestamp),
-      'Tâm thu': r.systolic,
-      'Tâm trương': r.diastolic,
-      'Nhịp tim': r.heartRate,
+    const elder = RTS.getElders().find(e => e.id === elderId);
+    const fallbackReadings = RTS.getBP(elderId) || [];
+    const visibleReadings = apiAvailable ? readings : fallbackReadings.slice(-days);
+    const latest = visibleReadings[visibleReadings.length - 1];
+    const avg = (key) => visibleReadings.length
+      ? Math.round(visibleReadings.reduce((sum, row) => sum + Number(row[key] || 0), 0) / visibleReadings.length)
+      : '—';
+    const avgHeartRate = visibleReadings.some(row => row.heart_rate !== undefined)
+      ? avg('heart_rate') : avg('heartRate');
+    const dateLabel = value => {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? value : date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+    };
+    const scheduleRows = apiAvailable ? schedules : schedules.map(s => ({
+      ...s, scheduled_at: s.scheduled_at || s.time, type: s.type === 'appointment' ? 'checkup' : s.type,
+    })).filter(s => ['medication', 'checkup'].includes(s.type));
+    const paymentRows = subscription.payments.length ? subscription.payments : [demoPayment];
+    const refreshConnectivity = () => fetch(apiUrl(`/device/connectivity/${elderId}`))
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(setConnectivity);
+    const saveWifi = event => {
+      event.preventDefault();
+      setDeviceMessage('');
+      fetch(apiUrl(`/device/wifi/${elderId}`), {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wifiForm),
+      }).then(r => r.ok ? r.json() : Promise.reject())
+        .then(() => { setWifiForm({ ssid: '', password: '' }); setDeviceMessage('Đã cập nhật cấu hình Wi-Fi demo.'); return refreshConnectivity(); })
+        .catch(() => setDeviceMessage('Không kết nối được API backend.'));
+    };
+    const pairDevice = event => {
+      event.preventDefault();
+      const device_name = newDeviceName.trim();
+      if (!device_name) return;
+      fetch(apiUrl(`/device/bluetooth/pair/${elderId}`), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ device_name, device_type: 'sphygmomanometer' }),
+      }).then(r => r.ok ? r.json() : Promise.reject())
+        .then(() => { setNewDeviceName(''); setDeviceMessage('Đã ghép thiết bị trong dữ liệu demo.'); return refreshConnectivity(); })
+        .catch(() => setDeviceMessage('Không kết nối được API backend.'));
+    };
+    const unpairDevice = deviceId => fetch(apiUrl(`/device/bluetooth/${elderId}/${encodeURIComponent(deviceId)}`), { method: 'DELETE' })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(() => { setDeviceMessage('Đã gỡ thiết bị khỏi dữ liệu demo.'); return refreshConnectivity(); })
+      .catch(() => setDeviceMessage('Không kết nối được API backend.'));
+    const tabs = [
+      { id: 'health', label: 'Sức khỏe' },
+      { id: 'schedule', label: 'Lịch chăm sóc' },
+      { id: 'device', label: 'Bảo trì' },
+      { id: 'connectivity', label: 'Kết nối thiết bị' },
+      { id: 'service', label: 'Gói dịch vụ & thanh toán' },
+      { id: 'agent', label: 'AI Agent' },
+    ];
+    const Chart = window.Recharts || {};
+    const chartData = visibleReadings.map(row => ({
+      time: new Date(row.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+      'Tâm thu': row.systolic,
+      'Tâm trương': row.diastolic,
+      'Nhịp tim': row.heart_rate || row.heartRate,
     }));
 
-    // [U - UPDATE HOME WI-FI]
-    function handleUpdateWifi(e) {
-      e.preventDefault();
-      if (!wifiSSID.trim()) return;
-
-      const updated = {
-        ...connectivity,
-        wifi_ssid: wifiSSID.trim(),
-        wifi_password: wifiPass ? '••••••••' : connectivity.wifi_password,
-        wifi_status: 'connected',
-        wifi_signal: 95,
-        last_updated: new Date().toISOString()
-      };
-      setConnectivity(updated);
-      RTS.saveConnectivity(myElderId, updated);
-
-      // Call backend API
-      fetch('http://127.0.0.1:8000/api/device/wifi/' + myElderId, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ssid: wifiSSID.trim(), password: wifiPass, frequency: '2.4GHz' })
-      }).catch(() => {});
-
-      setWifiMsg(`✅ Đã cập nhật và lưu cấu hình Wi-Fi nhà "${wifiSSID}" cho Robot Myka!`);
-      setTimeout(() => setWifiMsg(''), 4000);
-      setWifiPass('');
-    }
-
-    // [D - DELETE / RESET WI-FI]
-    function handleDeleteWifi() {
-      if (!confirm('Bạn có chắc chắn muốn ngắt kết nối và xóa Wi-Fi của Robot Myka?')) return;
-      const updated = {
-        ...connectivity,
-        wifi_ssid: null,
-        wifi_password: null,
-        wifi_ip: null,
-        wifi_status: 'disconnected',
-        wifi_signal: 0,
-        last_updated: new Date().toISOString()
-      };
-      setConnectivity(updated);
-      setWifiSSID('');
-      RTS.saveConnectivity(myElderId, updated);
-
-      fetch('http://127.0.0.1:8000/api/device/wifi/' + myElderId, { method: 'DELETE' }).catch(() => {});
-      setWifiMsg('⚠️ Đã xóa thông tin Wi-Fi. Robot Myka hiện ở chế độ Offline.');
-      setTimeout(() => setWifiMsg(''), 4000);
-    }
-
-    // [U - UPDATE / PAIR BLUETOOTH]
-    function handlePairBluetooth(e) {
-      e.preventDefault();
-      if (!newDeviceName.trim()) return;
-      const newDev = {
-        id: 'DEV-BLE-0' + (connectivity.paired_devices.length + 1),
-        name: newDeviceName.trim(),
-        type: 'sphygmomanometer',
-        status: 'connected',
-        signal: -58
-      };
-      const updated = {
-        ...connectivity,
-        paired_devices: [...connectivity.paired_devices, newDev],
-        last_updated: new Date().toISOString()
-      };
-      setConnectivity(updated);
-      RTS.saveConnectivity(myElderId, updated);
-
-      fetch('http://127.0.0.1:8000/api/device/bluetooth/pair/' + myElderId, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_name: newDeviceName.trim(), device_type: 'sphygmomanometer' })
-      }).catch(() => {});
-
-      setNewDeviceName('');
-      setShowPairModal(false);
-      alert(`Đã ghép đôi thành công thiết bị: ${newDev.name}`);
-    }
-
-    // [D - DELETE / UNPAIR BLUETOOTH]
-    function handleUnpairBluetooth(devId) {
-      if (!confirm('Hủy ghép đôi thiết bị Bluetooth này?')) return;
-      const updated = {
-        ...connectivity,
-        paired_devices: connectivity.paired_devices.filter(d => d.id !== devId),
-        last_updated: new Date().toISOString()
-      };
-      setConnectivity(updated);
-      RTS.saveConnectivity(myElderId, updated);
-
-      fetch(`http://127.0.0.1:8000/api/device/bluetooth/${myElderId}/${devId}`, { method: 'DELETE' }).catch(() => {});
-    }
-
-    // Family AI Assistant query handler
-    function handleAskAI(e) {
-      e.preventDefault();
-      if (!aiQuery.trim() || aiLoading) return;
-      const q = aiQuery.trim();
-      setAiQuery('');
-      setAiChatHistory(prev => [...prev, { sender: 'user', text: q }]);
-      setAiLoading(true);
-
-      // Call Backend API
-      fetch('http://127.0.0.1:8000/api/chat/family-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ elder_id: myElderId, question: q })
-      })
-      .then(res => res.json())
-      .then(data => {
-        setAiChatHistory(prev => [...prev, {
-          sender: 'ai',
-          text: data.answer,
-          isRefused: data.is_medical_refused,
-          telegramLink: data.telegram_link
-        }]);
-      })
-      .catch(() => {
-        // Fallback local logic
-        const lower = q.toLowerCase();
-        let ans = '';
-        let isRef = false;
-        if (['thuốc', 'chẩn đoán', 'bệnh gì', 'uống thuốc', 'kê đơn'].some(k => lower.includes(k))) {
-          ans = '⚠️ MIỄN TRỪ TRÁCH NHIỆM Y KHOA: Tôi là AI Trợ lý Gia đình, theo quy định pháp lý tôi KHÔNG ĐƯỢC PHÉP tư vấn y tế hay chẩn đoán bệnh tật. Xin vui lòng liên hệ Bác sĩ Tuấn qua Kênh Telegram chính thức!';
-          isRef = true;
-        } else {
-          ans = `📋 Tóm tắt cho Chị Duyên: Lần đo gần nhất của Ngoại là ${latestBP.systolic}/${latestBP.diastolic} mmHg (Ổn định). Robot Myka đang kết nối Wi-Fi nhà tốt.`;
-        }
-        setAiChatHistory(prev => [...prev, { sender: 'ai', text: ans, isRefused: isRef, telegramLink: isRef ? 'https://t.me/myka_care_p101_bot' : null }]);
-      })
-      .finally(() => setAiLoading(false));
-    }
-
-    const TABS = [
-      { id: 'health_summary', label: '📊 Bảng Sức khỏe & Lịch sử đo (Read-only)' },
-      { id: 'telegram_chat',  label: `🤖 Lịch sử chat Myka (Telegram)` },
-      { id: 'connectivity',   label: '📶 Cấu hình Robot (Wi-Fi & Bluetooth RUD)' },
-      { id: 'telegram_consult', label: '💬 Kênh Tư Vấn Y Tế (Telegram)' },
-      { id: 'calls',          label: `📞 Cuộc gọi Myka (${calls.length})` },
-      { id: 'alerts',         label: `⚠️ Cảnh báo & SOS${alerts.length > 0 ? ` (${alerts.length})` : ''}` },
-      { id: 'ai_assistant',   label: '💡 Trợ lý AI Gia đình' },
-    ];
-
     return (
-      <div className="min-h-screen bg-slate-100">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-blue-700 text-white px-6 py-4 flex items-center justify-between shadow-md">
+      <div className="min-h-screen bg-slate-50 text-slate-800">
+        <header className="bg-white border-b border-slate-200 px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-3xl">{user.avatar}</span>
-            <div>
-              <div className="font-bold text-xl">{user.name}</div>
-              <div className="text-purple-200 text-xs flex items-center gap-2">
-                <span>Người thân • {elder ? elder.name : 'Bà Nguyễn Thị Hoa'} (Phòng P101)</span>
-                <span className="bg-green-500 bg-opacity-30 border border-green-300 text-white px-2 py-0.5 rounded-full text-[11px]">
-                  ✓ Robot Online (Wi-Fi nhà)
-                </span>
-              </div>
-            </div>
+            <div className="w-11 h-11 rounded-2xl bg-violet-100 text-violet-700 grid place-items-center text-2xl">♥</div>
+            <div><div className="font-bold text-lg">Myka Care Companion</div><div className="text-sm text-slate-500">Không gian chăm sóc gia đình</div></div>
           </div>
-          <button onClick={onLogout} className="text-purple-200 hover:text-white text-sm px-3 py-1.5 rounded-lg hover:bg-white hover:bg-opacity-10 transition">
-            Đăng xuất
-          </button>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="bg-white border-b border-slate-200 px-4 overflow-x-auto shadow-sm">
-          <div className="flex gap-1 min-w-max">
-            {TABS.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
-                className={`px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${
-                  activeTab === t.id ? 'border-purple-600 text-purple-700 bg-purple-50 bg-opacity-50' : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="max-w-5xl mx-auto px-4 py-6">
-
-          {/* TAB 1: BẢNG KẾT QUẢ SỨC KHỎE & LỊCH SỬ ĐO MỖI NGÀY (READ-ONLY) */}
-          {activeTab === 'health_summary' && (
-            <div className="space-y-5">
-              {/* Notice Banner */}
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
-                <span className="text-2xl flex-shrink-0">ℹ️</span>
-                <div className="text-sm text-blue-900">
-                  <span className="font-bold">Chế độ Giám sát (Read-Only): </span>
-                  Người cao tuổi đo huyết áp trực tiếp bằng máy đo và Robot Myka tại nhà. 
-                  Dữ liệu được tự động lưu trữ và đồng bộ về ứng dụng này để Người thân và Bác sĩ theo dõi liên tục.
-                </div>
-              </div>
-
-              {/* 3 Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-100">
-                  <div className="text-slate-500 text-xs font-semibold uppercase mb-1">Huyết áp gần nhất</div>
-                  {latestBP ? (
-                    <div>
-                      <div className={`text-4xl font-extrabold ${latestBP.systolic >= 140 ? 'text-red-600' : latestBP.systolic >= 130 ? 'text-yellow-600' : 'text-green-600'}`}>
-                        {latestBP.systolic}/{latestBP.diastolic} <span className="text-sm font-normal text-slate-400">mmHg</span>
-                      </div>
-                      <div className="text-slate-500 text-xs mt-1">💓 Nhịp tim: <span className="font-semibold text-slate-700">{latestBP.heartRate} bpm</span></div>
-                      <div className="text-slate-400 text-xs mt-1">🕒 {RTS.formatDateTime(latestBP.timestamp)}</div>
-                    </div>
-                  ) : <div className="text-slate-400 text-sm">Chưa có dữ liệu</div>}
-                </div>
-
-                <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-100">
-                  <div className="text-slate-500 text-xs font-semibold uppercase mb-1">Chỉ số trung bình (7 ngày)</div>
-                  <div className="text-3xl font-extrabold text-indigo-700">
-                    {avgSys}/{avgDia} <span className="text-sm font-normal text-slate-400">mmHg</span>
-                  </div>
-                  <div className="text-slate-500 text-xs mt-1">Nhịp tim TB: <span className="font-semibold text-slate-700">{avgHR} bpm</span></div>
-                  <div className="text-slate-400 text-xs mt-1">Tổng số lần đo: <span className="font-semibold text-slate-700">{bpList.length} lần</span></div>
-                </div>
-
-                <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-100">
-                  <div className="text-slate-500 text-xs font-semibold uppercase mb-1">Đánh giá tổng quát</div>
-                  <div className="text-lg font-bold text-green-700 flex items-center gap-1.5 mt-1">
-                    <span>✅</span> Ổn định tốt
-                  </div>
-                  <div className="text-slate-500 text-xs mt-1">Chỉ số kiểm soát trong ngưỡng an toàn theo hướng dẫn tim mạch.</div>
-                  <div className="text-xs text-purple-700 font-medium mt-2 bg-purple-50 p-2 rounded-lg">
-                    Bác sĩ theo dõi: BS. Phạm Minh Tuấn
-                  </div>
-                </div>
-              </div>
-
-              {/* 7-Day Trend Chart */}
-              <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-100">
-                <h3 className="font-bold text-slate-800 text-base mb-3 flex items-center gap-2">
-                  <span>📈 Biểu đồ biến thiên Huyết áp 7 ngày gần nhất</span>
-                  <span className="text-xs text-slate-400 font-normal">(Đồng bộ tự động từ Robot Myka)</span>
-                </h3>
-                {LineChart ? (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                      <YAxis domain={[50, 160]} tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="Tâm thu" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="Tâm trương" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="Nhịp tim" stroke="#10b981" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : <div className="text-slate-400 text-center py-8">Đang tải biểu đồ...</div>}
-              </div>
-
-              {/* Daily Measurement Table */}
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-100">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="font-bold text-slate-800 text-base">📋 Bảng lịch sử đo huyết áp mỗi ngày</h3>
-                  <span className="text-xs text-slate-400">Dữ liệu chỉ xem (Read-only)</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500 text-left border-b border-slate-100">
-                        <th className="py-3 px-4 font-semibold">Thời gian</th>
-                        <th className="py-3 px-4 font-semibold text-center">Tâm thu (mmHg)</th>
-                        <th className="py-3 px-4 font-semibold text-center">Tâm trương (mmHg)</th>
-                        <th className="py-3 px-4 font-semibold text-center">Nhịp tim (bpm)</th>
-                        <th className="py-3 px-4 font-semibold text-center">Đánh giá</th>
-                        <th className="py-3 px-4 font-semibold">Ghi chú ngữ cảnh</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {bpList.slice().reverse().map(r => (
-                        <tr key={r.id} className="hover:bg-slate-50 transition">
-                          <td className="py-3 px-4 text-slate-600 font-medium">{RTS.formatDateTime(r.timestamp)}</td>
-                          <td className={`py-3 px-4 text-center font-bold text-base ${r.systolic >= 140 ? 'text-red-600' : r.systolic >= 130 ? 'text-yellow-600' : 'text-green-600'}`}>
-                            {r.systolic}
-                          </td>
-                          <td className="py-3 px-4 text-center text-slate-700 font-medium">{r.diastolic}</td>
-                          <td className="py-3 px-4 text-center text-slate-600 font-medium">{r.heartRate}</td>
-                          <td className="py-3 px-4 text-center">
-                            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
-                              r.status === 'normal' ? 'bg-green-100 text-green-700' :
-                              r.status === 'warning' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {r.status === 'normal' ? 'Bình thường' : r.status === 'warning' ? 'Hơi cao' : 'Nguy hiểm'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-slate-500 text-xs">{r.note || 'Đo tự động từ Robot Myka'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+          <div className="flex items-center gap-4"><span className="text-sm text-slate-600">{user.name}</span><button onClick={onLogout} className="text-sm text-violet-700 hover:underline">Đăng xuất</button></div>
+        </header>
+        <main className="max-w-6xl mx-auto p-5 md:p-8">
+          <section className="flex flex-wrap items-end justify-between gap-4 mb-6">
+            <div><p className="text-sm text-violet-700 font-semibold mb-1">HỒ SƠ NGƯỜI THÂN</p><h1 className="text-2xl md:text-3xl font-bold">{elder?.name || 'Bà Nguyễn Thị Hoa'}</h1><p className="text-slate-500 mt-1">Theo dõi thông tin chăm sóc và sức khỏe</p></div>
+            <span className={`text-sm px-3 py-1.5 rounded-full ${apiAvailable ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{apiAvailable ? 'Dữ liệu từ máy chủ' : 'Dữ liệu demo'}</span>
+          </section>
+          <section className="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="font-semibold">Kênh trao đổi qua Telegram</h2><p className="text-sm text-slate-500">Trao đổi với đội chăm sóc trong kênh Telegram đã cấu hình.</p></div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: 'Vào nhóm Telegram', href: telegramLinks.group_chat_url },
+                ].map(link => link.href
+                  ? <a key={link.label} href={link.href} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700">{link.label} ↗</a>
+                  : <button key={link.label} type="button" disabled title="Chưa cấu hình đường dẫn Telegram" className="px-3 py-2 rounded-lg bg-slate-100 text-slate-400 text-sm font-semibold cursor-not-allowed">{link.label} · chưa cấu hình</button>)}
               </div>
             </div>
-          )}
+          </section>
+          <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 mb-6">
+            {tabs.map(item => <button key={item.id} onClick={() => setTab(item.id)} className={`px-4 py-3 whitespace-nowrap border-b-2 text-sm font-semibold ${tab === item.id ? 'border-violet-600 text-violet-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>{item.label}</button>)}
+          </nav>
 
-          {/* TAB 2: LỊCH SỬ CHAT MYKA (ĐẨY TỪ TELEGRAM) */}
-          {activeTab === 'telegram_chat' && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-100">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                  <div>
-                    <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                      <span>🤖 Lịch sử trò chuyện giữa Bà Hoa và Robot Myka</span>
-                      <span className="text-xs bg-blue-100 text-blue-700 font-semibold px-2.5 py-0.5 rounded-full">Đẩy từ Telegram</span>
-                    </h2>
-                    <p className="text-slate-500 text-xs mt-1">
-                      Ngoại trò chuyện bằng giọng nói với Robot Myka tại nhà. Hệ thống tự động chuyển thành văn bản (STT) và đồng bộ qua kênh Telegram Bot 
-                      <span className="font-semibold text-blue-600"> @myka_care_p101_bot</span>.
-                    </p>
-                  </div>
-                  <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                    Cập nhật thời gian thực
-                  </span>
-                </div>
-
-                {/* Conversation List */}
-                <div className="mt-4 space-y-3 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin">
-                  {telegramChats.map(c => {
-                    const isElder = c.sender === 'elder';
-                    return (
-                      <div key={c.id} className={`flex gap-3 ${isElder ? 'justify-end' : 'justify-start'}`}>
-                        {!isElder && <div className="text-2xl flex-shrink-0 mt-1">🤖</div>}
-                        <div className={`max-w-md rounded-2xl p-4 text-sm ${
-                          isElder ? 'bg-purple-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-800 rounded-tl-none border border-slate-200'
-                        }`}>
-                          <div className={`text-xs font-bold mb-1 flex items-center gap-2 ${isElder ? 'text-purple-200' : 'text-slate-500'}`}>
-                            <span>{c.sender_name}</span>
-                            <span className="font-normal opacity-80">({c.source || 'Telegram'})</span>
-                          </div>
-                          <div className="leading-relaxed">{c.message}</div>
-                          <div className={`text-[11px] mt-2 text-right ${isElder ? 'text-purple-200' : 'text-slate-400'}`}>
-                            {RTS.formatDateTime(c.timestamp)}
-                          </div>
-                        </div>
-                        {isElder && <div className="text-2xl flex-shrink-0 mt-1">👵</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+          {tab === 'health' && <section>
+            <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 className="text-xl font-bold">Huyết áp và nhịp tim</h2><p className="text-sm text-slate-500">Thông tin theo dõi, không thay thế tư vấn y tế.</p></div><select value={days} onChange={e => setDays(Number(e.target.value))} className="bg-white border border-slate-300 rounded-lg px-3 py-2"><option value={7}>7 ngày gần đây</option><option value={30}>30 ngày gần đây</option></select></div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+              {[["Lần đo gần nhất", latest ? `${latest.systolic}/${latest.diastolic}` : '—', 'mmHg'], ['Tâm thu trung bình', avg('systolic'), 'mmHg'], ['Tâm trương trung bình', avg('diastolic'), 'mmHg'], ['Nhịp tim trung bình', avgHeartRate, 'lần/phút']].map(([label, value, unit]) => <div key={label} className="bg-white rounded-xl border border-slate-200 p-4"><p className="text-sm text-slate-500">{label}</p><p className="text-2xl font-bold mt-2">{value} <span className="text-sm font-normal text-slate-500">{unit}</span></p></div>)}
             </div>
-          )}
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5"><h3 className="font-semibold mb-3">Xu hướng chỉ số</h3>{Chart.ResponsiveContainer && chartData.length ? <Chart.ResponsiveContainer width="100%" height={260}><Chart.LineChart data={chartData}><Chart.CartesianGrid strokeDasharray="3 3" /><Chart.XAxis dataKey="time" /><Chart.YAxis /><Chart.Tooltip /><Chart.Legend /><Chart.Line type="monotone" dataKey="Tâm thu" stroke="#7c3aed" /><Chart.Line type="monotone" dataKey="Tâm trương" stroke="#0ea5e9" /><Chart.Line type="monotone" dataKey="Nhịp tim" stroke="#f59e0b" /></Chart.LineChart></Chart.ResponsiveContainer> : <p className="text-sm text-slate-500 py-8 text-center">Chưa có đủ dữ liệu để hiển thị biểu đồ.</p>}</div>
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden"><h3 className="font-semibold p-4">Lịch sử đo</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Thời gian</th><th className="text-left p-3">Huyết áp</th><th className="text-left p-3">Nhịp tim</th><th className="text-left p-3">Ghi chú</th></tr></thead><tbody>{visibleReadings.slice().reverse().map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{dateLabel(row.timestamp)}</td><td className="p-3 font-semibold">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 text-slate-500">{row.note || '—'}</td></tr>)}</tbody></table>{!visibleReadings.length && <p className="p-6 text-center text-slate-500">Chưa có bản ghi trong khoảng thời gian này.</p>}</div></div>
+          </section>}
 
-          {/* TAB 3: CẤU HÌNH KẾT NỐI ROBOT (BLUETOOTH & HOME WI-FI - RUD) */}
-          {activeTab === 'connectivity' && (
-            <div className="space-y-5">
-              <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-100">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-                  <div>
-                    <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                      <span>📶 Cấu hình kết nối Robot Myka (RUD)</span>
-                      <span className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2.5 py-0.5 rounded-full">Wi-Fi & Bluetooth</span>
-                    </h2>
-                    <p className="text-slate-500 text-xs mt-0.5">
-                      Người thân dùng ứng dụng để Đọc (Read), Cập nhật (Update) hoặc Xóa (Delete) kết nối mạng Wi-Fi và thiết bị Bluetooth cho Robot tại nhà.
-                    </p>
-                  </div>
-                </div>
+          {tab === 'schedule' && <section><h2 className="text-xl font-bold mb-1">Lịch uống thuốc và tái khám</h2><p className="text-sm text-slate-500 mb-4">Lịch được lập cho người cao tuổi; ứng dụng gia đình hiển thị để theo dõi.</p><div className="space-y-3">{scheduleRows.map(row => <article key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 items-start"><span className="text-2xl">{row.type === 'checkup' ? '🏥' : '💊'}</span><div className="flex-1"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{row.title}</h3><span className="text-sm text-slate-500">{dateLabel(row.scheduled_at)}</span></div><p className="text-sm text-slate-600 mt-1">{row.detail}</p></div><span className={`text-xs px-2 py-1 rounded-full ${row.confirmed ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>{row.confirmed ? 'Đã xác nhận' : 'Theo lịch'}</span></article>)}{!scheduleRows.length && <p className="bg-white rounded-xl p-6 text-slate-500">Chưa có lịch chăm sóc.</p>}</div></section>}
 
-                {wifiMsg && (
-                  <div className="bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-2.5 rounded-xl mb-4">
-                    {wifiMsg}
-                  </div>
-                )}
+          {tab === 'device' && <section><h2 className="text-xl font-bold mb-1">Thông báo bảo trì thiết bị</h2><p className="text-sm text-slate-500 mb-4">Các nhắc nhở vận hành thiết bị được gửi từ hệ thống.</p><div className="space-y-3">{maintenance.map(item => <article key={item.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4"><span className="text-2xl">🛠️</span><div className="flex-1"><h3 className="font-semibold">{item.title}</h3><p className="text-sm text-slate-600 mt-1">{item.detail}</p><p className="text-xs text-slate-500 mt-2">Hạn: {item.due_at || 'Chưa xác định'}</p></div><span className="text-xs px-2 py-1 h-fit rounded-full bg-amber-100 text-amber-800">{item.status === 'pending' ? 'Cần chú ý' : 'Đã xử lý'}</span></article>)}{!maintenance.length && <p className="bg-white rounded-xl p-6 text-slate-500">Hiện chưa có thông báo bảo trì.</p>}</div></section>}
+          {tab === 'connectivity' && <section>
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold">Kết nối Robot Myka và máy đo</h2><p className="text-sm text-slate-500">Xem trạng thái Wi-Fi và thiết bị Bluetooth đã ghép.</p></div><span className="px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">DEMO API · CHƯA KẾT NỐI PHẦN CỨNG THẬT</span></div>
+            {connectivity ? <>
+              <div className="grid sm:grid-cols-2 gap-3 mb-5"><article className="bg-white border border-slate-200 rounded-xl p-4"><h3 className="font-semibold">Wi-Fi trong nhà</h3><p className="mt-2 text-sm">Mạng: {connectivity.wifi_ssid || 'Chưa cấu hình'}</p><p className="text-sm text-slate-500">Trạng thái: {connectivity.wifi_status || 'Chưa xác định'}{connectivity.wifi_signal ? ` · tín hiệu ${connectivity.wifi_signal}%` : ''}</p></article><article className="bg-white border border-slate-200 rounded-xl p-4"><h3 className="font-semibold">Bluetooth</h3><p className="mt-2 text-sm">Trạng thái: {connectivity.bluetooth_status || 'Chưa xác định'}</p><p className="text-sm text-slate-500">Thiết bị đã ghép: {connectivity.paired_devices?.length || 0}</p></article></div>
+              <div className="space-y-2 mb-5">{(connectivity.paired_devices || []).map(item => <article key={item.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{item.name}</p><p className="text-sm text-slate-500">{item.type} · {item.status}</p></div><button onClick={() => unpairDevice(item.id)} disabled={!apiAvailable} className="px-3 py-2 rounded-lg border border-slate-300 text-sm disabled:opacity-50">Gỡ thiết bị</button></article>)}</div>
+              <div className="grid md:grid-cols-2 gap-4"><form onSubmit={saveWifi} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3"><h3 className="font-semibold">Cập nhật Wi-Fi (RUD demo)</h3><input required value={wifiForm.ssid} onChange={e => setWifiForm({ ...wifiForm, ssid: e.target.value })} placeholder="Tên mạng Wi-Fi" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /><input type="password" value={wifiForm.password} onChange={e => setWifiForm({ ...wifiForm, password: e.target.value })} placeholder="Mật khẩu Wi-Fi mới (không bắt buộc)" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /><button disabled={!apiAvailable} className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold disabled:opacity-50">Lưu cấu hình</button></form><form onSubmit={pairDevice} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3"><h3 className="font-semibold">Ghép Bluetooth (RUD demo)</h3><input required value={newDeviceName} onChange={e => setNewDeviceName(e.target.value)} placeholder="Tên thiết bị đo huyết áp" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /><button disabled={!apiAvailable} className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold disabled:opacity-50">Thêm thiết bị</button></form></div>
+              {deviceMessage && <p role="status" className="text-sm text-violet-700 mt-3">{deviceMessage}</p>}
+            </> : <div className="bg-white border border-slate-200 rounded-xl p-5"><p className="font-semibold">Chưa kết nối được API thiết bị.</p><p className="text-sm text-slate-500 mt-1">Mở backend demo để đọc và cập nhật trạng thái. Wi-Fi/Bluetooth hiện được mô phỏng qua API; để kết nối thiết bị thật cần firmware hoặc gateway phần cứng.</p></div>}
+          </section>}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Wi-Fi Setup (RUD) */}
-                  <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                        <span>📡 Mạng Wi-Fi trong nhà</span>
-                      </span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${connectivity.wifi_status === 'connected' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {connectivity.wifi_status === 'connected' ? '● Đã kết nối' : '○ Chưa kết nối'}
-                      </span>
-                    </div>
-
-                    {/* [R - Read Wi-Fi] */}
-                    <div className="bg-white rounded-xl p-3 border border-slate-200 text-xs space-y-1 mb-4">
-                      <div><span className="text-slate-400">Tên mạng hiện tại:</span> <span className="font-bold text-slate-800">{connectivity.wifi_ssid || 'Chưa cài đặt'}</span></div>
-                      <div><span className="text-slate-400">Địa chỉ IP Robot:</span> <span className="font-mono text-slate-700">{connectivity.wifi_ip || '-'}</span></div>
-                      <div><span className="text-slate-400">Cường độ sóng:</span> <span className="text-green-600 font-semibold">{connectivity.wifi_signal}% (Rất mạnh)</span> • Băng tần 2.4GHz</div>
-                    </div>
-
-                    {/* [U - Update Wi-Fi] */}
-                    <form onSubmit={handleUpdateWifi} className="space-y-3">
-                      <div>
-                        <label className="text-xs font-semibold text-slate-600 block mb-1">Tên Wi-Fi nhà (SSID):</label>
-                        <input
-                          type="text"
-                          value={wifiSSID}
-                          onChange={(e) => setWifiSSID(e.target.value)}
-                          placeholder="Ví dụ: Nha_Ngoai_2.4G"
-                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-slate-600 block mb-1">Mật khẩu Wi-Fi:</label>
-                        <input
-                          type="password"
-                          value={wifiPass}
-                          onChange={(e) => setWifiPass(e.target.value)}
-                          placeholder="Nhập mật khẩu Wi-Fi nhà..."
-                          className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-                        />
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          type="submit"
-                          className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
-                        >
-                          Lưu & Kết nối Wi-Fi (Update)
-                        </button>
-                        {/* [D - Delete Wi-Fi] */}
-                        <button
-                          type="button"
-                          onClick={handleDeleteWifi}
-                          className="px-3 py-2 border border-red-300 text-red-600 hover:bg-red-50 rounded-xl text-xs font-semibold transition"
-                        >
-                          Xóa Wi-Fi (Delete)
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* Bluetooth BLE Devices (RUD) */}
-                  <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                        <span>🔵 Thiết bị Bluetooth (BLE)</span>
-                      </span>
-                      <button
-                        onClick={() => setShowPairModal(true)}
-                        className="text-xs bg-indigo-600 text-white px-2.5 py-1 rounded-lg font-semibold hover:bg-indigo-700"
-                      >
-                        + Ghép đôi mới
-                      </button>
-                    </div>
-
-                    {/* [R - Read Bluetooth devices] */}
-                    <div className="space-y-2">
-                      {connectivity.paired_devices && connectivity.paired_devices.length > 0 ? (
-                        connectivity.paired_devices.map(dev => (
-                          <div key={dev.id} className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between">
-                            <div>
-                              <div className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
-                                <span>{dev.type === 'robot' ? '🤖' : '💓'}</span>
-                                <span>{dev.name}</span>
-                              </div>
-                              <div className="text-[11px] text-slate-400 mt-0.5">Mã: {dev.id} • Tín hiệu: {dev.signal} dBm</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
-                                Đã kết nối
-                              </span>
-                              {/* [D - Delete / Unpair] */}
-                              <button
-                                onClick={() => handleUnpairBluetooth(dev.id)}
-                                className="text-red-500 hover:text-red-700 text-xs px-1.5 py-0.5"
-                                title="Hủy ghép đôi"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-slate-400 text-xs py-4 text-center">Chưa có thiết bị Bluetooth nào ghép đôi</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+          {tab === 'service' && <section><h2 className="text-xl font-bold mb-1">Gói dịch vụ và thanh toán</h2><p className="text-sm text-slate-500 mb-4">Thông tin gói đang sử dụng và lịch sử giao dịch.</p>{subscription.current_plan && <article className="bg-violet-50 border border-violet-200 rounded-xl p-5 mb-5"><p className="text-sm text-violet-700 font-semibold">GÓI ĐANG SỬ DỤNG</p><h3 className="text-xl font-bold mt-1">{subscription.current_plan.service_name}</h3><p className="mt-2">{Number(subscription.current_plan.amount).toLocaleString('vi-VN')} {subscription.current_plan.currency}</p><p className="text-sm text-slate-600 mt-1">Thời hạn: {subscription.current_plan.period_start} – {subscription.current_plan.period_end}</p></article>}<div className="bg-white rounded-xl border border-slate-200 overflow-hidden"><h3 className="font-semibold p-4">Lịch sử thanh toán</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Mã giao dịch</th><th className="text-left p-3">Gói dịch vụ</th><th className="text-left p-3">Số tiền</th><th className="text-left p-3">Ngày thanh toán</th><th className="text-left p-3">Trạng thái</th></tr></thead><tbody>{paymentRows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.id}</td><td className="p-3">{row.service_name}</td><td className="p-3">{Number(row.amount).toLocaleString('vi-VN')} {row.currency}</td><td className="p-3">{row.paid_at || '—'}</td><td className="p-3 text-green-700">{row.status === 'paid' ? 'Đã thanh toán' : row.status}</td></tr>)}</tbody></table></div></div></section>}
+          {tab === 'agent' && (() => {
+            const measured = agentStatus?.latest_measurement || latest;
+            const level = measured?.status || 'unknown';
+            const levelLabel = ({ normal: 'Trong ngưỡng theo dõi', warning: 'Cần người chăm sóc lưu ý', critical: 'Đã phát hiện chỉ số vượt ngưỡng', unknown: 'Chưa có dữ liệu' })[level] || 'Chưa có dữ liệu';
+            const activities = agentStatus?.activities || [
+              { title: 'Thu thập dữ liệu', detail: measured ? `Đã nhận chỉ số huyết áp ${measured.systolic}/${measured.diastolic} mmHg và nhịp tim ${measured.heart_rate || measured.heartRate} bpm.` : 'Đang chờ dữ liệu từ máy đo/robot.' },
+              { title: 'Đối chiếu quy tắc cảnh báo', detail: measured ? levelLabel : 'Chưa có phép đo để đối chiếu.' },
+              { title: 'Lưu lịch sử và cập nhật trạng thái', detail: 'Kết quả được lưu qua API backend để người thân xem lại.' },
+              { title: level === 'critical' || level === 'warning' ? 'Tạo cảnh báo cho người thân' : 'Tiếp tục theo dõi', detail: level === 'critical' || level === 'warning' ? 'Thông tin được chuyển thành cảnh báo; phần tư vấn cần trao đổi với nhân viên y tế qua Telegram.' : 'Không tự đưa ra tư vấn hoặc chẩn đoán sức khỏe.' },
+            ];
+            return <section>
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold">AI Agent theo dõi tự động</h2><p className="text-sm text-slate-500">Agent nhận dữ liệu, xử lý theo quy tắc, lưu kết quả và tạo cảnh báo mà không cần người dùng chat với AI.</p></div><span className="px-3 py-1.5 rounded-full bg-violet-100 text-violet-800 text-xs font-semibold">{agentStatus?.agent_name || 'MYKA CARE AGENT · DEMO'}</span></div>
+              <div className="grid md:grid-cols-3 gap-3 mb-5">
+                <article className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-sm text-slate-500">Trạng thái dịch vụ</p><p className="text-lg font-bold mt-2 text-green-700">{agentStatus?.service_status || 'Đang theo dõi dữ liệu demo'}</p></article>
+                <article className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-sm text-slate-500">Kết quả xử lý gần nhất</p><p className="text-lg font-bold mt-2">{levelLabel}</p></article>
+                <article className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-sm text-slate-500">Nguồn dữ liệu</p><p className="text-lg font-bold mt-2">{agentStatus?.data_source || (apiAvailable ? 'API backend / thiết bị' : 'Dữ liệu mẫu trong ứng dụng')}</p></article>
               </div>
-            </div>
-          )}
-
-          {/* TAB 4: KÊNH TƯ VẤN Y TẾ QUA TELEGRAM (CHÍNH THỨC - KHÔNG CHAT RIÊNG TRONG APP) */}
-          {activeTab === 'telegram_consult' && (
-            <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-100">
-              <div className="max-w-2xl mx-auto text-center space-y-4">
-                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl mx-auto">
-                  💬
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800">{telegramConsult.group_name}</h2>
-                <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-xs text-left leading-relaxed">
-                  <span className="font-bold">⚠️ Quy định pháp lý & Y tế: </span>
-                  Ứng dụng chỉ phục vụ mục đích theo dõi, lưu trữ chỉ số sinh tồn và không cho phép nhắn tin tư vấn riêng lẻ giữa Bác sĩ và Người thân trong ứng dụng. 
-                  Mọi hoạt động tư vấn chuyên môn y khoa, hỏi đáp triệu chứng hoặc hướng dẫn phác đồ đều được chuyển tiếp qua Kênh Telegram chính thức có sự tham gia đồng thời của Bác sĩ chuyên khoa, Điều dưỡng và Người thân.
-                </div>
-
-                {/* Telegram Channel Info */}
-                <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 text-left space-y-3">
-                  <div className="font-bold text-sm text-slate-700">Các thành viên phụ trách kênh tư vấn:</div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {telegramConsult.members.map((m, idx) => (
-                      <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-2">
-                        <span className="text-2xl">{m.avatar}</span>
-                        <div>
-                          <div className="font-bold text-xs text-slate-800">{m.name}</div>
-                          <div className="text-[11px] text-slate-500">{m.role}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div>
-                      <div className="text-xs text-slate-500">Kênh bot Telegram: <span className="font-bold text-blue-600">{telegramConsult.bot_username}</span></div>
-                      <div className="text-xs text-slate-400 mt-0.5">Hỗ trợ nhận tin nhắn thoại và cảnh báo trực tiếp từ Robot Myka</div>
-                    </div>
-                    <a
-                      href={telegramConsult.telegram_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition shadow-md flex items-center gap-2"
-                    >
-                      🚀 Mở Nhóm Tư Vấn Telegram
-                    </a>
-                  </div>
-                </div>
-
-                {/* QR Code */}
-                <div className="pt-2">
-                  <div className="text-xs text-slate-500 mb-2">Quét mã QR bằng điện thoại để tham gia nhóm Telegram ngay:</div>
-                  <img
-                    src={telegramConsult.qr_code_url}
-                    alt="Telegram QR Code"
-                    className="w-40 h-40 mx-auto rounded-xl border border-slate-200 shadow-sm p-1 bg-white"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: CUỘC GỌI MYKA (TC-034 ~ TC-053) */}
-          {activeTab === 'calls' && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-100">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div>
-                    <h3 className="font-bold text-slate-800 text-base">📞 Lịch sử cuộc gọi đàm thoại qua Robot Myka</h3>
-                    <p className="text-slate-500 text-xs">Cuộc gọi thoại hai chiều giữa Ngoại (loa Robot) và Con gái (Chị Duyên).</p>
-                  </div>
-                  <button
-                    onClick={() => alert('Đang kết nối cuộc gọi thoại tới loa Robot Myka phòng P101 của Ngoại...')}
-                    className="px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700"
-                  >
-                    📞 Gọi về Robot của Ngoại
-                  </button>
-                </div>
-                <div className="divide-y divide-slate-100 mt-3">
-                  {calls.map(c => (
-                    <div key={c.id} className="py-3 flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{c.direction === 'outgoing' ? '↗️' : '↙️'}</span>
-                        <div>
-                          <div className="font-bold text-slate-800 text-xs">{c.caller} ➔ {c.receiver}</div>
-                          <div className="text-slate-500 text-xs">{c.note}</div>
-                          <div className="text-slate-400 text-[11px]">{RTS.formatDateTime(c.timestamp)} • Thời lượng: {c.duration}</div>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">Thành công</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 6: CẢNH BÁO & SOS */}
-          {activeTab === 'alerts' && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-100">
-                <h3 className="font-bold text-slate-800 text-base mb-3">⚠️ Danh sách sự kiện SOS và cảnh báo huyết áp</h3>
-                <div className="space-y-3">
-                  {alerts.map(a => (
-                    <div key={a.id} className="p-4 rounded-xl border border-red-200 bg-red-50 flex items-start gap-3">
-                      <span className="text-2xl flex-shrink-0">🚨</span>
-                      <div>
-                        <div className="font-bold text-red-800 text-sm">{a.title}</div>
-                        <div className="text-slate-600 text-xs mt-0.5">{a.detail}</div>
-                        <div className="text-slate-400 text-[11px] mt-1">{RTS.formatDateTime(a.timestamp)} • Đã chuyển tiếp điều dưỡng</div>
-                      </div>
-                    </div>
-                  ))}
-                  {alerts.length === 0 && (
-                    <div className="text-center text-slate-400 py-6 text-sm">Hiện không có cảnh báo nguy kịch nào.</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 7: TRỢ LÝ AI GIA ĐÌNH (CHATBOX AI CHO NGƯỜI THÂN - CÓ MIỄN TRỪ PHÁP LÝ) */}
-          {activeTab === 'ai_assistant' && (
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-100">
-              <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-purple-50 to-indigo-50">
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">💡</span>
-                  <div>
-                    <h2 className="font-bold text-slate-800 text-base">Trợ lý AI Hỗ trợ Chăm sóc Gia đình</h2>
-                    <p className="text-slate-500 text-xs">Giải đáp thông tin sinh hoạt, tóm tắt lịch sử đo và hướng dẫn kết nối Robot.</p>
-                  </div>
-                </div>
-                <div className="mt-3 bg-red-50 border border-red-200 text-red-800 text-xs p-2.5 rounded-xl leading-relaxed">
-                  <span className="font-bold">⚠️ Ranh giới pháp lý: </span>
-                  AI Trợ lý KHÔNG có thẩm quyền chẩn đoán bệnh hay tư vấn dùng thuốc. Mọi câu hỏi y tế sẽ được từ chối và hướng dẫn sang nhóm Bác sĩ trên Telegram.
-                </div>
-              </div>
-
-              {/* Chat messages */}
-              <div className="p-5 space-y-3 max-h-96 overflow-y-auto scrollbar-thin bg-slate-50">
-                {aiChatHistory.map((m, idx) => (
-                  <div key={idx} className={`flex gap-2 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    {m.sender === 'ai' && <span className="text-2xl mt-1">💡</span>}
-                    <div className={`max-w-md p-3.5 rounded-2xl text-xs leading-relaxed ${
-                      m.sender === 'user' ? 'bg-purple-600 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-sm'
-                    }`}>
-                      <div className="whitespace-pre-line">{m.text}</div>
-                      {m.telegramLink && (
-                        <div className="mt-2 pt-2 border-t border-slate-100">
-                          <a href={m.telegramLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
-                            <span>💬 Mở Kênh Telegram Bác sĩ Tuấn</span> →
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {aiLoading && (
-                  <div className="text-xs text-slate-400 italic">Trợ lý AI đang tra cứu...</div>
-                )}
-              </div>
-
-              {/* Query form */}
-              <form onSubmit={handleAskAI} className="p-3 border-t border-slate-100 bg-white flex gap-2">
-                <input
-                  type="text"
-                  value={aiQuery}
-                  onChange={(e) => setAiQuery(e.target.value)}
-                  placeholder="Hỏi AI: 'Tóm tắt sức khỏe hôm nay', 'Lịch sử chat Telegram', v.v."
-                  className="flex-1 text-xs px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <button
-                  type="submit"
-                  disabled={aiLoading}
-                  className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
-                >
-                  Gửi hỏi
-                </button>
-              </form>
-            </div>
-          )}
-
-        </div>
-
-        {/* Modal Pair Bluetooth */}
-        {showPairModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-              <h3 className="font-bold text-slate-800 text-base mb-2">Ghép đôi thiết bị Bluetooth mới</h3>
-              <p className="text-slate-500 text-xs mb-4">Nhập tên thiết bị đo y tế BLE hoặc cảm biến để Robot Myka quét và kết nối.</p>
-              <form onSubmit={handlePairBluetooth} className="space-y-3">
-                <input
-                  type="text"
-                  value={newDeviceName}
-                  onChange={(e) => setNewDeviceName(e.target.value)}
-                  placeholder="Ví dụ: Máy đo Huyết Áp Omron-BLE #9901"
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <div className="flex gap-2 pt-2">
-                  <button type="submit" className="flex-1 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700">
-                    Ghép đôi (Pair)
-                  </button>
-                  <button type="button" onClick={() => setShowPairModal(false)} className="px-3 py-2 border border-slate-200 text-slate-600 text-xs rounded-xl hover:bg-slate-50">
-                    Huỷ
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
+              <div className="bg-white border border-slate-200 rounded-xl p-4"><h3 className="font-semibold mb-4">Luồng xử lý tự động</h3><ol className="space-y-3">{activities.map((item, index) => <li key={index} className="flex gap-3"><span className="w-8 h-8 shrink-0 rounded-full bg-violet-100 text-violet-800 font-bold grid place-items-center">{index + 1}</span><div><p className="font-semibold">{item.title}</p><p className="text-sm text-slate-600 mt-0.5">{item.detail}</p></div></li>)}</ol></div>
+              <p className="text-xs text-slate-500 mt-3">Bản demo minh họa Agent xử lý theo quy tắc/ngưỡng cấu hình; không chẩn đoán, không tư vấn y tế và không thay thế nhân viên y tế. Khi cần trao đổi, người thân mở kênh Telegram đã cấu hình.</p>
+            </section>;
+          })()}
+          <footer className="text-xs text-slate-400 mt-8">Myka Care Companion là phân hệ đọc và theo dõi dành cho người thân. Trao đổi tư vấn diễn ra trên Telegram, không có chat bác sĩ–người thân trong ứng dụng.</footer>
+        </main>
       </div>
     );
   }
-
   window.FamilyDashboard = FamilyDashboard;
 })();
