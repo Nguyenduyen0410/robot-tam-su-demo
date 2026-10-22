@@ -1,17 +1,32 @@
-# Đưa Myka Care Companion lên điện thoại
+# Deploy Myka Care Companion lên Cloudflare
 
-## Deploy frontend bằng Cloudflare Pages
+## Thành phần demo
 
-Frontend là ứng dụng tĩnh HTML/CSS/JavaScript. Trong Cloudflare Pages, nối tài khoản GitHub rồi chọn repository `robot-tam-su-demo`; đặt production branch là `main`, để trống **Build command**, đặt **Build output directory** là `/` (thư mục gốc). Sau khi deploy, Cloudflare cấp URL HTTPS `*.pages.dev`; mở URL trên điện thoại và chọn **Thêm vào màn hình chính**.
+- Frontend tĩnh được phục vụ bởi Cloudflare Pages.
+- API nằm trong `functions/api/[[path]].js` và chạy bằng Pages Functions.
+- Dữ liệu demo lưu trong Cloudflare D1, binding có tên `MYKA_DB`.
+- `migrations/0001_myka_demo.sql` tạo schema và dữ liệu tổng hợp giả cho hồ sơ `E001`.
+- Push lên nhánh `main` sẽ kích hoạt Pages Git integration tự build và deploy.
 
-Git integration tự tạo deployment khi có push; branch khác có URL preview. Tài liệu: https://developers.cloudflare.com/pages/get-started/git-integration/.
+## Cấu hình D1
 
-## Giới hạn bản public hiện tại
+Trong Cloudflare Pages → Settings → Functions → Bindings, tạo binding loại **D1 database**, tên biến `MYKA_DB`, chọn database `myka-care-db` cho môi trường Production. Với database mới, chạy migration bằng D1 Console:
 
-- Tài khoản demo: `nguoithan@demo.com` / `123456`.
-- Giao diện dùng dữ liệu mẫu khi không có API. Agent demo hiện xử lý theo quy tắc/ngưỡng, không tư vấn hay chẩn đoán.
-- Inbox mô phỏng đã được bỏ. Tư vấn chỉ mở nhóm Telegram chung đã cấu hình.
-- Màn hình Wi-Fi/Bluetooth hiện chỉ mô phỏng thao tác qua API; chưa kết nối phần cứng thật.
-- Backend hiện ở thư mục riêng `robot-myka-backend`, dùng SQLite và chưa có xác thực server-side. Cloudflare Pages chỉ deploy frontend; không đặt mật khẩu Wi-Fi hoặc dữ liệu người bệnh thật trong bản public.
+```sh
+wrangler d1 execute myka-care-db --remote --file=migrations/0001_myka_demo.sql
+```
 
-Muốn Agent, dữ liệu lưu bền vững và API thiết bị chạy từ điện thoại, cần deploy FastAPI riêng, chuyển SQLite sang PostgreSQL, cấu hình CORS và xác thực/ủy quyền API trước khi đưa backend lên Internet. Chỉ đặt URL API công khai trong `api-config.js`; database URL và service key không được đưa vào frontend.
+Sau khi thêm binding, cần có một deployment mới để Function nhận binding.
+
+## Phạm vi Agent
+
+Agent demo chạy theo luồng nhận phép đo → áp dụng ngưỡng cấu hình → lưu vào D1 → tạo cảnh báo khi vượt ngưỡng → cung cấp trạng thái cho người thân. Đây là xử lý theo quy tắc, không phải mô hình chẩn đoán hoặc tư vấn. App không có hội thoại sức khỏe hay chat riêng bác sĩ–người thân; trao đổi tư vấn dùng nhóm Telegram chung đã được cấu hình.
+
+Các thao tác Wi-Fi/Bluetooth và ghi phép đo hiện chỉ mô phỏng dữ liệu qua API; chưa kết nối thiết bị thật. Trang Telegram sẽ chỉ mở nhóm khi có URL nhóm được cấu hình.
+
+## Dùng thử và giới hạn
+
+- Tài khoản giao diện demo: `nguoithan@demo.com` / `123456`.
+- Dữ liệu trong migration là dữ liệu tổng hợp giả, không phải hồ sơ bệnh nhân.
+- Demo hiện chưa có xác thực/ủy quyền server-side; đăng nhập giao diện không bảo vệ API. Chỉ dùng dữ liệu giả, không đưa thông tin sức khỏe, danh tính, mật khẩu Wi-Fi hoặc thiết bị thật lên bản public.
+- Trước khi triển khai thật cần bổ sung xác thực server-side, phân quyền theo hồ sơ, bảo vệ API thiết bị và quy trình bảo mật dữ liệu.
