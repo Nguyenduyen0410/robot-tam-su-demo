@@ -124,6 +124,35 @@
       { key: 'Tâm trương', color: '#0ea5e9' },
       { key: 'Nhịp tim', color: '#f59e0b' },
     ];
+    const dailyTrend = new Map();
+    visibleReadings.forEach(row => {
+      const day = new Date(row.timestamp).toISOString().slice(0, 10);
+      const systolic = Number(row.systolic), diastolic = Number(row.diastolic);
+      const level = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
+      const priority = { normal: 0, warning: 1, critical: 2 };
+      const current = dailyTrend.get(day);
+      if (!current || priority[level] > priority[current]) dailyTrend.set(day, level);
+    });
+    const orderedDays = [...dailyTrend.entries()].sort(([a], [b]) => a.localeCompare(b));
+    let warningStreak = 0, maxWarningStreak = 0;
+    let previousDay = null;
+    orderedDays.forEach(([day, level]) => {
+      const consecutive = previousDay && (Date.parse(`${day}T00:00:00Z`) - Date.parse(`${previousDay}T00:00:00Z`)) === 86400000;
+      warningStreak = level === 'normal' ? 0 : (consecutive ? warningStreak : 0) + 1;
+      maxWarningStreak = Math.max(maxWarningStreak, warningStreak);
+      previousDay = day;
+    });
+    const criticalDays = orderedDays.filter(([, level]) => level === 'critical').length;
+    const warningDays = orderedDays.filter(([, level]) => level !== 'normal').length;
+    const trendSummary = !orderedDays.length
+      ? { tone: 'slate', title: 'Chưa có đủ số đo', detail: 'Khi có dữ liệu, ứng dụng sẽ tổng hợp các lần đo đã ghi nhận trong khoảng thời gian này.' }
+      : criticalDays
+        ? { tone: 'rose', title: 'Có bản ghi vượt ngưỡng cảnh báo cấu hình', detail: `Ghi nhận ${criticalDays} ngày có ít nhất một lần đo ở mức cảnh báo cao. Gia đình hãy xem lại bản ghi và trao đổi với nhân viên y tế.` }
+        : maxWarningStreak >= 3
+          ? { tone: 'amber', title: `Có chỉ số vượt ngưỡng theo dõi ${maxWarningStreak} ngày liên tiếp`, detail: 'Gia đình nên xem lại các lần đo trong chuỗi này và trao đổi với nhân viên y tế qua kênh chăm sóc.' }
+          : warningDays
+            ? { tone: 'amber', title: `Ghi nhận ${warningDays} ngày có chỉ số vượt ngưỡng theo dõi`, detail: 'Hiện chưa ghi nhận chuỗi vượt ngưỡng từ 3 ngày liên tiếp. Gia đình có thể xem lại từng lần đo trong lịch sử.' }
+            : { tone: 'emerald', title: 'Chưa ghi nhận lần đo vượt ngưỡng cấu hình', detail: 'Các số đo đã lưu trong khoảng thời gian này đều nằm trong ngưỡng theo dõi demo.' };
 
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800">
@@ -160,7 +189,8 @@
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
               {[["Lần đo gần nhất", latest ? `${latest.systolic}/${latest.diastolic}` : '—', 'mmHg'], ['Tâm thu trung bình', avg('systolic'), 'mmHg'], ['Tâm trương trung bình', avg('diastolic'), 'mmHg'], ['Nhịp tim trung bình', avgHeartRate, 'lần/phút']].map(([label, value, unit]) => <div key={label} className="bg-white rounded-xl border border-slate-200 p-4"><p className="text-sm text-slate-500">{label}</p><p className="text-2xl font-bold mt-2">{value} <span className="text-sm font-normal text-slate-500">{unit}</span></p></div>)}
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5"><h3 className="font-semibold mb-3">Xu hướng chỉ số</h3>{chartData.length ? <><svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label="Biểu đồ xu hướng huyết áp và nhịp tim 7 ngày" className="w-full h-64"><title>Xu hướng huyết áp và nhịp tim</title>{[0, 1, 2, 3].map(index => { const value = chartMin + (chartMax - chartMin) * index / 3; const y = chartY(value); return <g key={index}><line x1={chartLeft} x2={chartWidth - chartRight} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="4 4" /><text x={chartLeft - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#64748b">{Math.round(value)}</text></g>; })}{chartLines.map(line => <g key={line.key}><polyline fill="none" stroke={line.color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" points={chartData.map((point, index) => `${chartX(index)},${chartY(Number(point[line.key]))}`).join(' ')} />{chartData.map((point, index) => <circle key={`${line.key}-${index}`} cx={chartX(index)} cy={chartY(Number(point[line.key]))} r="3.5" fill={line.color}><title>{`${point.time}: ${line.key} ${point[line.key]}`}</title></circle>)}</g>)}{chartData.map((point, index) => <text key={`date-${index}`} x={chartX(index)} y={chartHeight - 10} textAnchor="middle" fontSize="10" fill="#64748b">{point.time}</text>)}</svg><div className="flex flex-wrap gap-4 justify-center text-xs text-slate-600">{chartLines.map(line => <span key={line.key} className="inline-flex items-center gap-1.5"><i className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: line.color }} />{line.key}</span>)}</div></> : <p className="text-sm text-slate-500 py-8 text-center">Chưa có dữ liệu để hiển thị biểu đồ.</p>}</div>
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5"><h3 className="font-semibold mb-3">Xu hướng chỉ số</h3>{chartData.length ? <><svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label={`Biểu đồ xu hướng huyết áp và nhịp tim ${days} ngày`} className="w-full h-64"><title>{`Xu hướng huyết áp và nhịp tim ${days} ngày`}</title>{[0, 1, 2, 3].map(index => { const value = chartMin + (chartMax - chartMin) * index / 3; const y = chartY(value); return <g key={index}><line x1={chartLeft} x2={chartWidth - chartRight} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="4 4" /><text x={chartLeft - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#64748b">{Math.round(value)}</text></g>; })}{chartLines.map(line => <g key={line.key}><polyline fill="none" stroke={line.color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" points={chartData.map((point, index) => `${chartX(index)},${chartY(Number(point[line.key]))}`).join(' ')} />{chartData.map((point, index) => <circle key={`${line.key}-${index}`} cx={chartX(index)} cy={chartY(Number(point[line.key]))} r="3.5" fill={line.color}><title>{`${point.time}: ${line.key} ${point[line.key]}`}</title></circle>)}</g>)}{chartData.map((point, index) => <text key={`date-${index}`} x={chartX(index)} y={chartHeight - 10} textAnchor="middle" fontSize="10" fill="#64748b">{point.time}</text>)}</svg><div className="flex flex-wrap gap-4 justify-center text-xs text-slate-600">{chartLines.map(line => <span key={line.key} className="inline-flex items-center gap-1.5"><i className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: line.color }} />{line.key}</span>)}</div></> : <p className="text-sm text-slate-500 py-8 text-center">Chưa có dữ liệu để hiển thị biểu đồ.</p>}</div>
+            <article className={`rounded-xl border p-4 mb-5 ${trendSummary.tone === 'rose' ? 'bg-rose-50 border-rose-200' : trendSummary.tone === 'amber' ? 'bg-amber-50 border-amber-200' : trendSummary.tone === 'emerald' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}><h3 className="font-semibold">Tóm tắt xu hướng {days} ngày</h3><p className="font-semibold mt-2">{trendSummary.title}</p><p className="text-sm text-slate-700 mt-1">{trendSummary.detail}</p><p className="text-xs text-slate-500 mt-3">Tóm tắt tự động theo ngưỡng demo đã cấu hình; không phải kết luận sức khỏe hay tư vấn y tế.</p></article>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden"><h3 className="font-semibold p-4">Lịch sử đo</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Thời gian</th><th className="text-left p-3">Huyết áp</th><th className="text-left p-3">Nhịp tim</th><th className="text-left p-3">Ghi chú</th></tr></thead><tbody>{visibleReadings.slice().reverse().map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{dateLabel(row.timestamp)}</td><td className="p-3 font-semibold">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 text-slate-500">{row.note || '—'}</td></tr>)}</tbody></table>{!visibleReadings.length && <p className="p-6 text-center text-slate-500">Chưa có bản ghi trong khoảng thời gian này.</p>}</div></div>
           </section>}
 
