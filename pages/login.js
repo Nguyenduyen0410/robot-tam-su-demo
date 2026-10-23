@@ -3,7 +3,8 @@
 // ============================================================
 (function () {
   const DEMO_ACCOUNTS = [
-    { role: 'family',   roleLabel: 'Người thân (App Theo dõi)', email: 'nguoithan@demo.com',    password: '123456', icon: '👩', color: 'bg-purple-50 border-purple-200 text-purple-700' },
+    { role: 'family', roleLabel: 'Đã cài đặt robot', email: 'nguoithan@demo.com', password: '123456', icon: '👩', setupMode: false },
+    { role: 'family', roleLabel: 'Cài đặt từ đầu', email: 'caidat@demo.com', password: '123456', icon: '🤖', setupMode: true },
   ];
 
   function LoginPage({ onLogin, onNavigate }) {
@@ -25,7 +26,10 @@
       setLoading(true);
       setTimeout(() => {
         const users = RTS.getUsers();
-        const user = users.find(u => u.role === 'family' && u.email === email.trim() && u.password === password);
+        const account = DEMO_ACCOUNTS.find(item => item.email === email.trim() && item.password === password);
+        const user = account?.setupMode
+          ? { id: 'U-DEMO-SETUP', role: 'family', email: account.email, name: 'Tài khoản cài đặt Myka', elderId: 'E001', demoSetupMode: true }
+          : users.find(u => u.role === 'family' && u.email === email.trim() && u.password === password);
         if (user) {
           onLogin(user);
         } else {
@@ -111,12 +115,12 @@
           <div className="flex-1 w-full">
             <div className="bg-white bg-opacity-10 backdrop-blur rounded-2xl p-6 border border-white border-opacity-20">
               <h3 className="text-white font-bold text-lg mb-1">🎯 Tài khoản Demo</h3>
-              <p className="text-blue-200 text-sm mb-5">Myka Care Companion chỉ dành cho người thân. Nhấn tài khoản demo bên dưới để điền thông tin.</p>
+              <p className="text-blue-200 text-sm mb-5">Chọn tài khoản đã có robot hoặc tài khoản demo mới để trải nghiệm thiết lập lần đầu. Mật khẩu: 123456.</p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {DEMO_ACCOUNTS.map(acc => (
                   <button
-                    key={acc.role}
+                    key={acc.email}
                     onClick={() => fillDemo(acc)}
                     className={`flex items-center gap-3 p-4 rounded-xl border-2 bg-white hover:shadow-md transition-all text-left ${
                       email === acc.email ? 'ring-2 ring-white shadow-lg scale-105' : ''

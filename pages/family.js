@@ -12,6 +12,8 @@
       { id: 'MNT-DEMO-01', title: 'Kiểm tra máy đo huyết áp', detail: 'Đến hạn kiểm tra định kỳ thiết bị đo huyết áp.', status: 'pending', due_at: '2026-10-30' },
     ]);
     const [connectivity, setConnectivity] = React.useState(null);
+    const setupCompleteKey = `myka_setup_complete_${user?.id || 'family'}`;
+    const [setupMode, setSetupMode] = React.useState(() => Boolean(user?.demoSetupMode && !RTS.LS.get(setupCompleteKey)));
     const [wifiForm, setWifiForm] = React.useState({ ssid: '', password: '' });
     const [newDeviceName, setNewDeviceName] = React.useState('');
     const [deviceMessage, setDeviceMessage] = React.useState('');
@@ -215,7 +217,11 @@
 
     const devicePaired = Boolean(connectivity?.paired_devices?.length);
     if (connectivity === null) return <div className="min-h-screen grid place-items-center bg-slate-50"><p className="text-slate-600">Đang kiểm tra trạng thái thiết bị Myka…</p></div>;
-    if (!devicePaired) return <DeviceSetupScreen apiUrl={apiUrl} onPaired={refreshConnectivity} />;
+    if (setupMode || !devicePaired) return <DeviceSetupScreen apiUrl={apiUrl} onPaired={() => {
+      if (setupMode) RTS.LS.set(setupCompleteKey, true);
+      setSetupMode(false);
+      refreshConnectivity();
+    }} />;
 
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800">

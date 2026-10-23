@@ -44,7 +44,8 @@ CTA thanh toán mở màn hình checkout minh họa có trạng thái đang tả
 
 ## Dùng thử và giới hạn
 
-- Tài khoản giao diện demo: `nguoithan@demo.com` / `123456`.
+- Tài khoản demo đã ghép thiết bị: `nguoithan@demo.com` / `123456`.
+- Tài khoản demo trải nghiệm thiết lập lần đầu: `caidat@demo.com` / `123456` (trạng thái mô phỏng ở giao diện; không phải tài khoản xác thực server-side).
 - Dữ liệu trong migration là dữ liệu tổng hợp giả, không phải hồ sơ bệnh nhân.
 - Demo hiện chưa có xác thực/ủy quyền server-side; đăng nhập giao diện không bảo vệ API. Chỉ dùng dữ liệu giả, không đưa thông tin sức khỏe, danh tính, mật khẩu Wi-Fi hoặc thiết bị thật lên bản public.
 - Trước khi triển khai thật cần bổ sung xác thực server-side, phân quyền theo hồ sơ, bảo vệ API thiết bị và quy trình bảo mật dữ liệu.
