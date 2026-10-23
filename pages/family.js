@@ -249,7 +249,7 @@
             <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full border-[28px] border-white/10" aria-hidden="true" />
             <div className="relative">
               <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:gap-5 sm:text-left">
-                <img src="assets/avatar-elder.svg" alt="Ảnh minh họa hồ sơ người cao tuổi" className="h-28 w-28 shrink-0 rounded-full border-4 border-white/90 object-cover shadow-lg sm:h-24 sm:w-24" />
+                <img src="assets/avatar-elder.png" alt="Ảnh đại diện minh họa Ngoại" className="h-28 w-28 shrink-0 rounded-full border-4 border-white/90 object-cover shadow-lg sm:h-24 sm:w-24" />
                 <div className="mt-4 sm:mt-0"><p className="text-xs font-bold tracking-[.16em] text-blue-50">HỒ SƠ CHĂM SÓC · {elder?.id || elderId}</p><h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">{elder?.name || 'Bà Nguyễn Thị Hoa'}</h1><p className="mt-1 text-sm text-blue-50">{elder?.age || careProfile?.age || 72} tuổi <span aria-hidden="true">·</span> {elder?.room || 'Gia đình Myka'}</p></div>
               </div>
               <p className="mx-auto mt-4 max-w-2xl text-center text-sm text-blue-50 sm:mx-0 sm:text-left">Không gian để gia đình xem lại số đo, lịch chăm sóc và thông tin của người thân.</p>
