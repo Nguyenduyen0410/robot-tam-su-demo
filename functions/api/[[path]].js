@@ -85,14 +85,24 @@ async function ensureConversationLogs(db, elderId) {
       const localDate = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const at = time => new Date(`${localDate}T${time}:00+07:00`).toISOString();
       const samples = [
-        ['CHAT-DEMO-01', 'elder', 'Myka ơi, hôm nay con thấy hơi mệt. Con ghi lời nhắn để Duyên gọi hỏi thăm mẹ nhé.', at('08:20'), 'family_followup'],
-        ['CHAT-DEMO-02', 'myka', 'Dạ, Myka đã ghi nhận lời nhắn để người thân xem lại trong ứng dụng.', at('08:21'), 'none'],
-        ['CHAT-DEMO-03', 'elder', 'Chiều nay thời tiết thế nào Myka?', at('15:10'), 'none'],
-        ['CHAT-DEMO-04', 'myka', 'Dạ, đây là một cuộc trò chuyện minh họa trong bản demo Myka.', at('15:11'), 'none'],
+        ['CHAT-DEMO-01', 'elder', 'Myka ơi, Ngoại muốn trò chuyện với con.', at('08:20'), 'none'],
+        ['CHAT-DEMO-02', 'myka', 'Dạ, con nghe đây Ngoại ơi. Hôm nay Ngoại thấy trong người thế nào ạ?', at('08:21'), 'none'],
+        ['CHAT-DEMO-03', 'elder', 'Hôm nay Ngoại thấy hơi mệt, con ghi lời nhắn để Duyên gọi hỏi thăm Ngoại nhé.', at('15:10'), 'family_followup'],
+        ['CHAT-DEMO-04', 'myka', 'Dạ, con đã ghi nhận lời nhắn để gia đình xem lại trong ứng dụng ạ.', at('15:11'), 'none'],
       ];
       await db.batch(samples.map(([id, speaker, message, timestamp, flag]) => db.prepare(`INSERT OR IGNORE INTO conversation_logs (id, elder_id, speaker, message_text, timestamp, source, review_flag)
         VALUES (?, ?, ?, ?, ?, 'demo', ?)`).bind(id, elderId, speaker, message, timestamp, flag)));
     }
+    // Keep existing demo rows aligned with the selected Ngoại–con address after deployment.
+    const demoTranscript = [
+      ['CHAT-DEMO-01', 'Myka ơi, Ngoại muốn trò chuyện với con.', 'none'],
+      ['CHAT-DEMO-02', 'Dạ, con nghe đây Ngoại ơi. Hôm nay Ngoại thấy trong người thế nào ạ?', 'none'],
+      ['CHAT-DEMO-03', 'Hôm nay Ngoại thấy hơi mệt, con ghi lời nhắn để Duyên gọi hỏi thăm Ngoại nhé.', 'family_followup'],
+      ['CHAT-DEMO-04', 'Dạ, con đã ghi nhận lời nhắn để gia đình xem lại trong ứng dụng ạ.', 'none'],
+    ];
+    await db.batch(demoTranscript.map(([id, message, flag]) => db.prepare(`UPDATE conversation_logs
+      SET message_text = ?, review_flag = ? WHERE id = ? AND elder_id = ? AND source = 'demo'`)
+      .bind(message, flag, id, elderId)));
   }
 }
 
