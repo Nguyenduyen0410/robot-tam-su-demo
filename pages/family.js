@@ -27,6 +27,7 @@
     const [agentStatus, setAgentStatus] = React.useState(null);
     const [telegramLinks, setTelegramLinks] = React.useState({ group_chat_url: '' });
     const [apiAvailable, setApiAvailable] = React.useState(false);
+    const [healthDataSource, setHealthDataSource] = React.useState('app_demo');
     const [preferences, setPreferences] = React.useState({ dnd_mode: 'off', dnd_until: null, voice_profile: 'female_young_sweet', robot_name: '' });
     const [settingsSaving, setSettingsSaving] = React.useState(false);
     const [settingsMessage, setSettingsMessage] = React.useState('');
@@ -45,6 +46,7 @@
       ]).then(([health, plan, notices, payments]) => {
         if (!active) return;
         setReadings((health.daily_readings || []).slice().reverse());
+        setHealthDataSource(health.data_source || 'app_demo');
         setSchedules(plan);
         setMaintenance(notices);
         setSubscription(payments);
@@ -234,7 +236,7 @@
           <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-700 via-violet-600 to-sky-600 text-white p-6 md:p-8 mb-6 shadow-lg shadow-violet-200/60">
             <div className="absolute -right-12 -top-16 w-64 h-64 rounded-full bg-white/10" aria-hidden="true" />
             <div className="relative flex items-center justify-between gap-5">
-              <div className="max-w-xl"><p className="text-sm font-semibold tracking-wider text-violet-100">MYKA CARE COMPANION</p><h1 className="text-2xl md:text-3xl font-bold mt-2">Chăm sóc Ngoại mỗi ngày</h1><p className="text-violet-100 mt-2">Xin chào {familyUserName}. Cùng theo dõi sức khỏe và những điều cần quan tâm của {elder?.name || 'Bà Hoa'}.</p><span className={`inline-flex mt-4 text-xs font-semibold px-3 py-1.5 rounded-full ${apiAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-white/20 text-white'}`}>{apiAvailable ? '● Dữ liệu demo từ backend' : '● Bản demo'}</span></div>
+              <div className="max-w-xl"><p className="text-sm font-semibold tracking-wider text-violet-100">MYKA CARE COMPANION</p><h1 className="text-2xl md:text-3xl font-bold mt-2">Chăm sóc Ngoại mỗi ngày</h1><p className="text-violet-100 mt-2">Xin chào {familyUserName}. Cùng theo dõi sức khỏe và những điều cần quan tâm của {elder?.name || 'Bà Hoa'}.</p><span className={`inline-flex mt-4 text-xs font-semibold px-3 py-1.5 rounded-full ${apiAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-white/20 text-white'}`}>{healthDataSource === 'third_party_guide_demo' ? '● Dữ liệu mẫu theo API guide' : apiAvailable ? '● Dữ liệu demo từ backend' : '● Bản demo'}</span></div>
               <svg className="hidden sm:block w-36 md:w-48 h-36 md:h-44 shrink-0" viewBox="0 0 200 180" role="img" aria-label="Minh họa Myka đồng hành cùng người cao tuổi">
                 <circle cx="102" cy="91" r="77" fill="white" fillOpacity=".14"/><path d="M48 133c7-24 23-36 48-36s41 12 48 36" fill="#FDE68A"/><circle cx="96" cy="70" r="31" fill="#F5C9A5"/><path d="M65 68c2-25 17-39 36-39 18 0 31 13 32 34-13-2-24-11-29-20-7 13-20 22-39 25Z" fill="#64748B"/><path d="M67 63c-5 20 1 39 11 48" fill="none" stroke="#64748B" strokeWidth="8" strokeLinecap="round"/><path d="M132 60h33a12 12 0 0 1 12 12v23a12 12 0 0 1-12 12h-7l-10 11v-11h-16a12 12 0 0 1-12-12V72a12 12 0 0 1 12-12Z" fill="#fff"/><circle cx="139" cy="84" r="3" fill="#7C3AED"/><circle cx="151" cy="84" r="3" fill="#7C3AED"/><path d="M139 94c4 5 9 5 13 0" fill="none" stroke="#7C3AED" strokeWidth="2.5" strokeLinecap="round"/><path d="M42 46c0-7 9-10 13-3 4-7 13-4 13 3 0 6-13 15-13 15S42 52 42 46Z" fill="#FCA5A5"/>
               </svg>
@@ -258,7 +260,7 @@
           </nav>
 
           {tab === 'health' && <section>
-            <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 className="text-xl font-bold">Huyết áp và nhịp tim</h2><p className="text-sm text-slate-500">Thông tin theo dõi, không thay thế tư vấn y tế.</p></div><select value={days} onChange={e => setDays(Number(e.target.value))} className="bg-white border border-slate-300 rounded-lg px-3 py-2"><option value={7}>7 ngày gần đây</option><option value={30}>30 ngày gần đây</option></select></div>
+            <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 className="text-xl font-bold">Huyết áp và nhịp tim</h2><p className="text-sm text-slate-500">{healthDataSource === 'third_party_guide_demo' ? 'Dữ liệu ví dụ chuyển đổi từ 3rd_party_api_guide.md · chưa phải kết nối máy đo thật.' : 'Thông tin theo dõi, không thay thế tư vấn y tế.'}</p></div><select value={days} onChange={e => setDays(Number(e.target.value))} className="bg-white border border-slate-300 rounded-lg px-3 py-2"><option value={7}>7 ngày gần đây</option><option value={30}>30 ngày gần đây</option></select></div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
               {[["Lần đo gần nhất", latest ? `${latest.systolic}/${latest.diastolic}` : '—', 'mmHg'], ['Tâm thu trung bình', avg('systolic'), 'mmHg'], ['Tâm trương trung bình', avg('diastolic'), 'mmHg'], ['Nhịp tim trung bình', avgHeartRate, 'lần/phút']].map(([label, value, unit]) => <div key={label} className="bg-white rounded-xl border border-slate-200 p-4"><p className="text-sm text-slate-500">{label}</p><p className="text-2xl font-bold mt-2">{value} <span className="text-sm font-normal text-slate-500">{unit}</span></p></div>)}
             </div>
@@ -311,7 +313,7 @@
             </section>;
           })()}
           {tab === 'conversations' && <section>
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-5"><div><p className="text-sm text-violet-700 font-semibold">THEO DÕI GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Nhật ký trò chuyện với Myka</h2><p className="text-sm text-slate-500 mt-1">Hồ sơ Bà Hoa · Cách xưng hô trong hội thoại: Ngoại – con. Nhật ký chỉ đọc.</p></div><span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${conversationData.source === 'telegram' ? 'bg-sky-100 text-sky-800' : conversationData.source === 'demo' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>{conversationData.source === 'telegram' ? 'Nguồn Telegram' : conversationData.source === 'demo' ? 'Dữ liệu minh họa' : 'Chưa có bản ghi'}</span></div>
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-5"><div><p className="text-sm text-violet-700 font-semibold">THEO DÕI GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Nhật ký trò chuyện với Myka</h2><p className="text-sm text-slate-500 mt-1">Hồ sơ Bà Hoa · Cách xưng hô trong hội thoại: Ngoại – con. Nhật ký chỉ đọc.</p></div><span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${conversationData.source === 'telegram' ? 'bg-sky-100 text-sky-800' : ['demo', 'guide_demo'].includes(conversationData.source) ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>{conversationData.source === 'telegram' ? 'Nguồn Telegram' : conversationData.source === 'guide_demo' ? 'Ví dụ theo API guide' : conversationData.source === 'demo' ? 'Dữ liệu minh họa' : 'Chưa có bản ghi'}</span></div>
             <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-3"><div><label htmlFor="conversation-date" className="block text-sm font-semibold">Chọn ngày</label><p className="text-xs text-slate-500 mt-1">Mặc định là hôm nay</p></div><input id="conversation-date" type="date" value={conversationDate} onChange={event => setConversationDate(event.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
             {conversationData.review_needed_count > 0 && <article className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4"><p className="font-semibold text-amber-900">Có {conversationData.review_needed_count} lời nhắn được đánh dấu để gia đình xem lại</p><p className="text-sm text-amber-800 mt-1">Trong dữ liệu demo, đây là lời nhắn người thân cần xem lại. Nhãn này không phải đánh giá hay chẩn đoán sức khỏe.</p></article>}
             <div className="bg-white border border-slate-200 rounded-xl p-4 md:p-5"><div className="flex items-center justify-between gap-3 mb-4"><h3 className="font-semibold">Nội dung trong ngày</h3><span className="text-xs text-slate-500">{conversationData.messages?.length || 0} tin nhắn</span></div>
@@ -320,7 +322,7 @@
                   : conversationData.messages?.length ? <ConversationHistory messages={conversationData.messages} loading={false} robotName={preferences.robot_name} />
                     : <p className="py-10 text-center text-sm text-slate-500">{conversationLoading ? 'Đang tải…' : 'Ngày này chưa có bản ghi trò chuyện.'}</p>}
             </div>
-            <p className="text-xs text-slate-500 mt-3">Hiện chỉ có hội thoại tổng hợp để minh họa giao diện. Link Telegram Web không cung cấp quyền lấy lịch sử; để xem hội thoại thật, robot hoặc bot cần gửi bản ghi mới vào backend sau khi thiết lập quyền truy cập và chia sẻ phù hợp.</p>
+            <p className="text-xs text-slate-500 mt-3">Nội dung hiện là ví dụ trong 3rd_party_api_guide.md để minh họa cách hiển thị. Nhật ký thật chỉ được kết nối sau khi API có HTTPS, token chỉ đọc và ứng dụng có xác thực/phân quyền người thân.</p>
           </section>}
           {tab === 'settings' && <section>
             <div className="mb-5"><p className="text-sm text-violet-700 font-semibold">TÙY CHỈNH CHO GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Cài đặt Myka</h2><p className="text-sm text-slate-500 mt-1">Lựa chọn được lưu theo hồ sơ người thân.</p></div>

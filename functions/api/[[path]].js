@@ -1,3 +1,5 @@
+import { getReadOnlyBpm, getReadOnlyChat } from '../lib/third-party-myka.js';
+
 const corsHeaders = (request) => {
   const origin = request.headers.get('Origin') || '';
   const allowed = new Set([
@@ -179,15 +181,15 @@ export async function onRequest({ request, env, params }) {
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'health-summary' && elderId) {
-      await ensureBackendDemoData(db, elderId);
+      if (elderId !== 'E001') return json(request, { error: 'Bản mẫu API guide hiện chỉ được gán cho hồ sơ E001 (Bà Hoa).' }, 404);
       const days = Math.min(30, Math.max(7, Number(new URL(request.url).searchParams.get('days') || 7)));
-      const { results } = await db.prepare(`SELECT * FROM blood_pressure WHERE elder_id = ? AND timestamp >= datetime('now', ?) ORDER BY timestamp DESC`).bind(elderId, `-${days} days`).all();
-      if (!results.length) return json(request, { elder_id: elderId, summary: null, daily_readings: [] });
+      const { rows: results, source } = await getReadOnlyBpm(env, days);
+      if (!results.length) return json(request, { elder_id: elderId, summary: null, daily_readings: [], data_source: source, demo: source !== 'third_party_api' });
       const latest = results[0];
       const avg = (key) => Math.round(results.reduce((sum, row) => sum + Number(row[key] || 0), 0) / results.length * 10) / 10;
       const status = Number(latest.systolic) >= 140 || Number(latest.diastolic) >= 90 ? 'critical' : Number(latest.systolic) >= 130 || Number(latest.diastolic) >= 85 ? 'warning' : 'normal';
       return json(request, {
-        elder_id: elderId, period_days: days, elder_name: 'Người thân demo',
+        elder_id: elderId, period_days: days, elder_name: 'Bà Nguyễn Thị Hoa', data_source: source, demo: source !== 'third_party_api',
         latest_reading: latest,
         statistics: { total_measurements: results.length, avg_systolic: avg('systolic'), avg_diastolic: avg('diastolic'), avg_heart_rate: avg('heart_rate'), overall_status: status, overall_label: status === 'normal' ? 'Trong ngưỡng theo dõi' : status === 'warning' ? 'Cần người chăm sóc lưu ý' : 'Đã phát hiện chỉ số vượt ngưỡng' },
         daily_readings: results,
@@ -232,15 +234,14 @@ export async function onRequest({ request, env, params }) {
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'conversation-history' && elderId) {
-      await ensureConversationLogs(db, elderId);
+      if (elderId !== 'E001') return json(request, { error: 'Bản mẫu API guide hiện chỉ được gán cho hồ sơ E001 (Bà Hoa).' }, 404);
       const requestedDate = new URL(request.url).searchParams.get('date') || new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) return json(request, { error: 'Ngày không hợp lệ.' }, 422);
-      const { results } = await db.prepare(`SELECT id, elder_id, speaker, message_text, timestamp, source, review_flag
-        FROM conversation_logs WHERE elder_id = ? AND substr(timestamp, 1, 10) = ? ORDER BY timestamp ASC`).bind(elderId, requestedDate).all();
+      const { messages, source } = await getReadOnlyChat(env, requestedDate);
       return json(request, {
-        elder_id: elderId, date: requestedDate, source: results.some(row => row.source === 'telegram') ? 'telegram' : results.length ? 'demo' : 'none',
-        review_needed_count: results.filter(row => row.review_flag === 'family_followup').length,
-        messages: results,
+        elder_id: elderId, date: requestedDate,
+        source: messages.length ? 'guide_demo' : 'none',
+        demo: source !== 'third_party_api', review_needed_count: 0, messages,
       });
     }
 
