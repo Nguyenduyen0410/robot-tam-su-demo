@@ -24,6 +24,7 @@ const json = (request, data, status = 200) => new Response(JSON.stringify(data),
 const nowIso = () => new Date().toISOString();
 const newId = (prefix) => `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 let familyPreferencesSchemaReady = false;
+let elderProfilesSchemaReady = false;
 let conversationLogsSchemaReady = false;
 
 async function ensureBackendDemoData(db, elderId) {
@@ -126,6 +127,24 @@ async function ensureFamilyPreferences(db, elderId) {
     VALUES (?, 'off', NULL, 'female_young_sweet', '', ?)`).bind(elderId, nowIso()).run();
 }
 
+async function ensureElderProfiles(db, elderId) {
+  if (!elderProfilesSchemaReady) {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS elder_profiles (
+      elder_id TEXT PRIMARY KEY,
+      age INTEGER,
+      address TEXT NOT NULL DEFAULT '',
+      health_notes TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    )`).run();
+    elderProfilesSchemaReady = true;
+  }
+  if (elderId === 'E001') {
+    await db.prepare(`INSERT OR IGNORE INTO elder_profiles (elder_id, age, address, health_notes, updated_at)
+      VALUES ('E001', 72, '12 Đường Hoa Mai, Phường Hòa Xuân, Đà Nẵng (địa chỉ giả)',
+      'Tăng huyết áp (tình trạng minh họa)', ?)`).bind(nowIso()).run();
+  }
+}
+
 async function ensureConversationLogs(db, elderId) {
   if (!conversationLogsSchemaReady) {
     await db.prepare(`CREATE TABLE IF NOT EXISTS conversation_logs (
@@ -194,6 +213,13 @@ export async function onRequest({ request, env, params }) {
         statistics: { total_measurements: results.length, avg_systolic: avg('systolic'), avg_diastolic: avg('diastolic'), avg_heart_rate: avg('heart_rate'), overall_status: status, overall_label: status === 'normal' ? 'Trong ngưỡng theo dõi' : status === 'warning' ? 'Cần người chăm sóc lưu ý' : 'Đã phát hiện chỉ số vượt ngưỡng' },
         daily_readings: results,
       });
+    }
+
+    if (request.method === 'GET' && area === 'family' && section === 'elder-profile' && elderId) {
+      await ensureElderProfiles(db, elderId);
+      const profile = await db.prepare('SELECT elder_id, age, address, health_notes, updated_at FROM elder_profiles WHERE elder_id = ?').bind(elderId).first();
+      if (!profile) return json(request, { elder_id: elderId, age: null, address: '', health_notes: '' });
+      return json(request, profile);
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'settings' && elderId) {

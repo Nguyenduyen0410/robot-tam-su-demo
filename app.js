@@ -50,6 +50,7 @@
 
     function login(user) {
       if (!user || user.role !== 'family') return;
+      RTS.LS.set(`myka_ever_logged_in_${user.id}`, true);
       setCurrentUser(user);
       RTS.LS.set('rts_current_user', user);
       navigate('family');
