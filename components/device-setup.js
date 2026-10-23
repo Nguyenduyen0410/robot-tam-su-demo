@@ -62,7 +62,7 @@
       if (!serial.trim()) { setMessage('Nhập mã số máy hoặc quét QR trước.'); setStep(1); return; }
       setBusy(true); setMessage('');
       try {
-        const response = await fetch(`${apiUrl}/device/bluetooth/pair/E001`, {
+        const response = await fetch(apiUrl('/device/bluetooth/pair/E001'), {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ device_name: deviceName.trim() || 'Máy đo Myka', device_type: 'sphygmomanometer', serial_number: serial.trim() }),
         });
@@ -75,7 +75,7 @@
     const saveWifi = async () => {
       setBusy(true); setMessage('');
       try {
-        const response = await fetch(`${apiUrl}/device/wifi/E001`, {
+        const response = await fetch(apiUrl('/device/wifi/E001'), {
           method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ssid: selectedNetwork, password }),
         });
         if (!response.ok) throw new Error('Không lưu được mạng Wi-Fi.');
