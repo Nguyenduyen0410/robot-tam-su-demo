@@ -115,7 +115,7 @@
           <div className="flex-1 w-full">
             <div className="bg-white bg-opacity-10 backdrop-blur rounded-2xl p-6 border border-white border-opacity-20">
               <h3 className="text-white font-bold text-lg mb-1">🎯 Tài khoản Demo</h3>
-              <p className="text-blue-200 text-sm mb-5">Chọn tài khoản đã có robot hoặc tài khoản demo mới để trải nghiệm thiết lập lần đầu. Mật khẩu: 123456.</p>
+              <p className="text-blue-200 text-sm mb-5">Chọn tài khoản đã có robot hoặc tài khoản demo mới để trải nghiệm thiết lập lần đầu.</p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {DEMO_ACCOUNTS.map(acc => (
