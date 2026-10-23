@@ -17,8 +17,11 @@ Agent được trình bày như một tiến trình tự động theo luồng **
 - Xem trạng thái Agent và cảnh báo do backend ghi nhận.
 - Mở nhóm Telegram chung để trao đổi với đội chăm sóc.
 - Đọc/cập nhật/xóa cấu hình Wi-Fi demo; đọc/ghép/gỡ thiết bị Bluetooth demo qua API.
+- Lưu tùy chọn Không làm phiền theo thời hạn, kiểu giọng dự kiến và tên robot hiển thị tùy chọn.
 
 Các thao tác Wi-Fi/Bluetooth hiện chỉ cập nhật dữ liệu qua API giả lập. Chúng chưa dò mạng Wi-Fi, quét Bluetooth hay điều khiển robot thật. Cần tích hợp firmware hoặc gateway phần cứng để thực hiện kết nối thiết bị thật. Người dùng app chỉ được thao tác cấu hình thiết bị ở mức demo; các màn hình sức khỏe khác chủ yếu read-only.
+
+Không làm phiền hiện chỉ lưu lựa chọn và thời hạn; app chưa có push notification nên chưa thể thực sự tắt rung/âm thanh của thông báo. Kiểu giọng và tên robot cũng mới là tùy chọn hồ sơ, chưa đồng bộ tới robot.
 
 ## API hiện có
 
@@ -26,6 +29,7 @@ Các thao tác Wi-Fi/Bluetooth hiện chỉ cập nhật dữ liệu qua API gi�
 - Telegram: `GET /api/family/telegram-consultation/{elder_id}` chỉ trả link nhóm dùng bởi app.
 - Kết nối demo: `GET /api/device/connectivity/{elder_id}`, `PUT` và `DELETE /api/device/wifi/{elder_id}`, `POST /api/device/bluetooth/pair/{elder_id}`, `DELETE /api/device/bluetooth/{elder_id}/{device_id}`.
 - Thiết bị ghi phép đo: `POST /api/device/bp-record/{elder_id}`.
+- Cài đặt hồ sơ: `GET/PUT /api/family/settings/{elder_id}`.
 
 ## Lưu ý trước khi public
 

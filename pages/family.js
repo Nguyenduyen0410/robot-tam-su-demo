@@ -20,6 +20,9 @@
     const [agentStatus, setAgentStatus] = React.useState(null);
     const [telegramLinks, setTelegramLinks] = React.useState({ group_chat_url: '' });
     const [apiAvailable, setApiAvailable] = React.useState(false);
+    const [preferences, setPreferences] = React.useState({ dnd_mode: 'off', dnd_until: null, voice_profile: 'female_young_sweet', robot_name: '' });
+    const [settingsSaving, setSettingsSaving] = React.useState(false);
+    const [settingsMessage, setSettingsMessage] = React.useState('');
 
     React.useEffect(() => {
       let active = true;
@@ -53,6 +56,10 @@
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => { if (active) setConnectivity(data); })
         .catch(() => { if (active) setConnectivity(null); });
+      fetch(apiUrl(`/family/settings/${elderId}`))
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => { if (active) setPreferences(data); })
+        .catch(() => { if (active) setSettingsMessage('Chưa tải được cài đặt từ máy chủ.'); });
       return () => { active = false; };
     }, [days]);
 
@@ -99,6 +106,23 @@
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(() => { setDeviceMessage('Đã gỡ thiết bị khỏi dữ liệu demo.'); return refreshConnectivity(); })
       .catch(() => setDeviceMessage('Không kết nối được API backend.'));
+    const savePreferences = event => {
+      event.preventDefault();
+      setSettingsSaving(true);
+      setSettingsMessage('');
+      fetch(apiUrl(`/family/settings/${elderId}`), {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(preferences),
+      }).then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => { setPreferences(data); setSettingsMessage('Đã lưu cài đặt vào hồ sơ gia đình.'); })
+        .catch(() => setSettingsMessage('Chưa lưu được cài đặt. Vui lòng thử lại khi kết nối máy chủ ổn định.'))
+        .finally(() => setSettingsSaving(false));
+    };
+    const voiceOptions = [
+      { id: 'male_young_warm', label: 'Nam thành niên', detail: 'Ấm áp' },
+      { id: 'male_middle_steady', label: 'Nam trung niên', detail: 'Vững chãi' },
+      { id: 'female_young_sweet', label: 'Nữ thành niên', detail: 'Ngọt ngào' },
+      { id: 'female_middle_calm', label: 'Nữ trung niên', detail: 'Trầm ổn' },
+    ];
     const tabs = [
       { id: 'health', label: 'Sức khỏe' },
       { id: 'schedule', label: 'Lịch chăm sóc' },
@@ -106,6 +130,7 @@
       { id: 'connectivity', label: 'Kết nối thiết bị' },
       { id: 'service', label: 'Gói dịch vụ & thanh toán' },
       { id: 'agent', label: 'AI Agent' },
+      { id: 'settings', label: 'Cài đặt' },
     ];
     const chartData = visibleReadings.map(row => ({
       time: new Date(row.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
@@ -229,6 +254,28 @@
               <p className="text-xs text-slate-500 mt-3">Bản demo minh họa Agent xử lý theo quy tắc/ngưỡng cấu hình; không chẩn đoán, không tư vấn y tế và không thay thế nhân viên y tế. Khi cần trao đổi, người thân mở kênh Telegram đã cấu hình.</p>
             </section>;
           })()}
+          {tab === 'settings' && <section>
+            <div className="mb-5"><p className="text-sm text-violet-700 font-semibold">TÙY CHỈNH CHO GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Cài đặt Myka</h2><p className="text-sm text-slate-500 mt-1">Lựa chọn được lưu theo hồ sơ người thân.</p></div>
+            <form onSubmit={savePreferences} className="space-y-5">
+              <article className="bg-white border border-slate-200 rounded-xl p-4 md:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">Chế độ Không làm phiền</h3><p className="text-sm text-slate-500 mt-1">Chọn khoảng thời gian tạm tắt thông báo trên ứng dụng.</p></div><span className={`text-xs font-semibold rounded-full px-3 py-1.5 ${preferences.dnd_mode === 'off' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{preferences.dnd_mode === 'off' ? 'Thông báo đang bật' : 'Không làm phiền đã chọn'}</span></div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">{[
+                  { id: 'off', label: 'Bật thông báo lại', detail: 'Tắt Không làm phiền' },
+                  { id: '2h', label: 'Tắt trong 2 giờ', detail: 'Tự bật lại sau 2 giờ' },
+                  { id: '5h', label: 'Tắt trong 5 giờ', detail: 'Tự bật lại sau 5 giờ' },
+                  { id: 'until_off', label: 'Đến khi tôi bật lại', detail: 'Không tự bật lại' },
+                ].map(option => <label key={option.id} className={`cursor-pointer rounded-xl border p-3 transition ${preferences.dnd_mode === option.id ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-300' : 'border-slate-200 hover:border-violet-300'}`}><span className="flex items-start gap-2"><input type="radio" name="dnd_mode" value={option.id} checked={preferences.dnd_mode === option.id} onChange={() => { setPreferences({ ...preferences, dnd_mode: option.id }); setSettingsMessage(''); }} className="mt-1 accent-violet-600" /><span><span className="block text-sm font-semibold">{option.label}</span><span className="block text-xs text-slate-500 mt-1">{option.detail}</span></span></span></label>)}</div>
+                {['2h', '5h'].includes(preferences.dnd_mode) && preferences.dnd_until && <p className="text-sm text-amber-800 mt-3">Tự bật lại lúc {new Date(preferences.dnd_until).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}.</p>}
+                <p className="text-xs text-slate-500 mt-4">Hiện app chưa gửi thông báo đẩy; lựa chọn này được lưu để dùng khi tích hợp thông báo. Khi đó, chế độ này sẽ tắt âm thanh và rung theo cấu hình ứng dụng.</p>
+              </article>
+
+              <article className="bg-white border border-slate-200 rounded-xl p-4 md:p-5"><h3 className="font-semibold">Tùy chỉnh giọng nói</h3><p className="text-sm text-slate-500 mt-1">Chọn phong cách giọng mà người cao tuổi cảm thấy dễ nghe.</p><div className="grid sm:grid-cols-2 gap-3 mt-4">{voiceOptions.map(voice => <label key={voice.id} className={`cursor-pointer rounded-xl border p-4 transition ${preferences.voice_profile === voice.id ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-300' : 'border-slate-200 hover:border-violet-300'}`}><span className="flex items-center gap-3"><input type="radio" name="voice_profile" value={voice.id} checked={preferences.voice_profile === voice.id} onChange={() => { setPreferences({ ...preferences, voice_profile: voice.id }); setSettingsMessage(''); }} className="accent-violet-600" /><span><span className="block font-semibold">{voice.label}</span><span className="block text-sm text-slate-500">Giọng {voice.detail.toLowerCase()}</span></span></span></label>)}</div><p className="text-xs text-slate-500 mt-4">Cài đặt giọng sẽ được lưu trong hồ sơ; hiện chưa đổi giọng phát ra từ robot vì chưa kết nối phần cứng.</p></article>
+
+              <article className="bg-white border border-slate-200 rounded-xl p-4 md:p-5"><h3 className="font-semibold">Đổi tên robot</h3><p className="text-sm text-slate-500 mt-1">Không bắt buộc. Để trống nếu muốn tiếp tục dùng tên Myka.</p><label className="block text-sm font-medium mt-4" htmlFor="robot-name">Tên robot hiển thị</label><input id="robot-name" maxLength="40" value={preferences.robot_name || ''} onChange={event => { setPreferences({ ...preferences, robot_name: event.target.value }); setSettingsMessage(''); }} placeholder="Myka" className="mt-1 w-full sm:max-w-md border border-slate-300 rounded-lg px-3 py-2 text-sm" /><p className="text-xs text-slate-500 mt-2">Tên hiện tại: {preferences.robot_name?.trim() || 'Myka'}. Tên này chưa được đồng bộ tới phần cứng.</p></article>
+
+              <div className="flex flex-wrap items-center gap-3"><button type="submit" disabled={!apiAvailable || settingsSaving} className="px-5 py-2.5 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50">{settingsSaving ? 'Đang lưu…' : 'Lưu cài đặt'}</button>{settingsMessage && <p role="status" className="text-sm text-violet-700">{settingsMessage}</p>}</div>
+            </form>
+          </section>}
           <footer className="text-xs text-slate-400 mt-8">Myka Care Companion là phân hệ đọc và theo dõi dành cho người thân. Trao đổi tư vấn diễn ra trên Telegram, không có chat bác sĩ–người thân trong ứng dụng.</footer>
         </main>
       </div>

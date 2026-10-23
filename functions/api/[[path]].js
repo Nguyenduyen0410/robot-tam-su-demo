@@ -21,6 +21,7 @@ const json = (request, data, status = 200) => new Response(JSON.stringify(data),
 
 const nowIso = () => new Date().toISOString();
 const newId = (prefix) => `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+let familyPreferencesSchemaReady = false;
 
 async function latestFor(db, elderId) {
   return db.prepare('SELECT * FROM blood_pressure WHERE elder_id = ? ORDER BY timestamp DESC LIMIT 1').bind(elderId).first();
@@ -46,6 +47,22 @@ async function agentStatus(db, elderId) {
       { title: 'Ghi nhận cảnh báo', detail: alert ? `Có cảnh báo gần nhất: ${alert.title} (${alert.status}).` : 'Không có cảnh báo đã ghi nhận gần đây.' },
     ],
   };
+}
+
+async function ensureFamilyPreferences(db, elderId) {
+  if (!familyPreferencesSchemaReady) {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS family_preferences (
+      elder_id TEXT PRIMARY KEY,
+      dnd_mode TEXT NOT NULL DEFAULT 'off',
+      dnd_until TEXT,
+      voice_profile TEXT NOT NULL DEFAULT 'female_young_sweet',
+      robot_name TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    )`).run();
+    familyPreferencesSchemaReady = true;
+  }
+  await db.prepare(`INSERT OR IGNORE INTO family_preferences (elder_id, dnd_mode, dnd_until, voice_profile, robot_name, updated_at)
+    VALUES (?, 'off', NULL, 'female_young_sweet', '', ?)`).bind(elderId, nowIso()).run();
 }
 
 export async function onRequest({ request, env, params }) {
@@ -77,6 +94,40 @@ export async function onRequest({ request, env, params }) {
         statistics: { total_measurements: results.length, avg_systolic: avg('systolic'), avg_diastolic: avg('diastolic'), avg_heart_rate: avg('heart_rate'), overall_status: status, overall_label: status === 'normal' ? 'Trong ngưỡng theo dõi' : status === 'warning' ? 'Cần người chăm sóc lưu ý' : 'Đã phát hiện chỉ số vượt ngưỡng' },
         daily_readings: results,
       });
+    }
+
+    if (request.method === 'GET' && area === 'family' && section === 'settings' && elderId) {
+      await ensureFamilyPreferences(db, elderId);
+      const settings = await db.prepare('SELECT dnd_mode, dnd_until, voice_profile, robot_name, updated_at FROM family_preferences WHERE elder_id = ?').bind(elderId).first();
+      if (!settings) return json(request, { error: 'Chưa có cài đặt cho hồ sơ này.' }, 404);
+      if (settings.dnd_until && Date.parse(settings.dnd_until) <= Date.now()) {
+        await db.prepare("UPDATE family_preferences SET dnd_mode = 'off', dnd_until = NULL, updated_at = ? WHERE elder_id = ?").bind(nowIso(), elderId).run();
+        settings.dnd_mode = 'off';
+        settings.dnd_until = null;
+        settings.updated_at = nowIso();
+      }
+      return json(request, { ...settings, dnd_enabled: settings.dnd_mode !== 'off' });
+    }
+
+    if (request.method === 'PUT' && area === 'family' && section === 'settings' && elderId) {
+      await ensureFamilyPreferences(db, elderId);
+      const body = await request.json();
+      const allowedModes = new Set(['off', '2h', '5h', 'until_off']);
+      const allowedVoices = new Set(['male_young_warm', 'male_middle_steady', 'female_young_sweet', 'female_middle_calm']);
+      const mode = String(body.dnd_mode || 'off');
+      const voice = String(body.voice_profile || 'female_young_sweet');
+      const robotName = String(body.robot_name || '').trim().slice(0, 40);
+      if (!allowedModes.has(mode)) return json(request, { error: 'Lựa chọn Không làm phiền không hợp lệ.' }, 422);
+      if (!allowedVoices.has(voice)) return json(request, { error: 'Lựa chọn giọng nói không hợp lệ.' }, 422);
+      const dndUntil = mode === '2h' ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+        : mode === '5h' ? new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString() : null;
+      const updatedAt = nowIso();
+      await db.prepare(`INSERT INTO family_preferences (elder_id, dnd_mode, dnd_until, voice_profile, robot_name, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(elder_id) DO UPDATE SET dnd_mode = excluded.dnd_mode, dnd_until = excluded.dnd_until,
+        voice_profile = excluded.voice_profile, robot_name = excluded.robot_name, updated_at = excluded.updated_at`)
+        .bind(elderId, mode, dndUntil, voice, robotName, updatedAt).run();
+      return json(request, { success: true, dnd_mode: mode, dnd_until: dndUntil, dnd_enabled: mode !== 'off', voice_profile: voice, robot_name: robotName, updated_at: updatedAt });
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'schedules' && elderId) {
