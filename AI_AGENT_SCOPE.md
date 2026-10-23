@@ -16,12 +16,15 @@ Agent được trình bày như một tiến trình tự động theo luồng **
 - Đọc lịch uống thuốc, lịch tái khám, nhắc bảo trì, gói dịch vụ và lịch sử thanh toán.
 - Xem trạng thái Agent và cảnh báo do backend ghi nhận.
 - Mở nhóm Telegram chung để trao đổi với đội chăm sóc.
+- Xem nhật ký trò chuyện Myka theo ngày ở chế độ chỉ đọc để người thân xem lại nội dung.
 - Đọc/cập nhật/xóa cấu hình Wi-Fi demo; đọc/ghép/gỡ thiết bị Bluetooth demo qua API.
 - Lưu tùy chọn Không làm phiền theo thời hạn, kiểu giọng dự kiến và tên robot hiển thị tùy chọn.
 
 Các thao tác Wi-Fi/Bluetooth hiện chỉ cập nhật dữ liệu qua API giả lập. Chúng chưa dò mạng Wi-Fi, quét Bluetooth hay điều khiển robot thật. Cần tích hợp firmware hoặc gateway phần cứng để thực hiện kết nối thiết bị thật. Người dùng app chỉ được thao tác cấu hình thiết bị ở mức demo; các màn hình sức khỏe khác chủ yếu read-only.
 
 Không làm phiền hiện chỉ lưu lựa chọn và thời hạn; app chưa có push notification nên chưa thể thực sự tắt rung/âm thanh của thông báo. Kiểu giọng và tên robot cũng mới là tùy chọn hồ sơ, chưa đồng bộ tới robot.
+
+Nhật ký trò chuyện hiện dùng dữ liệu tổng hợp minh họa. Chưa có bot/robot chuyển hội thoại Telegram hoặc phần cứng thật vào backend; URL Telegram Web không cấp quyền đọc lịch sử. Bản demo cũng chưa phân tích hội thoại tự động để phát hiện vấn đề sức khỏe.
 
 ## API hiện có
 
@@ -30,6 +33,7 @@ Không làm phiền hiện chỉ lưu lựa chọn và thời hạn; app chưa c
 - Kết nối demo: `GET /api/device/connectivity/{elder_id}`, `PUT` và `DELETE /api/device/wifi/{elder_id}`, `POST /api/device/bluetooth/pair/{elder_id}`, `DELETE /api/device/bluetooth/{elder_id}/{device_id}`.
 - Thiết bị ghi phép đo: `POST /api/device/bp-record/{elder_id}`.
 - Cài đặt hồ sơ: `GET/PUT /api/family/settings/{elder_id}`.
+- Nhật ký đọc theo ngày: `GET /api/family/conversation-history/{elder_id}?date=YYYY-MM-DD`.
 
 ## Lưu ý trước khi public
 

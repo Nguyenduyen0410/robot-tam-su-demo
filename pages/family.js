@@ -23,6 +23,10 @@
     const [preferences, setPreferences] = React.useState({ dnd_mode: 'off', dnd_until: null, voice_profile: 'female_young_sweet', robot_name: '' });
     const [settingsSaving, setSettingsSaving] = React.useState(false);
     const [settingsMessage, setSettingsMessage] = React.useState('');
+    const [conversationDate, setConversationDate] = React.useState(new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10));
+    const [conversationData, setConversationData] = React.useState({ messages: [], review_needed_count: 0, source: 'none' });
+    const [conversationLoading, setConversationLoading] = React.useState(false);
+    const [conversationError, setConversationError] = React.useState('');
 
     React.useEffect(() => {
       let active = true;
@@ -62,6 +66,18 @@
         .catch(() => { if (active) setSettingsMessage('Chưa tải được cài đặt từ máy chủ.'); });
       return () => { active = false; };
     }, [days]);
+
+    React.useEffect(() => {
+      let active = true;
+      setConversationLoading(true);
+      setConversationError('');
+      fetch(apiUrl(`/family/conversation-history/${elderId}?date=${encodeURIComponent(conversationDate)}`))
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => { if (active) setConversationData(data); })
+        .catch(() => { if (active) setConversationError('Chưa tải được nhật ký từ máy chủ.'); })
+        .finally(() => { if (active) setConversationLoading(false); });
+      return () => { active = false; };
+    }, [conversationDate]);
 
     const elder = RTS.getElders().find(e => e.id === elderId);
     const fallbackReadings = RTS.getBP(elderId) || [];
@@ -130,6 +146,7 @@
       { id: 'connectivity', label: 'Kết nối thiết bị' },
       { id: 'service', label: 'Gói dịch vụ & thanh toán' },
       { id: 'agent', label: 'AI Agent' },
+      { id: 'conversations', label: 'Nhật ký Myka' },
       { id: 'settings', label: 'Cài đặt' },
     ];
     const chartData = visibleReadings.map(row => ({
@@ -254,6 +271,18 @@
               <p className="text-xs text-slate-500 mt-3">Bản demo minh họa Agent xử lý theo quy tắc/ngưỡng cấu hình; không chẩn đoán, không tư vấn y tế và không thay thế nhân viên y tế. Khi cần trao đổi, người thân mở kênh Telegram đã cấu hình.</p>
             </section>;
           })()}
+          {tab === 'conversations' && <section>
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-5"><div><p className="text-sm text-violet-700 font-semibold">THEO DÕI GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Nhật ký trò chuyện với Myka</h2><p className="text-sm text-slate-500 mt-1">Xem lại nội dung người cao tuổi đã trao đổi trong ngày. Nhật ký chỉ đọc.</p></div><span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${conversationData.source === 'telegram' ? 'bg-sky-100 text-sky-800' : conversationData.source === 'demo' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>{conversationData.source === 'telegram' ? 'Nguồn Telegram' : conversationData.source === 'demo' ? 'Dữ liệu minh họa' : 'Chưa có bản ghi'}</span></div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-3"><div><label htmlFor="conversation-date" className="block text-sm font-semibold">Chọn ngày</label><p className="text-xs text-slate-500 mt-1">Mặc định là hôm nay</p></div><input id="conversation-date" type="date" value={conversationDate} onChange={event => setConversationDate(event.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
+            {conversationData.review_needed_count > 0 && <article className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4"><p className="font-semibold text-amber-900">Có {conversationData.review_needed_count} lời nhắn được đánh dấu để gia đình xem lại</p><p className="text-sm text-amber-800 mt-1">Trong dữ liệu demo, đây là lời nhắn người thân cần xem lại. Nhãn này không phải đánh giá hay chẩn đoán sức khỏe.</p></article>}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 md:p-5"><div className="flex items-center justify-between gap-3 mb-4"><h3 className="font-semibold">Nội dung trong ngày</h3><span className="text-xs text-slate-500">{conversationData.messages?.length || 0} tin nhắn</span></div>
+              {conversationLoading ? <p className="py-10 text-center text-sm text-slate-500">Đang tải nhật ký…</p>
+                : conversationError ? <p role="status" className="py-10 text-center text-sm text-rose-700">{conversationError}</p>
+                  : conversationData.messages?.length ? <ol className="space-y-4">{conversationData.messages.map(message => { const fromElder = message.speaker === 'elder'; return <li key={message.id} className={`flex ${fromElder ? 'justify-start' : 'justify-end'}`}><article className={`max-w-[90%] sm:max-w-[75%] rounded-2xl px-4 py-3 ${fromElder ? 'bg-violet-50 text-slate-800 rounded-tl-sm' : 'bg-slate-100 text-slate-800 rounded-tr-sm'}`}><div className="flex flex-wrap items-center gap-2 mb-1"><span className="text-xs font-bold">{fromElder ? 'Người cao tuổi' : preferences.robot_name?.trim() || 'Myka'}</span><time className="text-xs text-slate-500">{new Date(message.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</time>{message.review_flag === 'family_followup' && <span className="text-[11px] rounded-full bg-amber-100 text-amber-800 px-2 py-0.5">Gia đình xem lại · demo</span>}</div><p className="text-sm leading-relaxed whitespace-pre-wrap">{message.message_text}</p></article></li>; })}</ol>
+                    : <p className="py-10 text-center text-sm text-slate-500">{conversationLoading ? 'Đang tải…' : 'Ngày này chưa có bản ghi trò chuyện.'}</p>}
+            </div>
+            <p className="text-xs text-slate-500 mt-3">Hiện chỉ có hội thoại tổng hợp để minh họa giao diện. Link Telegram Web không cung cấp quyền lấy lịch sử; để xem hội thoại thật, robot hoặc bot cần gửi bản ghi mới vào backend sau khi thiết lập quyền truy cập và chia sẻ phù hợp.</p>
+          </section>}
           {tab === 'settings' && <section>
             <div className="mb-5"><p className="text-sm text-violet-700 font-semibold">TÙY CHỈNH CHO GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Cài đặt Myka</h2><p className="text-sm text-slate-500 mt-1">Lựa chọn được lưu theo hồ sơ người thân.</p></div>
             <form onSubmit={savePreferences} className="space-y-5">

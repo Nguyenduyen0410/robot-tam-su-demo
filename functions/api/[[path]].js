@@ -22,6 +22,7 @@ const json = (request, data, status = 200) => new Response(JSON.stringify(data),
 const nowIso = () => new Date().toISOString();
 const newId = (prefix) => `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 let familyPreferencesSchemaReady = false;
+let conversationLogsSchemaReady = false;
 
 async function latestFor(db, elderId) {
   return db.prepare('SELECT * FROM blood_pressure WHERE elder_id = ? ORDER BY timestamp DESC LIMIT 1').bind(elderId).first();
@@ -63,6 +64,36 @@ async function ensureFamilyPreferences(db, elderId) {
   }
   await db.prepare(`INSERT OR IGNORE INTO family_preferences (elder_id, dnd_mode, dnd_until, voice_profile, robot_name, updated_at)
     VALUES (?, 'off', NULL, 'female_young_sweet', '', ?)`).bind(elderId, nowIso()).run();
+}
+
+async function ensureConversationLogs(db, elderId) {
+  if (!conversationLogsSchemaReady) {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS conversation_logs (
+      id TEXT PRIMARY KEY,
+      elder_id TEXT NOT NULL,
+      speaker TEXT NOT NULL,
+      message_text TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'demo',
+      review_flag TEXT NOT NULL DEFAULT 'none'
+    )`).run();
+    conversationLogsSchemaReady = true;
+  }
+  if (elderId === 'E001') {
+    const count = await db.prepare('SELECT COUNT(*) AS total FROM conversation_logs WHERE elder_id = ?').bind(elderId).first();
+    if (!Number(count?.total || 0)) {
+      const localDate = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const at = time => new Date(`${localDate}T${time}:00+07:00`).toISOString();
+      const samples = [
+        ['CHAT-DEMO-01', 'elder', 'Myka ơi, hôm nay con thấy hơi mệt. Con ghi lời nhắn để Duyên gọi hỏi thăm mẹ nhé.', at('08:20'), 'family_followup'],
+        ['CHAT-DEMO-02', 'myka', 'Dạ, Myka đã ghi nhận lời nhắn để người thân xem lại trong ứng dụng.', at('08:21'), 'none'],
+        ['CHAT-DEMO-03', 'elder', 'Chiều nay thời tiết thế nào Myka?', at('15:10'), 'none'],
+        ['CHAT-DEMO-04', 'myka', 'Dạ, đây là một cuộc trò chuyện minh họa trong bản demo Myka.', at('15:11'), 'none'],
+      ];
+      await db.batch(samples.map(([id, speaker, message, timestamp, flag]) => db.prepare(`INSERT OR IGNORE INTO conversation_logs (id, elder_id, speaker, message_text, timestamp, source, review_flag)
+        VALUES (?, ?, ?, ?, ?, 'demo', ?)`).bind(id, elderId, speaker, message, timestamp, flag)));
+    }
+  }
 }
 
 export async function onRequest({ request, env, params }) {
@@ -128,6 +159,19 @@ export async function onRequest({ request, env, params }) {
         voice_profile = excluded.voice_profile, robot_name = excluded.robot_name, updated_at = excluded.updated_at`)
         .bind(elderId, mode, dndUntil, voice, robotName, updatedAt).run();
       return json(request, { success: true, dnd_mode: mode, dnd_until: dndUntil, dnd_enabled: mode !== 'off', voice_profile: voice, robot_name: robotName, updated_at: updatedAt });
+    }
+
+    if (request.method === 'GET' && area === 'family' && section === 'conversation-history' && elderId) {
+      await ensureConversationLogs(db, elderId);
+      const requestedDate = new URL(request.url).searchParams.get('date') || new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) return json(request, { error: 'Ngày không hợp lệ.' }, 422);
+      const { results } = await db.prepare(`SELECT id, elder_id, speaker, message_text, timestamp, source, review_flag
+        FROM conversation_logs WHERE elder_id = ? AND substr(timestamp, 1, 10) = ? ORDER BY timestamp ASC`).bind(elderId, requestedDate).all();
+      return json(request, {
+        elder_id: elderId, date: requestedDate, source: results.some(row => row.source === 'telegram') ? 'telegram' : results.length ? 'demo' : 'none',
+        review_needed_count: results.filter(row => row.review_flag === 'family_followup').length,
+        messages: results,
+      });
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'schedules' && elderId) {

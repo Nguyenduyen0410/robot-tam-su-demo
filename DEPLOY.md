@@ -5,7 +5,7 @@
 - Frontend tĩnh được phục vụ bởi Cloudflare Pages.
 - API nằm trong `functions/api/[[path]].js` và chạy bằng Pages Functions.
 - Dữ liệu demo lưu trong Cloudflare D1, binding có tên `MYKA_DB`.
-- `migrations/0001_myka_demo.sql` tạo schema và dữ liệu tổng hợp giả; `0002_family_preferences.sql` bổ sung cài đặt người thân.
+- `migrations/0001_myka_demo.sql` tạo schema và dữ liệu tổng hợp giả; `0002_family_preferences.sql` bổ sung cài đặt người thân; `0003_conversation_logs.sql` tạo nhật ký hội thoại.
 - Push lên nhánh `main` sẽ kích hoạt Pages Git integration tự build và deploy.
 
 ## Cấu hình D1
@@ -15,6 +15,7 @@ Trong Cloudflare Pages → Settings → Functions → Bindings, tạo binding lo
 ```sh
 wrangler d1 execute myka-care-db --remote --file=migrations/0001_myka_demo.sql
 wrangler d1 execute myka-care-db --remote --file=migrations/0002_family_preferences.sql
+wrangler d1 execute myka-care-db --remote --file=migrations/0003_conversation_logs.sql
 ```
 
 Sau khi thêm binding, cần có một deployment mới để Function nhận binding.
@@ -28,6 +29,8 @@ Các thao tác Wi-Fi/Bluetooth và ghi phép đo hiện chỉ mô phỏng dữ l
 ## Cài đặt người thân
 
 `GET/PUT /api/family/settings/{elder_id}` lưu lựa chọn Không làm phiền (2 giờ, 5 giờ hoặc đến khi bật lại), kiểu giọng và tên robot tùy chọn. Đây là cấu hình hồ sơ demo: app chưa có push notification để tắt rung/âm thanh thực tế; giọng và tên chỉ được áp dụng khi tích hợp phần cứng.
+
+`GET /api/family/conversation-history/{elder_id}?date=YYYY-MM-DD` trả nhật ký chỉ đọc. Bản demo tự tạo một số tin nhắn tổng hợp cho hồ sơ E001; chưa nhận lịch sử từ Telegram hoặc robot.
 
 ## Dùng thử và giới hạn
 
