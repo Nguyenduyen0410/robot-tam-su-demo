@@ -144,14 +144,14 @@
       { id: 'female_middle_calm', label: 'Nữ trung niên', detail: 'Trầm ổn' },
     ];
     const tabs = [
-      { id: 'health', label: 'Sức khỏe' },
-      { id: 'schedule', label: 'Lịch chăm sóc' },
-      { id: 'device', label: 'Bảo trì' },
-      { id: 'connectivity', label: 'Kết nối thiết bị' },
-      { id: 'service', label: 'Gói dịch vụ & thanh toán' },
-      { id: 'agent', label: 'AI Agent' },
-      { id: 'conversations', label: 'Nhật ký Myka' },
-      { id: 'settings', label: 'Cài đặt' },
+      { id: 'health', label: 'Sức khỏe', icon: '💓' },
+      { id: 'schedule', label: 'Lịch chăm sóc', icon: '📅' },
+      { id: 'device', label: 'Bảo trì', icon: '🛠️' },
+      { id: 'connectivity', label: 'Kết nối thiết bị', icon: '📶' },
+      { id: 'service', label: 'Gói & thanh toán', icon: '💳' },
+      { id: 'agent', label: 'AI Agent', icon: '✨' },
+      { id: 'conversations', label: 'Nhật ký Myka', icon: '💬' },
+      { id: 'settings', label: 'Cài đặt', icon: '⚙️' },
     ];
     const chartData = visibleReadings.map(row => ({
       time: new Date(row.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
@@ -232,8 +232,8 @@
               </div>
             </div>
           </section>
-          <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 mb-6">
-            {tabs.map(item => <button key={item.id} onClick={() => setTab(item.id)} className={`px-4 py-3 whitespace-nowrap border-b-2 text-sm font-semibold ${tab === item.id ? 'border-violet-600 text-violet-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>{item.label}</button>)}
+          <nav aria-label="Các chức năng Myka Care" className="grid grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 mb-6">
+            {tabs.map(item => <button key={item.id} type="button" onClick={() => setTab(item.id)} aria-label={item.label} aria-current={tab === item.id ? 'page' : undefined} className={`min-h-[78px] sm:min-h-[92px] rounded-2xl border p-2 sm:p-3 flex flex-col items-center justify-center gap-1.5 text-center transition-all ${tab === item.id ? 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-200 -translate-y-0.5' : 'bg-white border-slate-200 text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:-translate-y-0.5'}`}><span className="text-xl sm:text-2xl leading-none" aria-hidden="true">{item.icon}</span><span className="text-[10px] leading-tight sm:text-xs font-semibold">{item.label}</span></button>)}
           </nav>
 
           {tab === 'health' && <section>
