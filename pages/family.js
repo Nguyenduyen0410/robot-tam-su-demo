@@ -15,6 +15,8 @@
     const [wifiForm, setWifiForm] = React.useState({ ssid: '', password: '' });
     const [newDeviceName, setNewDeviceName] = React.useState('');
     const [deviceMessage, setDeviceMessage] = React.useState('');
+    const [showScheduleEditor, setShowScheduleEditor] = React.useState(false);
+    const [showPaymentCheckout, setShowPaymentCheckout] = React.useState(false);
     const localToday = new Date(Date.now() + 7 * 60 * 60 * 1000);
     const nextMonthStart = new Date(Date.UTC(localToday.getUTCFullYear(), localToday.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
     const currentMonthEnd = new Date(Date.UTC(localToday.getUTCFullYear(), localToday.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
@@ -62,7 +64,7 @@
       fetch(apiUrl(`/device/connectivity/${elderId}`))
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => { if (active) setConnectivity(data); })
-        .catch(() => { if (active) setConnectivity(null); });
+        .catch(() => { if (active) setConnectivity({ paired_devices: [] }); });
       fetch(apiUrl(`/family/settings/${elderId}`))
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => { if (active) setPreferences(data); })
@@ -121,6 +123,17 @@
       }).then(r => r.ok ? r.json() : Promise.reject())
         .then(() => { setNewDeviceName(''); setDeviceMessage('Đã ghép thiết bị trong dữ liệu demo.'); return refreshConnectivity(); })
         .catch(() => setDeviceMessage('Không kết nối được API backend.'));
+    };
+    const createSchedule = row => {
+      fetch(apiUrl(`/family/schedules/${elderId}`), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(row),
+      }).then(response => response.ok ? response.json() : Promise.reject())
+        .then(saved => { setSchedules(current => [...current, saved].sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)))); setShowScheduleEditor(false); })
+        .catch(() => {
+          setSchedules(current => [...current, row].sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at))));
+          setShowScheduleEditor(false);
+          window.alert('Đã thêm lịch trong phiên demo trên thiết bị này. Chưa lưu được lên máy chủ.');
+        });
     };
     const unpairDevice = deviceId => fetch(apiUrl(`/device/bluetooth/${elderId}/${encodeURIComponent(deviceId)}`), { method: 'DELETE' })
       .then(r => r.ok ? r.json() : Promise.reject())
@@ -200,6 +213,10 @@
             ? { tone: 'amber', title: `Ghi nhận ${warningDays} ngày có chỉ số vượt ngưỡng theo dõi`, detail: 'Hiện chưa ghi nhận chuỗi vượt ngưỡng từ 3 ngày liên tiếp. Gia đình có thể xem lại từng lần đo trong lịch sử.' }
             : { tone: 'emerald', title: 'Chưa ghi nhận lần đo vượt ngưỡng cấu hình', detail: 'Các số đo đã lưu trong khoảng thời gian này đều nằm trong ngưỡng theo dõi demo.' };
 
+    const devicePaired = Boolean(connectivity?.paired_devices?.length);
+    if (connectivity === null) return <div className="min-h-screen grid place-items-center bg-slate-50"><p className="text-slate-600">Đang kiểm tra trạng thái thiết bị Myka…</p></div>;
+    if (!devicePaired) return <DeviceSetupScreen apiUrl={apiUrl} onPaired={refreshConnectivity} />;
+
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800">
         <header className="bg-white border-b border-slate-200 px-5 py-4 flex items-center justify-between">
@@ -246,7 +263,7 @@
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden"><h3 className="font-semibold p-4">Lịch sử đo</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Thời gian</th><th className="text-left p-3">Huyết áp</th><th className="text-left p-3">Nhịp tim</th><th className="text-left p-3">Ghi chú</th></tr></thead><tbody>{visibleReadings.slice().reverse().map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{dateLabel(row.timestamp)}</td><td className="p-3 font-semibold">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 text-slate-500">{row.note || '—'}</td></tr>)}</tbody></table>{!visibleReadings.length && <p className="p-6 text-center text-slate-500">Chưa có bản ghi trong khoảng thời gian này.</p>}</div></div>
           </section>}
 
-          {tab === 'schedule' && <section><h2 className="text-xl font-bold mb-1">Lịch uống thuốc và tái khám</h2><p className="text-sm text-slate-500 mb-4">Lịch được lập cho người cao tuổi; ứng dụng gia đình hiển thị để theo dõi.</p><div className="space-y-3">{scheduleRows.map(row => <article key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 items-start"><span className="text-2xl">{row.type === 'checkup' ? '🏥' : '💊'}</span><div className="flex-1"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{row.title}</h3><span className="text-sm text-slate-500">{dateLabel(row.scheduled_at)}</span></div><p className="text-sm text-slate-600 mt-1">{row.detail}</p></div><span className={`text-xs px-2 py-1 rounded-full ${row.confirmed ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>{row.confirmed ? 'Đã xác nhận' : 'Theo lịch'}</span></article>)}{!scheduleRows.length && <p className="bg-white rounded-xl p-6 text-slate-500">Chưa có lịch chăm sóc.</p>}</div></section>}
+          {tab === 'schedule' && <section><div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold mb-1">Lịch uống thuốc và tái khám</h2><p className="text-sm text-slate-500">Lịch được lưu vào backend demo; thông báo đẩy chưa được bật.</p></div><button onClick={() => setShowScheduleEditor(true)} className="rounded-xl bg-violet-600 text-white px-4 py-2.5 font-bold shadow-md shadow-violet-200">＋ Thêm lịch</button></div><div className="space-y-3">{scheduleRows.map(row => <article key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 items-start"><span className="text-2xl">{row.type === 'checkup' ? '🏥' : '💊'}</span><div className="flex-1"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{row.title}</h3><span className="text-sm text-slate-500">{dateLabel(row.scheduled_at)}</span></div><p className="text-sm text-slate-600 mt-1">{row.detail || '—'}</p></div><span className={`text-xs px-2 py-1 rounded-full ${row.confirmed ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>{row.confirmed ? 'Đã xác nhận' : 'Theo lịch'}</span></article>)}{!scheduleRows.length && <p className="bg-white rounded-xl p-6 text-slate-500">Chưa có lịch chăm sóc.</p>}</div></section>}
 
           {tab === 'device' && <section><h2 className="text-xl font-bold mb-1">Thông báo bảo trì thiết bị</h2><p className="text-sm text-slate-500 mb-4">Các nhắc nhở vận hành thiết bị được gửi từ hệ thống.</p><div className="space-y-3">{maintenance.map(item => <article key={item.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4"><span className="text-2xl">🛠️</span><div className="flex-1"><h3 className="font-semibold">{item.title}</h3><p className="text-sm text-slate-600 mt-1">{item.detail}</p><p className="text-xs text-slate-500 mt-2">Hạn: {item.due_at || 'Chưa xác định'}</p></div><span className="text-xs px-2 py-1 h-fit rounded-full bg-amber-100 text-amber-800">{item.status === 'pending' ? 'Cần chú ý' : 'Đã xử lý'}</span></article>)}{!maintenance.length && <p className="bg-white rounded-xl p-6 text-slate-500">Hiện chưa có thông báo bảo trì.</p>}</div></section>}
           {tab === 'connectivity' && <section>
@@ -265,7 +282,7 @@
               <article className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 text-white p-5 shadow-md shadow-violet-200"><span className="absolute -right-5 -top-8 text-8xl opacity-15" aria-hidden="true">🤖</span><div className="relative"><p className="text-sm text-violet-100">MUA MỘT LẦN</p><h3 className="text-lg font-bold mt-1">Thiết bị Myka</h3><p className="text-3xl font-extrabold mt-3">{Number(pricing.device_price).toLocaleString('vi-VN')} <span className="text-base font-semibold">đ</span></p><p className="text-sm text-violet-100 mt-2">Thanh toán một lần ở kỳ đầu. Thiết bị thuộc sở hữu gia đình sau khi mua.</p></div></article>
               <article className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 to-cyan-600 text-white p-5 shadow-md shadow-sky-200"><span className="absolute -right-4 -top-7 text-8xl opacity-15" aria-hidden="true">🔄</span><div className="relative"><p className="text-sm text-sky-100">THUÊ BAO HÀNG THÁNG</p><h3 className="text-lg font-bold mt-1">Myka Care Companion</h3><p className="text-3xl font-extrabold mt-3">{Number(pricing.monthly_fee).toLocaleString('vi-VN')} <span className="text-base font-semibold">đ/tháng</span></p><p className="text-sm text-sky-100 mt-2">Gia hạn định kỳ vào ngày {pricing.renewal_day} mỗi tháng.</p></div></article>
             </div>
-            <article className="bg-white border border-slate-200 rounded-2xl p-5 mb-5 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm text-slate-500">Thanh toán lần đầu</p><p className="text-2xl font-extrabold text-slate-900 mt-1">{Number(pricing.first_payment_total).toLocaleString('vi-VN')} đ</p><p className="text-sm text-slate-500 mt-1">2.000.000đ thiết bị + 100.000đ thuê bao tháng đầu</p></div><div className="rounded-xl bg-violet-50 border border-violet-100 px-4 py-3"><p className="text-xs font-semibold text-violet-700">KỲ GIA HẠN TIẾP THEO</p><p className="font-bold text-violet-900 mt-1">{pricing.next_renewal_date}</p><p className="text-sm text-violet-700">100.000đ vào ngày 1</p></div></div><p className="text-xs text-slate-500 mt-4">Ứng dụng minh họa lịch gia hạn. Tự động thu tiền cần tích hợp cổng thanh toán và phương thức thanh toán của gia đình.</p></article>
+            <article className="bg-white border border-slate-200 rounded-2xl p-5 mb-5 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm text-slate-500">Thanh toán lần đầu</p><p className="text-2xl font-extrabold text-slate-900 mt-1">{Number(pricing.first_payment_total).toLocaleString('vi-VN')} đ</p><p className="text-sm text-slate-500 mt-1">2.000.000đ thiết bị + 100.000đ thuê bao tháng đầu</p></div><div className="rounded-xl bg-violet-50 border border-violet-100 px-4 py-3"><p className="text-xs font-semibold text-violet-700">KỲ GIA HẠN TIẾP THEO</p><p className="font-bold text-violet-900 mt-1">{pricing.next_renewal_date}</p><p className="text-sm text-violet-700">100.000đ vào ngày 1</p></div></div><p className="text-xs text-slate-500 mt-4">Ứng dụng minh họa lịch gia hạn. Tự động thu tiền cần tích hợp cổng thanh toán và phương thức thanh toán của gia đình.</p><button onClick={() => setShowPaymentCheckout(true)} className="w-full mt-5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white py-3.5 font-bold shadow-md shadow-violet-200">{paymentRows.some(row => row.status === 'pending') ? 'Thanh toán ngay' : 'Gia hạn gói'}</button></article>
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm"><div className="flex items-center justify-between gap-3 p-4 border-b border-slate-100"><div><h3 className="font-semibold">Lịch sử và trạng thái thanh toán</h3><p className="text-xs text-slate-500 mt-1">Trạng thái đỏ: cần thanh toán · xanh: đã thanh toán</p></div><span className="text-xl" aria-hidden="true">🧾</span></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Nội dung</th><th className="text-left p-3">Số tiền</th><th className="text-left p-3">Kỳ thanh toán</th><th className="text-left p-3">Trạng thái</th></tr></thead><tbody>{paymentRows.map(row => { const paid = row.status === 'paid'; const isInitial = Number(row.amount) === Number(pricing.first_payment_total); return <tr key={row.id} className="border-t border-slate-100"><td className="p-3 font-medium">{row.service_name}</td><td className="p-3 font-bold">{Number(row.amount).toLocaleString('vi-VN')} {row.currency || 'VND'}</td><td className="p-3">{isInitial ? 'Thanh toán lần đầu' : `Gia hạn ngày ${pricing.renewal_day}`}</td><td className="p-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${paid ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700'}`}>{paid ? '✓ Đã thanh toán' : '● Cần thanh toán'}</span></td></tr>; })}</tbody></table></div></div>
           </section>}
           {tab === 'agent' && (() => {
@@ -296,7 +313,7 @@
             <div className="bg-white border border-slate-200 rounded-xl p-4 md:p-5"><div className="flex items-center justify-between gap-3 mb-4"><h3 className="font-semibold">Nội dung trong ngày</h3><span className="text-xs text-slate-500">{conversationData.messages?.length || 0} tin nhắn</span></div>
               {conversationLoading ? <p className="py-10 text-center text-sm text-slate-500">Đang tải nhật ký…</p>
                 : conversationError ? <p role="status" className="py-10 text-center text-sm text-rose-700">{conversationError}</p>
-                  : conversationData.messages?.length ? <ol className="space-y-4">{conversationData.messages.map(message => { const fromElder = message.speaker === 'elder'; return <li key={message.id} className={`flex ${fromElder ? 'justify-start' : 'justify-end'}`}><article className={`max-w-[90%] sm:max-w-[75%] rounded-2xl px-4 py-3 ${fromElder ? 'bg-violet-50 text-slate-800 rounded-tl-sm' : 'bg-slate-100 text-slate-800 rounded-tr-sm'}`}><div className="flex flex-wrap items-center gap-2 mb-1"><span className="text-xs font-bold">{fromElder ? 'Ngoại · Bà Hoa' : preferences.robot_name?.trim() || 'Myka · con'}</span><time className="text-xs text-slate-500">{new Date(message.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</time>{message.review_flag === 'family_followup' && <span className="text-[11px] rounded-full bg-amber-100 text-amber-800 px-2 py-0.5">Gia đình xem lại · demo</span>}</div><p className="text-sm leading-relaxed whitespace-pre-wrap">{message.message_text}</p></article></li>; })}</ol>
+                  : conversationData.messages?.length ? <ConversationHistory messages={conversationData.messages} loading={false} robotName={preferences.robot_name} />
                     : <p className="py-10 text-center text-sm text-slate-500">{conversationLoading ? 'Đang tải…' : 'Ngày này chưa có bản ghi trò chuyện.'}</p>}
             </div>
             <p className="text-xs text-slate-500 mt-3">Hiện chỉ có hội thoại tổng hợp để minh họa giao diện. Link Telegram Web không cung cấp quyền lấy lịch sử; để xem hội thoại thật, robot hoặc bot cần gửi bản ghi mới vào backend sau khi thiết lập quyền truy cập và chia sẻ phù hợp.</p>
@@ -306,13 +323,8 @@
             <form onSubmit={savePreferences} className="space-y-5">
               <article className="bg-white border border-slate-200 rounded-xl p-4 md:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">Chế độ Không làm phiền</h3><p className="text-sm text-slate-500 mt-1">Chọn khoảng thời gian tạm tắt thông báo trên ứng dụng.</p></div><span className={`text-xs font-semibold rounded-full px-3 py-1.5 ${preferences.dnd_mode === 'off' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{preferences.dnd_mode === 'off' ? 'Thông báo đang bật' : 'Không làm phiền đã chọn'}</span></div>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">{[
-                  { id: 'off', label: 'Bật thông báo lại', detail: 'Tắt Không làm phiền' },
-                  { id: '2h', label: 'Tắt trong 2 giờ', detail: 'Tự bật lại sau 2 giờ' },
-                  { id: '5h', label: 'Tắt trong 5 giờ', detail: 'Tự bật lại sau 5 giờ' },
-                  { id: 'until_off', label: 'Đến khi tôi bật lại', detail: 'Không tự bật lại' },
-                ].map(option => <label key={option.id} className={`cursor-pointer rounded-xl border p-3 transition ${preferences.dnd_mode === option.id ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-300' : 'border-slate-200 hover:border-violet-300'}`}><span className="flex items-start gap-2"><input type="radio" name="dnd_mode" value={option.id} checked={preferences.dnd_mode === option.id} onChange={() => { setPreferences({ ...preferences, dnd_mode: option.id, dnd_until: null }); setSettingsMessage(''); }} className="mt-1 accent-violet-600" /><span><span className="block text-sm font-semibold">{option.label}</span><span className="block text-xs text-slate-500 mt-1">{option.detail}</span></span></span></label>)}</div>
-                {['2h', '5h'].includes(preferences.dnd_mode) && preferences.dnd_until && <p className="text-sm text-amber-800 mt-3">Tự bật lại lúc {new Date(preferences.dnd_until).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}.</p>}
+                <div className="flex flex-wrap gap-3 mt-4"><button type="button" onClick={() => { setPreferences({ ...preferences, dnd_mode: 'off', dnd_until: null }); setSettingsMessage(''); }} className={`rounded-xl border px-4 py-3 font-semibold ${preferences.dnd_mode === 'off' ? 'bg-emerald-50 border-emerald-400 text-emerald-800' : 'border-slate-200'}`}>Bật thông báo lại</button><DndDurationPicker onSelect={(hours, minutes) => { const until = new Date(Date.now() + hours * 3600000 + minutes * 60000); setPreferences({ ...preferences, dnd_mode: 'custom', dnd_until: until.toISOString() }); setSettingsMessage(''); }} /><button type="button" onClick={() => { setPreferences({ ...preferences, dnd_mode: 'until_off', dnd_until: null }); setSettingsMessage(''); }} className={`rounded-xl border px-4 py-3 font-semibold ${preferences.dnd_mode === 'until_off' ? 'bg-amber-50 border-amber-400 text-amber-900' : 'border-slate-200'}`}>Đến khi tôi bật lại</button></div>
+                {preferences.dnd_mode === 'custom' && preferences.dnd_until && <p className="text-sm text-amber-800 mt-3">Tự bật lại lúc {new Date(preferences.dnd_until).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}.</p>}
                 <p className="text-xs text-slate-500 mt-4">Hiện app chưa gửi thông báo đẩy; lựa chọn này được lưu để dùng khi tích hợp thông báo. Khi đó, chế độ này sẽ tắt âm thanh và rung theo cấu hình ứng dụng.</p>
               </article>
 
@@ -325,6 +337,8 @@
           </section>}
           <footer className="text-xs text-slate-400 mt-8">Myka Care Companion là phân hệ đọc và theo dõi dành cho người thân. Trao đổi tư vấn diễn ra trên Telegram, không có chat bác sĩ–người thân trong ứng dụng.</footer>
         </main>
+        {showScheduleEditor && <ScheduleEditor onClose={() => setShowScheduleEditor(false)} onSave={createSchedule} />}
+        {showPaymentCheckout && <PaymentCheckout amount={paymentRows.find(row => row.status === 'pending')?.amount || pricing.monthly_fee} onClose={() => setShowPaymentCheckout(false)} />}
       </div>
     );
   }

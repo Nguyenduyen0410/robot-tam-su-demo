@@ -210,15 +210,18 @@ export async function onRequest({ request, env, params }) {
     if (request.method === 'PUT' && area === 'family' && section === 'settings' && elderId) {
       await ensureFamilyPreferences(db, elderId);
       const body = await request.json();
-      const allowedModes = new Set(['off', '2h', '5h', 'until_off']);
+      const allowedModes = new Set(['off', '2h', '5h', 'custom', 'until_off']);
       const allowedVoices = new Set(['male_young_warm', 'male_middle_steady', 'female_young_sweet', 'female_middle_calm']);
       const mode = String(body.dnd_mode || 'off');
       const voice = String(body.voice_profile || 'female_young_sweet');
       const robotName = String(body.robot_name || '').trim().slice(0, 40);
       if (!allowedModes.has(mode)) return json(request, { error: 'Lựa chọn Không làm phiền không hợp lệ.' }, 422);
       if (!allowedVoices.has(voice)) return json(request, { error: 'Lựa chọn giọng nói không hợp lệ.' }, 422);
+      const requestedDndUntil = Date.parse(body.dnd_until || '');
       const dndUntil = mode === '2h' ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
-        : mode === '5h' ? new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString() : null;
+        : mode === '5h' ? new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString()
+          : mode === 'custom' && Number.isFinite(requestedDndUntil) && requestedDndUntil > Date.now() && requestedDndUntil <= Date.now() + 24 * 60 * 60 * 1000 ? new Date(requestedDndUntil).toISOString() : null;
+      if (mode === 'custom' && !dndUntil) return json(request, { error: 'Thời lượng Không làm phiền không hợp lệ.' }, 422);
       const updatedAt = nowIso();
       await db.prepare(`INSERT INTO family_preferences (elder_id, dnd_mode, dnd_until, voice_profile, robot_name, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -245,6 +248,20 @@ export async function onRequest({ request, env, params }) {
       await ensureBackendDemoData(db, elderId);
       const { results } = await db.prepare("SELECT * FROM care_schedule WHERE elder_id = ? AND scheduled_at >= datetime('now', '-30 days') ORDER BY scheduled_at ASC").bind(elderId).all();
       return json(request, results);
+    }
+    if (request.method === 'POST' && area === 'family' && section === 'schedules' && elderId) {
+      const body = await request.json();
+      const type = String(body.type || '');
+      const title = String(body.title || '').trim().slice(0, 120);
+      const detail = String(body.detail || '').trim().slice(0, 500);
+      const scheduledAt = String(body.scheduled_at || '');
+      if (!['medication', 'checkup'].includes(type) || !title || !Number.isFinite(Date.parse(scheduledAt))) {
+        return json(request, { error: 'Loại lịch, tên lịch hoặc thời điểm không hợp lệ.' }, 422);
+      }
+      const id = newId('SCH');
+      await db.prepare('INSERT INTO care_schedule (id, elder_id, type, title, detail, scheduled_at, confirmed) VALUES (?, ?, ?, ?, ?, ?, 0)')
+        .bind(id, elderId, type, title, detail, scheduledAt).run();
+      return json(request, { id, elder_id: elderId, type, title, detail, scheduled_at: scheduledAt, confirmed: 0 }, 201);
     }
     if (request.method === 'GET' && area === 'family' && section === 'maintenance-notifications' && elderId) {
       await ensureBackendDemoData(db, elderId);

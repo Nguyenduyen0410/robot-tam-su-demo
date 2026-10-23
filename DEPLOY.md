@@ -32,7 +32,13 @@ Các thao tác Wi-Fi/Bluetooth và ghi phép đo hiện chỉ mô phỏng dữ l
 
 ## Cài đặt người thân
 
-`GET/PUT /api/family/settings/{elder_id}` lưu lựa chọn Không làm phiền (2 giờ, 5 giờ hoặc đến khi bật lại), kiểu giọng và tên robot tùy chọn. Đây là cấu hình hồ sơ demo: app chưa có push notification để tắt rung/âm thanh thực tế; giọng và tên chỉ được áp dụng khi tích hợp phần cứng.
+`GET/PUT /api/family/settings/{elder_id}` lưu lựa chọn Không làm phiền (thời lượng tùy chỉnh tối đa 24 giờ hoặc đến khi bật lại), kiểu giọng và tên robot tùy chọn. Đây là cấu hình hồ sơ demo: app chưa có push notification để tắt rung/âm thanh thực tế; giọng và tên chỉ được áp dụng khi tích hợp phần cứng.
+
+`GET/POST /api/family/schedules/{elder_id}` đọc và tạo lịch thuốc/tái khám trong D1. Hàm `scheduleNotification()` hiện chỉ là điểm nối minh họa, chưa gửi push notification.
+
+Onboarding chỉ mở Dashboard khi hồ sơ có thiết bị Bluetooth trong trạng thái đã ghép. Camera QR và Web Bluetooth được bật theo khả năng trình duyệt; Wi-Fi gần đó không thể được quét bởi một trang web, nên danh sách hiện tại là mẫu. Lưu thiết bị/mạng ở onboarding chỉ cập nhật dữ liệu demo; kết nối thiết bị thật cần app/gateway và firmware Myka.
+
+CTA thanh toán mở màn hình checkout minh họa có trạng thái đang tải. Chưa cấu hình cổng thanh toán nên không tạo giao dịch, không mở ngân hàng và không đổi trạng thái hóa đơn.
 
 `GET /api/family/conversation-history/{elder_id}?date=YYYY-MM-DD` trả nhật ký chỉ đọc. Bản demo tự tạo một số tin nhắn tổng hợp cho hồ sơ E001; chưa nhận lịch sử từ Telegram hoặc robot.
 
