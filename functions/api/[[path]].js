@@ -194,8 +194,31 @@ export async function onRequest({ request, env, params }) {
     }
     if (request.method === 'GET' && area === 'family' && section === 'subscription' && elderId) {
       const { results } = await db.prepare('SELECT * FROM service_payments WHERE elder_id = ? ORDER BY period_start DESC').bind(elderId).all();
-      const current = results.find(row => row.status === 'paid' && row.period_start <= new Date().toISOString().slice(0, 10) && row.period_end >= new Date().toISOString().slice(0, 10)) || null;
-      return json(request, { elder_id: elderId, current_plan: current, payments: results });
+      const nowLocal = new Date(Date.now() + 7 * 60 * 60 * 1000);
+      const today = nowLocal.toISOString().slice(0, 10);
+      const nextRenewal = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
+      const monthEnd = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+      const payments = results.filter(row => row.status !== 'demo');
+      const displayPayments = payments.length ? payments : [{
+        id: `PAY-INITIAL-${elderId}`, elder_id: elderId,
+        service_name: 'Thiết bị Myka (mua đứt) + thuê bao tháng đầu',
+        amount: 2100000, currency: 'VND', status: 'pending',
+        period_start: today, period_end: monthEnd, due_at: today, paid_at: null,
+      }];
+      const current = payments.find(row => row.status === 'paid' && row.period_start <= today && row.period_end >= today) || null;
+      return json(request, {
+        elder_id: elderId,
+        current_plan: current,
+        payments: displayPayments,
+        pricing: {
+          device_price: 2000000,
+          monthly_fee: 100000,
+          first_payment_total: 2100000,
+          renewal_day: 1,
+          next_renewal_date: nextRenewal,
+          auto_renew: true,
+        },
+      });
     }
     if (request.method === 'GET' && area === 'family' && section === 'alerts' && elderId) {
       const { results } = await db.prepare('SELECT * FROM alerts WHERE elder_id = ? ORDER BY timestamp DESC').bind(elderId).all();
