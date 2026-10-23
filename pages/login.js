@@ -28,7 +28,7 @@
         const users = RTS.getUsers();
         const account = DEMO_ACCOUNTS.find(item => item.email === email.trim() && item.password === password);
         const user = account?.setupMode
-          ? { id: 'U-DEMO-SETUP', role: 'family', email: account.email, name: 'Tài khoản cài đặt Myka', elderId: 'E001', demoSetupMode: true }
+          ? { id: 'U-DEMO-SETUP', role: 'family', email: account.email, name: 'Chị Duyên', elderId: 'E001', demoSetupMode: true }
           : users.find(u => u.role === 'family' && u.email === email.trim() && u.password === password);
         if (user) {
           onLogin(user);
