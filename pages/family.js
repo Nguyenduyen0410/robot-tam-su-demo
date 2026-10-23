@@ -2,6 +2,7 @@
 (function () {
   function FamilyDashboard({ user, onLogout }) {
     const elderId = 'E001';
+    const familyUserName = user?.id === 'U-DEMO-SETUP' ? 'Chị Duyên' : user?.name || 'Chị Duyên';
     const apiBase = String(window.MYKA_API_BASE || '').replace(/\/$/, '');
     const apiUrl = path => `${apiBase}/api${path}`;
     const [tab, setTab] = React.useState('health');
@@ -227,13 +228,13 @@
             <div className="w-11 h-11 rounded-2xl bg-violet-100 text-violet-700 grid place-items-center text-2xl">♥</div>
             <div><div className="font-bold text-lg">Myka Care Companion</div><div className="text-sm text-slate-500">Không gian chăm sóc gia đình</div></div>
           </div>
-          <div className="flex items-center gap-4"><span className="text-sm text-slate-600">{user.name}</span><button onClick={onLogout} className="text-sm text-violet-700 hover:underline">Đăng xuất</button></div>
+          <div className="flex items-center gap-4"><span className="text-sm text-slate-600">{familyUserName}</span><button onClick={onLogout} className="text-sm text-violet-700 hover:underline">Đăng xuất</button></div>
         </header>
         <main className="max-w-6xl mx-auto p-5 md:p-8">
           <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-700 via-violet-600 to-sky-600 text-white p-6 md:p-8 mb-6 shadow-lg shadow-violet-200/60">
             <div className="absolute -right-12 -top-16 w-64 h-64 rounded-full bg-white/10" aria-hidden="true" />
             <div className="relative flex items-center justify-between gap-5">
-              <div className="max-w-xl"><p className="text-sm font-semibold tracking-wider text-violet-100">MYKA CARE COMPANION</p><h1 className="text-2xl md:text-3xl font-bold mt-2">Chăm sóc Ngoại mỗi ngày</h1><p className="text-violet-100 mt-2">Xin chào {user.name}. Cùng theo dõi sức khỏe và những điều cần quan tâm của {elder?.name || 'Bà Hoa'}.</p><span className={`inline-flex mt-4 text-xs font-semibold px-3 py-1.5 rounded-full ${apiAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-white/20 text-white'}`}>{apiAvailable ? '● Dữ liệu demo từ backend' : '● Bản demo'}</span></div>
+              <div className="max-w-xl"><p className="text-sm font-semibold tracking-wider text-violet-100">MYKA CARE COMPANION</p><h1 className="text-2xl md:text-3xl font-bold mt-2">Chăm sóc Ngoại mỗi ngày</h1><p className="text-violet-100 mt-2">Xin chào {familyUserName}. Cùng theo dõi sức khỏe và những điều cần quan tâm của {elder?.name || 'Bà Hoa'}.</p><span className={`inline-flex mt-4 text-xs font-semibold px-3 py-1.5 rounded-full ${apiAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-white/20 text-white'}`}>{apiAvailable ? '● Dữ liệu demo từ backend' : '● Bản demo'}</span></div>
               <svg className="hidden sm:block w-36 md:w-48 h-36 md:h-44 shrink-0" viewBox="0 0 200 180" role="img" aria-label="Minh họa Myka đồng hành cùng người cao tuổi">
                 <circle cx="102" cy="91" r="77" fill="white" fillOpacity=".14"/><path d="M48 133c7-24 23-36 48-36s41 12 48 36" fill="#FDE68A"/><circle cx="96" cy="70" r="31" fill="#F5C9A5"/><path d="M65 68c2-25 17-39 36-39 18 0 31 13 32 34-13-2-24-11-29-20-7 13-20 22-39 25Z" fill="#64748B"/><path d="M67 63c-5 20 1 39 11 48" fill="none" stroke="#64748B" strokeWidth="8" strokeLinecap="round"/><path d="M132 60h33a12 12 0 0 1 12 12v23a12 12 0 0 1-12 12h-7l-10 11v-11h-16a12 12 0 0 1-12-12V72a12 12 0 0 1 12-12Z" fill="#fff"/><circle cx="139" cy="84" r="3" fill="#7C3AED"/><circle cx="151" cy="84" r="3" fill="#7C3AED"/><path d="M139 94c4 5 9 5 13 0" fill="none" stroke="#7C3AED" strokeWidth="2.5" strokeLinecap="round"/><path d="M42 46c0-7 9-10 13-3 4-7 13-4 13 3 0 6-13 15-13 15S42 52 42 46Z" fill="#FCA5A5"/>
               </svg>
