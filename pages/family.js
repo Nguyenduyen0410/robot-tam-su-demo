@@ -14,7 +14,6 @@
     const [connectivity, setConnectivity] = React.useState(null);
     const setupCompleteKey = `myka_setup_complete_${user?.id || 'family'}`;
     const [setupMode, setSetupMode] = React.useState(() => Boolean(user?.demoSetupMode && !RTS.LS.get(setupCompleteKey)));
-    const [wifiForm, setWifiForm] = React.useState({ ssid: '', password: '' });
     const [newDeviceName, setNewDeviceName] = React.useState('');
     const [deviceMessage, setDeviceMessage] = React.useState('');
     const [showScheduleEditor, setShowScheduleEditor] = React.useState(false);
@@ -107,14 +106,12 @@
     const refreshConnectivity = () => fetch(apiUrl(`/device/connectivity/${elderId}`))
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(setConnectivity);
-    const saveWifi = event => {
-      event.preventDefault();
-      setDeviceMessage('');
-      fetch(apiUrl(`/device/wifi/${elderId}`), {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wifiForm),
-      }).then(r => r.ok ? r.json() : Promise.reject())
-        .then(() => { setWifiForm({ ssid: '', password: '' }); setDeviceMessage('Đã cập nhật cấu hình Wi-Fi demo.'); return refreshConnectivity(); })
-        .catch(() => setDeviceMessage('Không kết nối được API backend.'));
+    const saveWifiNetwork = async ({ ssid, password }) => {
+      const response = await fetch(apiUrl(`/device/wifi/${elderId}`), {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ssid, password }),
+      });
+      if (!response.ok) throw new Error('Không lưu được cấu hình Wi-Fi vào API.');
+      await refreshConnectivity();
     };
     const pairDevice = event => {
       event.preventDefault();
@@ -277,7 +274,7 @@
             {connectivity ? <>
               <div className="grid sm:grid-cols-2 gap-3 mb-5"><article className="bg-white border border-slate-200 rounded-xl p-4"><h3 className="font-semibold">Wi-Fi trong nhà</h3><p className="mt-2 text-sm">Mạng: {connectivity.wifi_ssid || 'Chưa cấu hình'}</p><p className="text-sm text-slate-500">Trạng thái: {connectivity.wifi_status || 'Chưa xác định'}{connectivity.wifi_signal ? ` · tín hiệu ${connectivity.wifi_signal}%` : ''}</p></article><article className="bg-white border border-slate-200 rounded-xl p-4"><h3 className="font-semibold">Bluetooth</h3><p className="mt-2 text-sm">Trạng thái: {connectivity.bluetooth_status || 'Chưa xác định'}</p><p className="text-sm text-slate-500">Thiết bị đã ghép: {connectivity.paired_devices?.length || 0}</p></article></div>
               <div className="space-y-2 mb-5">{(connectivity.paired_devices || []).map(item => <article key={item.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{item.name}</p><p className="text-sm text-slate-500">{item.type} · {item.status}</p></div><button onClick={() => unpairDevice(item.id)} disabled={!apiAvailable} className="px-3 py-2 rounded-lg border border-slate-300 text-sm disabled:opacity-50">Gỡ thiết bị</button></article>)}</div>
-              <div className="grid md:grid-cols-2 gap-4"><form onSubmit={saveWifi} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3"><h3 className="font-semibold">Cập nhật Wi-Fi (RUD demo)</h3><input required value={wifiForm.ssid} onChange={e => setWifiForm({ ...wifiForm, ssid: e.target.value })} placeholder="Tên mạng Wi-Fi" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /><input type="password" value={wifiForm.password} onChange={e => setWifiForm({ ...wifiForm, password: e.target.value })} placeholder="Mật khẩu Wi-Fi mới (không bắt buộc)" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /><button disabled={!apiAvailable} className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold disabled:opacity-50">Lưu cấu hình</button></form><form onSubmit={pairDevice} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3"><h3 className="font-semibold">Ghép Bluetooth (RUD demo)</h3><input required value={newDeviceName} onChange={e => setNewDeviceName(e.target.value)} placeholder="Tên thiết bị đo huyết áp" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /><button disabled={!apiAvailable} className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold disabled:opacity-50">Thêm thiết bị</button></form></div>
+              <div className="grid md:grid-cols-2 gap-4"><WifiNetworkPicker currentSsid={connectivity.wifi_ssid} onSaved={saveWifiNetwork} /><form onSubmit={pairDevice} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3"><h3 className="font-semibold">Ghép Bluetooth (RUD demo)</h3><input required value={newDeviceName} onChange={e => setNewDeviceName(e.target.value)} placeholder="Tên thiết bị đo huyết áp" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /><button disabled={!apiAvailable} className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold disabled:opacity-50">Thêm thiết bị</button></form></div>
               {deviceMessage && <p role="status" className="text-sm text-violet-700 mt-3">{deviceMessage}</p>}
             </> : <div className="bg-white border border-slate-200 rounded-xl p-5"><p className="font-semibold">Chưa kết nối được API thiết bị.</p><p className="text-sm text-slate-500 mt-1">Mở backend demo để đọc và cập nhật trạng thái. Wi-Fi/Bluetooth hiện được mô phỏng qua API; để kết nối thiết bị thật cần firmware hoặc gateway phần cứng.</p></div>}
           </section>}

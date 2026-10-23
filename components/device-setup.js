@@ -4,10 +4,7 @@
     const [step, setStep] = React.useState(0);
     const [serial, setSerial] = React.useState('');
     const [deviceName, setDeviceName] = React.useState('Máy đo Myka');
-    const [networks, setNetworks] = React.useState([]);
-    const [selectedNetwork, setSelectedNetwork] = React.useState(null);
     const [wifiSaved, setWifiSaved] = React.useState(false);
-    const [password, setPassword] = React.useState('');
     const [cameraOn, setCameraOn] = React.useState(false);
     const [message, setMessage] = React.useState('');
     const [busy, setBusy] = React.useState(false);
@@ -43,11 +40,6 @@
     }, [cameraOn]);
 
     const startSetup = () => { setStep(1); setMessage(''); };
-    const scanNetworks = () => {
-      // Browsers cannot scan nearby Wi-Fi. These sample networks keep the UI demonstrable.
-      setNetworks([{ ssid: 'Myka-Home-2.4G', signal: 92 }, { ssid: 'Home-WiFi', signal: 76 }, { ssid: 'Guest-Network', signal: 54 }]);
-      setMessage('Danh sách minh họa. Quét Wi-Fi thật cần app/gateway chạy trên thiết bị Myka.');
-    };
     const chooseBluetoothDevice = async () => {
       setBusy(true); setMessage('');
       try {
@@ -72,16 +64,12 @@
       } catch (error) { setMessage(`${error.message} Đây là luồng demo, chưa ghép phần cứng thật.`); }
       finally { setBusy(false); }
     };
-    const saveWifi = async () => {
-      setBusy(true); setMessage('');
-      try {
-        const response = await fetch(apiUrl('/device/wifi/E001'), {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ssid: selectedNetwork, password }),
-        });
-        if (!response.ok) throw new Error('Không lưu được mạng Wi-Fi.');
-        setWifiSaved(true); setMessage('Đã lưu tên mạng trong dữ liệu demo. Mật khẩu không được lưu và Myka chưa kết nối mạng thật.');
-      } catch (error) { setMessage(error.message); }
-      finally { setBusy(false); setPassword(''); }
+    const saveWifi = async ({ ssid, password }) => {
+      const response = await fetch(apiUrl('/device/wifi/E001'), {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ssid, password }),
+      });
+      if (!response.ok) throw new Error('Không lưu được mạng Wi-Fi.');
+      setWifiSaved(true);
     };
 
     const steps = ['Xác thực thiết bị', 'Ghép nối Bluetooth', 'Kết nối mạng Wi-Fi'];
@@ -91,7 +79,7 @@
       <h1 className="text-2xl font-bold">{steps[step - 1]}</h1>
       {step === 1 && <div className="mt-5 space-y-4"><p className="text-sm text-slate-600">Quét mã QR trên thân máy hoặc nhập mã số máy.</p>{cameraOn && <video ref={videoRef} autoPlay playsInline className="w-full max-h-64 rounded-xl bg-slate-900 object-cover" />}<div className="flex flex-wrap gap-2"><button onClick={() => { setMessage(''); setCameraOn(true); }} className="rounded-lg bg-violet-100 text-violet-800 px-4 py-2 font-semibold">📷 Mở camera quét QR</button><button onClick={() => setCameraOn(false)} className="rounded-lg border px-4 py-2">Tắt camera</button></div><label className="block text-sm font-semibold">Mã số máy<input value={serial} onChange={e => setSerial(e.target.value)} placeholder="Ví dụ: MYKA-0001" className="mt-1 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label><label className="block text-sm font-semibold">Tên thiết bị<input value={deviceName} onChange={e => setDeviceName(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label><button onClick={() => setStep(2)} className="rounded-xl bg-violet-600 text-white px-5 py-3 font-bold">Tiếp tục</button></div>}
       {step === 2 && <div className="mt-5 space-y-4"><p className="text-sm text-slate-600">Bật máy đo và cho phép trình duyệt tìm thiết bị Bluetooth ở gần. Cần HTTPS và trình duyệt hỗ trợ Web Bluetooth.</p><button disabled={busy} onClick={chooseBluetoothDevice} className="rounded-xl bg-sky-600 text-white px-5 py-3 font-bold disabled:opacity-60">{busy ? 'Đang tìm…' : 'Tìm thiết bị Bluetooth'}</button><div><button onClick={savePairing} disabled={busy} className="rounded-xl bg-violet-600 text-white px-5 py-3 font-bold disabled:opacity-60">Lưu ghép nối demo và tiếp tục</button><p className="text-xs text-slate-500 mt-2">Lưu demo chỉ cập nhật hồ sơ API, không có nghĩa phần cứng đã kết nối.</p></div></div>}
-      {step === 3 && <div className="mt-5 space-y-4"><p className="text-sm text-slate-600">Trang web không được phép quét Wi-Fi xung quanh. Chọn một mạng minh họa để trình bày luồng; triển khai thật cần Myka/gateway hỗ trợ provisioning.</p><button onClick={scanNetworks} className="rounded-xl border border-violet-300 text-violet-800 px-4 py-2 font-semibold">Tìm mạng (danh sách demo)</button>{networks.map(network => <button key={network.ssid} onClick={() => setSelectedNetwork(network.ssid)} className={`w-full text-left rounded-xl border p-4 ${selectedNetwork === network.ssid ? 'border-violet-500 bg-violet-50' : 'border-slate-200'}`}>📶 {network.ssid}<span className="float-right text-sm text-slate-500">{network.signal}%</span></button>)}{selectedNetwork && <div className="rounded-2xl bg-slate-50 p-4"><p className="font-semibold mb-2">Mật khẩu cho {selectedNetwork}</p><input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" placeholder="Nhập mật khẩu Wi-Fi" className="w-full rounded-xl border p-3" /><button disabled={busy} onClick={saveWifi} className="mt-3 rounded-xl bg-violet-600 text-white px-5 py-3 font-bold disabled:opacity-60">{busy ? 'Đang lưu…' : 'Lưu Wi-Fi demo'}</button></div>}</div>}
+      {step === 3 && <div className="mt-5"><WifiNetworkPicker currentSsid="" onSaved={saveWifi} /><p className="text-xs text-slate-500 mt-3">Đây là cấu hình minh họa. Khi có phần cứng, thiết bị/gateway Myka sẽ quét và nhận thông tin Wi-Fi.</p></div>}
       {message && <p role="status" className="mt-4 rounded-xl bg-amber-50 text-amber-900 p-3 text-sm">{message}</p>}
       <div className="mt-6 flex justify-between"><button onClick={() => setStep(Math.max(1, step - 1))} className="rounded-lg border px-4 py-2">Quay lại</button>{step === 3 && <button disabled={!wifiSaved} onClick={onPaired} className="rounded-xl bg-violet-600 text-white px-5 py-2.5 font-bold disabled:opacity-40">{wifiSaved ? 'Hoàn tất thiết lập' : 'Lưu Wi-Fi demo để hoàn tất'}</button>}</div>
     </section></div>;
