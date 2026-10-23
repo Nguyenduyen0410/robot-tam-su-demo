@@ -8,6 +8,10 @@
 - `migrations/0001_myka_demo.sql` tạo schema và dữ liệu tổng hợp giả; `0002_family_preferences.sql` bổ sung cài đặt người thân; `0003_conversation_logs.sql` tạo nhật ký hội thoại.
 - Push lên nhánh `main` sẽ kích hoạt Pages Git integration tự build và deploy.
 
+## Dữ liệu demo từ backend FastAPI trong `robot-myka-backend`
+
+Các mẫu huyết áp, lịch chăm sóc, bảo trì, trạng thái thiết bị mô phỏng và hội thoại được đưa vào D1 khi API gia đình đọc hồ sơ E001 lần đầu. Các bản ghi này được dựng từ hàm `seed_data()`/`seed_family_app_data()` của FastAPI; đây là dữ liệu kiểm thử, không phải dữ liệu robot thật. Luồng demo không sao chép mật khẩu Wi-Fi hoặc địa chỉ IP riêng từ SQLite. Khoản thanh toán cũ trong backend mẫu không được nhập vì app dùng mức giá đã thống nhất: thiết bị 2.000.000đ và thuê bao 100.000đ/tháng.
+
 ## Cấu hình D1
 
 Trong Cloudflare Pages → Settings → Functions → Bindings, tạo binding loại **D1 database**, tên biến `MYKA_DB`, chọn database `myka-care-db` cho môi trường Production. Với database mới, chạy migration bằng D1 Console:

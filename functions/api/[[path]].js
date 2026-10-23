@@ -24,6 +24,64 @@ const newId = (prefix) => `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 let familyPreferencesSchemaReady = false;
 let conversationLogsSchemaReady = false;
 
+async function ensureBackendDemoData(db, elderId) {
+  if (elderId !== 'E001') return;
+  const imported = await db.prepare("SELECT id FROM blood_pressure WHERE elder_id = ? AND id = 'BP-001'").bind(elderId).first();
+  if (imported) return;
+
+  // Port the synthetic FastAPI/SQLite examples into D1. Never copy its Wi-Fi password or private IP.
+  const utcNow = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  const dateOffset = (daysAgo, time) => {
+    const date = new Date(utcNow.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    return new Date(`${date}T${time}+07:00`).toISOString();
+  };
+  const deviceList = JSON.stringify([
+    { id: 'DEV-BLE-01', name: 'Robot Myka Companion (mô phỏng)', type: 'robot', status: 'mô phỏng', signal: -52 },
+    { id: 'DEV-BLE-02', name: 'Máy đo huyết áp BLE (mô phỏng)', type: 'sphygmomanometer', status: 'mô phỏng', signal: -64 },
+  ]);
+  await db.batch([
+    db.prepare("DELETE FROM blood_pressure WHERE elder_id = ? AND id LIKE 'DEMO-%'").bind(elderId),
+    ...[
+      ['BP-001', 128, 78, 72, 'normal', 'Đo huyết áp buổi sáng sau ăn', dateOffset(5, '09:05:00')],
+      ['BP-002', 130, 80, 75, 'normal', 'Đo huyết áp buổi chiều', dateOffset(5, '14:15:00')],
+      ['BP-003', 126, 76, 70, 'normal', 'Đo định kỳ buổi sáng', dateOffset(4, '09:00:00')],
+      ['BP-004', 128, 79, 74, 'normal', 'Đo định kỳ buổi chiều', dateOffset(4, '14:00:00')],
+      ['BP-005', 145, 90, 88, 'critical', 'Tình huống mô phỏng có chỉ số vượt ngưỡng', dateOffset(3, '09:10:00')],
+      ['BP-006', 128, 78, 72, 'normal', 'Phép đo mô phỏng tiếp theo', dateOffset(3, '14:30:00')],
+      ['BP-007', 125, 75, 71, 'normal', 'Đo huyết áp buổi sáng', dateOffset(2, '09:00:00')],
+    ].map(([id, sys, dia, pulse, status, note, timestamp]) => db.prepare(`INSERT OR IGNORE INTO blood_pressure
+      (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, elderId, sys, dia, pulse, status, note, timestamp)),
+    db.prepare("DELETE FROM care_schedule WHERE elder_id = ? AND id LIKE 'SCH-DEMO-%'").bind(elderId),
+    ...[
+      ['SCH-001', 'medication', 'Uống thuốc huyết áp', 'Lịch dùng thuốc minh họa; đối chiếu với đơn thuốc thực tế.', dateOffset(0, '08:00:00'), 1],
+      ['SCH-002', 'medication', 'Uống thuốc buổi trưa', 'Lịch chăm sóc minh họa; không thay thế hướng dẫn của nhân viên y tế.', dateOffset(0, '12:00:00'), 0],
+      ['SCH-003', 'checkup', 'Lịch tái khám', 'Lịch hẹn minh họa.', dateOffset(-5, '09:00:00'), 0],
+    ].map(([id, type, title, detail, scheduledAt, confirmed]) => db.prepare(`INSERT OR REPLACE INTO care_schedule
+      (id, elder_id, type, title, detail, scheduled_at, confirmed) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, elderId, type, title, detail, scheduledAt, confirmed)),
+    db.prepare("DELETE FROM maintenance_notifications WHERE elder_id = ? AND id LIKE 'MNT-DEMO-%'").bind(elderId),
+    db.prepare(`INSERT OR REPLACE INTO maintenance_notifications
+      (id, elder_id, title, detail, status, due_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .bind('MNT-001', elderId, 'Kiểm tra máy đo huyết áp', 'Nhắc bảo trì thiết bị minh họa.', 'pending', dateOffset(-7, '00:00:00').slice(0, 10), nowIso()),
+    db.prepare(`INSERT INTO device_connectivity
+      (elder_id, wifi_ssid, wifi_ip, wifi_signal, wifi_frequency, wifi_status, bluetooth_status, paired_devices, last_updated)
+      VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(elder_id) DO UPDATE SET
+      wifi_ssid = CASE WHEN device_connectivity.wifi_ssid IS NULL OR device_connectivity.wifi_ssid = 'Wi-Fi minh họa' THEN excluded.wifi_ssid ELSE device_connectivity.wifi_ssid END,
+      wifi_ip = NULL,
+      wifi_signal = CASE WHEN device_connectivity.wifi_signal = 0 THEN excluded.wifi_signal ELSE device_connectivity.wifi_signal END,
+      wifi_frequency = COALESCE(device_connectivity.wifi_frequency, excluded.wifi_frequency),
+      wifi_status = excluded.wifi_status, bluetooth_status = excluded.bluetooth_status,
+      paired_devices = excluded.paired_devices, last_updated = excluded.last_updated`)
+      .bind(elderId, 'Wi-Fi mô phỏng nhà Ngoại', 92, '2.4GHz', 'mô phỏng', 'mô phỏng', deviceList, nowIso()),
+    db.prepare(`INSERT OR IGNORE INTO alerts
+      (id, elder_id, type, title, detail, severity, status, responded_by, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)`)
+      .bind('ALT-DEMO-01', elderId, 'bp_alert', 'Bản ghi mô phỏng có chỉ số vượt ngưỡng', 'Tình huống minh họa luồng Agent; không phải dữ liệu đo từ người thật.', 'warning', 'pending', dateOffset(3, '09:12:00')),
+  ]);
+}
+
 async function latestFor(db, elderId) {
   return db.prepare('SELECT * FROM blood_pressure WHERE elder_id = ? ORDER BY timestamp DESC LIMIT 1').bind(elderId).first();
 }
@@ -80,29 +138,27 @@ async function ensureConversationLogs(db, elderId) {
     conversationLogsSchemaReady = true;
   }
   if (elderId === 'E001') {
-    const count = await db.prepare('SELECT COUNT(*) AS total FROM conversation_logs WHERE elder_id = ?').bind(elderId).first();
-    if (!Number(count?.total || 0)) {
+    const imported = await db.prepare('SELECT id FROM conversation_logs WHERE id = ? AND elder_id = ?').bind('TGC-001', elderId).first();
+    if (!imported) {
       const localDate = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      const at = time => new Date(`${localDate}T${time}:00+07:00`).toISOString();
+      const at = time => new Date(`${localDate}T${time}+07:00`).toISOString();
       const samples = [
-        ['CHAT-DEMO-01', 'elder', 'Myka ơi, Ngoại muốn trò chuyện với con.', at('08:20'), 'none'],
-        ['CHAT-DEMO-02', 'myka', 'Dạ, con nghe đây Ngoại ơi. Hôm nay Ngoại thấy trong người thế nào ạ?', at('08:21'), 'none'],
-        ['CHAT-DEMO-03', 'elder', 'Hôm nay Ngoại thấy hơi mệt, con ghi lời nhắn để Duyên gọi hỏi thăm Ngoại nhé.', at('15:10'), 'family_followup'],
-        ['CHAT-DEMO-04', 'myka', 'Dạ, con đã ghi nhận lời nhắn để gia đình xem lại trong ứng dụng ạ.', at('15:11'), 'none'],
+        ['TGC-001', 'elder', 'Myka ơi, hôm nay thời tiết thế nào con?', '08:00:00', 'none'],
+        ['TGC-002', 'myka', 'Dạ, hôm nay trời mát mẻ ạ. Ngoại muốn con trò chuyện thêm điều gì không?', '08:00:15', 'none'],
+        ['TGC-003', 'elder', 'Trưa nay con Duyên có ghé ăn cơm với Ngoại không?', '09:30:00', 'none'],
+        ['TGC-004', 'myka', 'Dạ, đây là đoạn hội thoại minh họa trong dữ liệu backend demo ạ.', '09:30:20', 'none'],
+        ['TGC-005', 'elder', 'Hôm nay Ngoại hơi mệt trong người, chóng mặt nhẹ...', '10:15:00', 'family_followup'],
+        ['TGC-006', 'myka', 'Dạ, con nghe Ngoại chia sẻ. Con ghi nhận lời nhắn này để gia đình xem lại ạ.', '10:15:25', 'none'],
+        ['TGC-007', 'elder', 'Con kể chuyện vui ngày xưa cho Ngoại nghe đỡ buồn đi Myka.', '15:30:00', 'none'],
+        ['TGC-008', 'myka', 'Dạ, con kể Ngoại nghe một câu chuyện vui nhé…', '15:30:30', 'none'],
       ];
-      await db.batch(samples.map(([id, speaker, message, timestamp, flag]) => db.prepare(`INSERT OR IGNORE INTO conversation_logs (id, elder_id, speaker, message_text, timestamp, source, review_flag)
-        VALUES (?, ?, ?, ?, ?, 'demo', ?)`).bind(id, elderId, speaker, message, timestamp, flag)));
+      await db.batch([
+        db.prepare("DELETE FROM conversation_logs WHERE elder_id = ? AND source = 'demo' AND id LIKE 'CHAT-DEMO-%'").bind(elderId),
+        ...samples.map(([id, speaker, message, time, flag]) => db.prepare(`INSERT OR IGNORE INTO conversation_logs
+          (id, elder_id, speaker, message_text, timestamp, source, review_flag) VALUES (?, ?, ?, ?, ?, 'demo', ?)`)
+          .bind(id, elderId, speaker, message, at(time), flag)),
+      ]);
     }
-    // Keep existing demo rows aligned with the selected Ngoại–con address after deployment.
-    const demoTranscript = [
-      ['CHAT-DEMO-01', 'Myka ơi, Ngoại muốn trò chuyện với con.', 'none'],
-      ['CHAT-DEMO-02', 'Dạ, con nghe đây Ngoại ơi. Hôm nay Ngoại thấy trong người thế nào ạ?', 'none'],
-      ['CHAT-DEMO-03', 'Hôm nay Ngoại thấy hơi mệt, con ghi lời nhắn để Duyên gọi hỏi thăm Ngoại nhé.', 'family_followup'],
-      ['CHAT-DEMO-04', 'Dạ, con đã ghi nhận lời nhắn để gia đình xem lại trong ứng dụng ạ.', 'none'],
-    ];
-    await db.batch(demoTranscript.map(([id, message, flag]) => db.prepare(`UPDATE conversation_logs
-      SET message_text = ?, review_flag = ? WHERE id = ? AND elder_id = ? AND source = 'demo'`)
-      .bind(message, flag, id, elderId)));
   }
 }
 
@@ -123,6 +179,7 @@ export async function onRequest({ request, env, params }) {
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'health-summary' && elderId) {
+      await ensureBackendDemoData(db, elderId);
       const days = Math.min(30, Math.max(7, Number(new URL(request.url).searchParams.get('days') || 7)));
       const { results } = await db.prepare(`SELECT * FROM blood_pressure WHERE elder_id = ? AND timestamp >= datetime('now', ?) ORDER BY timestamp DESC`).bind(elderId, `-${days} days`).all();
       if (!results.length) return json(request, { elder_id: elderId, summary: null, daily_readings: [] });
@@ -185,10 +242,12 @@ export async function onRequest({ request, env, params }) {
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'schedules' && elderId) {
+      await ensureBackendDemoData(db, elderId);
       const { results } = await db.prepare("SELECT * FROM care_schedule WHERE elder_id = ? AND scheduled_at >= datetime('now', '-30 days') ORDER BY scheduled_at ASC").bind(elderId).all();
       return json(request, results);
     }
     if (request.method === 'GET' && area === 'family' && section === 'maintenance-notifications' && elderId) {
+      await ensureBackendDemoData(db, elderId);
       const { results } = await db.prepare('SELECT * FROM maintenance_notifications WHERE elder_id = ? ORDER BY COALESCE(due_at, created_at) ASC').bind(elderId).all();
       return json(request, results);
     }
@@ -221,10 +280,12 @@ export async function onRequest({ request, env, params }) {
       });
     }
     if (request.method === 'GET' && area === 'family' && section === 'alerts' && elderId) {
+      await ensureBackendDemoData(db, elderId);
       const { results } = await db.prepare('SELECT * FROM alerts WHERE elder_id = ? ORDER BY timestamp DESC').bind(elderId).all();
       return json(request, results);
     }
     if (request.method === 'GET' && area === 'family' && section === 'agent-status' && elderId) {
+      await ensureBackendDemoData(db, elderId);
       return json(request, await agentStatus(db, elderId));
     }
     if (request.method === 'GET' && area === 'family' && section === 'telegram-consultation' && elderId) {
@@ -232,6 +293,7 @@ export async function onRequest({ request, env, params }) {
       return row ? json(request, row) : json(request, { error: 'Chưa cấu hình nhóm Telegram.' }, 404);
     }
     if (request.method === 'GET' && area === 'device' && section === 'connectivity' && elderId) {
+      await ensureBackendDemoData(db, elderId);
       const row = await db.prepare('SELECT elder_id, wifi_ssid, wifi_ip, wifi_signal, wifi_frequency, wifi_status, bluetooth_status, paired_devices, last_updated FROM device_connectivity WHERE elder_id = ?').bind(elderId).first();
       if (!row) return json(request, { error: 'Chưa cấu hình thiết bị.' }, 404);
       return json(request, { ...row, paired_devices: JSON.parse(row.paired_devices || '[]') });
