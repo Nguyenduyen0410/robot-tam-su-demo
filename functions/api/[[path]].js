@@ -30,6 +30,24 @@ let conversationLogsSchemaReady = false;
 async function ensureBackendDemoData(db, elderId) {
   if (elderId !== 'E001') return;
   const imported = await db.prepare("SELECT id FROM blood_pressure WHERE elder_id = ? AND id = 'BP-001'").bind(elderId).first();
+  const utcNow = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  const dateOffset = (daysAgo, time) => {
+    const date = new Date(utcNow.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    return new Date(`${date}T${time}+07:00`).toISOString();
+  };
+  await db.prepare('CREATE TABLE IF NOT EXISTS myka_demo_seed_flags (id TEXT PRIMARY KEY, created_at TEXT NOT NULL)').run();
+  const scheduleSamplesSeeded = await db.prepare("SELECT id FROM myka_demo_seed_flags WHERE id = 'E001-care-schedule-statuses'").first();
+  if (!scheduleSamplesSeeded) {
+    await db.batch([
+      db.prepare("INSERT OR IGNORE INTO care_schedule (id, elder_id, type, title, detail, scheduled_at, confirmed) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .bind('SCH-DEMO-MED-MISSED', elderId, 'medication', 'Uống thuốc huyết áp', 'Robot chưa nhận được xác nhận đã uống thuốc.', dateOffset(1, '08:00:00'), 0),
+      db.prepare("INSERT OR IGNORE INTO care_schedule (id, elder_id, type, title, detail, scheduled_at, confirmed) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .bind('SCH-DEMO-MED-DONE', elderId, 'medication', 'Uống thuốc buổi tối', 'Robot đã ghi nhận Ngoại uống thuốc.', dateOffset(2, '20:00:00'), 1),
+      db.prepare("INSERT OR IGNORE INTO care_schedule (id, elder_id, type, title, detail, scheduled_at, confirmed) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .bind('SCH-DEMO-CHECKUP-DONE', elderId, 'checkup', 'Tái khám định kỳ', 'Đã hoàn thành buổi tái khám.', dateOffset(5, '09:00:00'), 1),
+      db.prepare("INSERT OR IGNORE INTO myka_demo_seed_flags (id, created_at) VALUES (?, ?)").bind('E001-care-schedule-statuses', nowIso()),
+    ]);
+  }
   await ensureElderProfiles(db, elderId);
   await ensureConversationLogs(db, elderId);
   await db.batch([
@@ -54,11 +72,6 @@ async function ensureBackendDemoData(db, elderId) {
   if (imported) return;
 
   // Port the synthetic FastAPI/SQLite examples into D1. Never copy its Wi-Fi password or private IP.
-  const utcNow = new Date(Date.now() + 7 * 60 * 60 * 1000);
-  const dateOffset = (daysAgo, time) => {
-    const date = new Date(utcNow.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    return new Date(`${date}T${time}+07:00`).toISOString();
-  };
   const deviceList = JSON.stringify([
     { id: 'DEV-BLE-01', name: 'Robot Myka Companion', type: 'robot', status: 'Đã ghép hồ sơ', signal: -52 },
     { id: 'DEV-BLE-02', name: 'Máy đo huyết áp BLE', type: 'sphygmomanometer', status: 'Đã ghép hồ sơ', signal: -64 },
@@ -76,11 +89,14 @@ async function ensureBackendDemoData(db, elderId) {
     ].map(([id, sys, dia, pulse, status, note, timestamp]) => db.prepare(`INSERT OR IGNORE INTO blood_pressure
       (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(id, elderId, sys, dia, pulse, status, note, timestamp)),
-    db.prepare("DELETE FROM care_schedule WHERE elder_id = ? AND id LIKE 'SCH-DEMO-%'").bind(elderId),
     ...[
       ['SCH-001', 'medication', 'Uống thuốc huyết áp', 'Uống thuốc theo lịch chăm sóc.', dateOffset(0, '08:00:00'), 1],
       ['SCH-002', 'medication', 'Uống thuốc buổi trưa', 'Nhắc uống thuốc buổi trưa.', dateOffset(0, '12:00:00'), 0],
-      ['SCH-003', 'checkup', 'Lịch tái khám', 'Tái khám định kỳ.', dateOffset(-5, '09:00:00'), 0],
+      ['SCH-003', 'checkup', 'Lịch tái khám', 'Đã hoàn thành buổi tái khám.', dateOffset(5, '09:00:00'), 1],
+      ['SCH-DEMO-MED-MISSED', 'medication', 'Uống thuốc huyết áp', 'Robot chưa nhận được xác nhận đã uống thuốc.', dateOffset(1, '08:00:00'), 0],
+      ['SCH-DEMO-MED-DONE', 'medication', 'Uống thuốc buổi tối', 'Robot đã ghi nhận Ngoại uống thuốc.', dateOffset(2, '20:00:00'), 1],
+      ['SCH-DEMO-CHECKUP-DONE', 'checkup', 'Tái khám định kỳ', 'Đã hoàn thành buổi tái khám.', dateOffset(5, '09:00:00'), 1],
+      ['SCH-DEMO-UPCOMING', 'medication', 'Uống thuốc huyết áp', 'Nhắc uống thuốc sau bữa sáng.', dateOffset(-1, '08:00:00'), 0],
     ].map(([id, type, title, detail, scheduledAt, confirmed]) => db.prepare(`INSERT OR REPLACE INTO care_schedule
       (id, elder_id, type, title, detail, scheduled_at, confirmed) VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .bind(id, elderId, type, title, detail, scheduledAt, confirmed)),
