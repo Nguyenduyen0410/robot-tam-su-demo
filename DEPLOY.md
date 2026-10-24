@@ -33,7 +33,7 @@ Các thao tác Wi-Fi/Bluetooth và ghi phép đo hiện chỉ mô phỏng dữ l
 
 ## Cài đặt người thân
 
-`GET /api/family/elder-profile/{elder_id}` trả về hồ sơ mẫu cố định để trình diễn giao diện. Endpoint này chỉ đọc và không nhận dữ liệu cá nhân do người dùng nhập.
+`GET/PUT /api/family/elder-profile/{elder_id}` đọc và lưu thông tin bổ sung của hồ sơ người cao tuổi đã liên kết: tuổi, địa chỉ và ghi chú sức khỏe. Người thân mở Hồ sơ, chọn Thêm thông tin hoặc Chỉnh sửa rồi Lưu thay đổi. API kiểm tra giới hạn dữ liệu, lưu vào D1 và trả hồ sơ đã cập nhật. Bản public hiện là demo dùng dữ liệu minh họa theo giới hạn bên dưới.
 
 `GET/PUT /api/family/settings/{elder_id}` lưu lựa chọn Không làm phiền (thời lượng tùy chỉnh tối đa 24 giờ hoặc đến khi bật lại), kiểu giọng và tên robot tùy chọn. Đây là cấu hình hồ sơ demo: app chưa có push notification để tắt rung/âm thanh thực tế; giọng và tên chỉ được áp dụng khi tích hợp phần cứng.
 

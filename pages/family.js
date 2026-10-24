@@ -30,7 +30,10 @@
     const [healthDataSource, setHealthDataSource] = React.useState('app_demo');
     const [preferences, setPreferences] = React.useState({ dnd_mode: 'off', dnd_until: null, voice_profile: 'female_young_sweet', robot_name: '' });
     const [careProfile, setCareProfile] = React.useState(null);
-    const [careProfileMessage, setCareProfileMessage] = React.useState('Đang tải hồ sơ mẫu từ backend…');
+    const [careProfileMessage, setCareProfileMessage] = React.useState('Đang tải hồ sơ người cao tuổi…');
+    const [profileEditing, setProfileEditing] = React.useState(false);
+    const [profileSaving, setProfileSaving] = React.useState(false);
+    const [profileDraft, setProfileDraft] = React.useState({ age: '', address: '', health_notes: '' });
     const [settingsSaving, setSettingsSaving] = React.useState(false);
     const [settingsMessage, setSettingsMessage] = React.useState('');
     const [conversationDate, setConversationDate] = React.useState(new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10));
@@ -77,8 +80,8 @@
         .catch(() => { if (active) setSettingsMessage('Chưa tải được cài đặt từ máy chủ.'); });
       fetch(apiUrl(`/family/elder-profile/${elderId}`))
         .then(r => r.ok ? r.json() : Promise.reject())
-        .then(data => { if (active) { setCareProfile(data); setCareProfileMessage('Hồ sơ mẫu đã tải từ backend.'); } })
-        .catch(() => { if (active) { setCareProfile(null); setCareProfileMessage('Chưa kết nối được backend để tải hồ sơ mẫu.'); } });
+        .then(data => { if (active) { setCareProfile(data); setCareProfileMessage('Đã tải hồ sơ người cao tuổi.'); } })
+        .catch(() => { if (active) { setCareProfile(null); setCareProfileMessage('Chưa tải được hồ sơ. Vui lòng kiểm tra kết nối.'); } });
       return () => { active = false; };
     }, [days]);
 
@@ -157,6 +160,26 @@
         .then(data => { setPreferences(data); setSettingsMessage('Đã lưu cài đặt vào hồ sơ gia đình.'); })
         .catch(() => setSettingsMessage('Chưa lưu được cài đặt. Vui lòng thử lại khi kết nối máy chủ ổn định.'))
         .finally(() => setSettingsSaving(false));
+    };
+    const startProfileEdit = () => {
+      setProfileDraft({ age: careProfile?.age ?? '', address: careProfile?.address || '', health_notes: careProfile?.health_notes || '' });
+      setProfileEditing(true);
+      setCareProfileMessage('Nhập thông tin rồi chọn Lưu thay đổi.');
+    };
+    const saveCareProfile = async event => {
+      event.preventDefault();
+      setProfileSaving(true);
+      try {
+        const response = await fetch(apiUrl(`/family/elder-profile/${elderId}`), {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...profileDraft, age: profileDraft.age === '' ? null : Number(profileDraft.age) }),
+        });
+        if (!response.ok) throw new Error();
+        const saved = await response.json();
+        setCareProfile(saved); setProfileEditing(false);
+        setCareProfileMessage('Đã lưu thay đổi hồ sơ người cao tuổi.');
+      } catch { setCareProfileMessage('Chưa lưu được hồ sơ. Thông tin đang nhập được giữ lại để thử lại.'); }
+      finally { setProfileSaving(false); }
     };
     const voiceOptions = [
       { id: 'male_young_warm', label: 'Nam thành niên', detail: 'Ấm áp' },
@@ -283,7 +306,18 @@
               <div className="flex items-center gap-4"><img src="assets/avatar-family.png" alt={`Ảnh đại diện ${familyUserName}`} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-white/70" /><div><p className="text-2xl font-bold">{familyUserName}</p><p className="text-blue-50/80">Người thân · Tài khoản Myka Care</p></div></div>
               <div className="mt-6 grid sm:grid-cols-2 gap-3"><div className="rounded-2xl bg-white/10 p-4"><p className="text-xs text-blue-50/70">EMAIL ĐĂNG NHẬP</p><p className="mt-1 font-semibold break-all">{user?.email || 'Chưa có email'}</p></div><div className="rounded-2xl bg-white/10 p-4"><p className="text-xs text-blue-50/70">MÃ HỒ SƠ NGƯỜI THÂN</p><p className="mt-1 font-semibold">{user?.id || 'Tài khoản gia đình'}</p></div></div>
             </article>
-            <article className="rounded-3xl border border-blue-100 bg-white p-5 md:p-6"><div className="flex items-center gap-3"><span className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-700 grid place-items-center text-xl"><span className="material-symbols-rounded" aria-hidden="true">favorite</span></span><div><h3 className="font-bold text-lg">Hồ sơ chăm sóc</h3><p className="text-sm text-slate-500">Thông tin mẫu về người thân được chăm sóc</p></div></div><div className="mt-5 grid sm:grid-cols-2 gap-4"><div><p className="text-xs text-slate-500">NGƯỜI THÂN</p><p className="font-semibold mt-1">{elder?.name || 'Bà Nguyễn Thị Hoa'}</p></div><div><p className="text-xs text-slate-500">MÃ HỒ SƠ</p><p className="font-semibold mt-1">{elder?.id || elderId}</p></div><div><p className="text-xs text-slate-500">TUỔI</p><p className="font-semibold mt-1">{careProfile?.age ? `${careProfile.age} tuổi` : '—'}</p></div><div><p className="text-xs text-slate-500">ĐỊA CHỈ</p><p className="font-semibold mt-1">{careProfile?.address || '—'}</p></div><div className="sm:col-span-2"><p className="text-xs text-slate-500">TÌNH TRẠNG SỨC KHỎE / TIỀN SỬ</p><p className="font-semibold mt-1">{careProfile?.health_notes || '—'}</p></div></div><p role="status" className="mt-4 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">{careProfileMessage}</p><p className="mt-3 text-xs text-slate-500">Đây là hồ sơ giả cố định để trình diễn luồng giao diện, được tải từ backend. Không nhập hoặc lưu thông tin cá nhân ở mục này.</p></article>
+            <article className="rounded-3xl border border-blue-100 bg-white p-5 md:p-6">
+              <div className="flex items-center justify-between gap-3"><div><h3 className="font-bold text-lg">Hồ sơ người cao tuổi</h3><p className="text-sm text-slate-500">{elder?.name || elderId} · Mã hồ sơ {elderId}</p></div>
+              {!profileEditing && <button type="button" onClick={startProfileEdit} className="rounded-xl bg-blue-700 px-4 py-2 font-semibold text-white">{careProfile?.updated_at ? 'Chỉnh sửa' : 'Thêm'}</button>}</div>
+              {!profileEditing && <button type="button" onClick={startProfileEdit} className="mt-3 text-sm font-semibold text-blue-700">Thêm thông tin</button>}
+              {profileEditing ? <form onSubmit={saveCareProfile} className="mt-5 space-y-4">
+                <label className="block text-sm font-semibold">Tuổi<input type="number" min="1" max="130" step="1" value={profileDraft.age} onChange={e => setProfileDraft({ ...profileDraft, age: e.target.value })} className="mt-1 block w-full rounded-xl border border-slate-300 p-3" /></label>
+                <label className="block text-sm font-semibold">Địa chỉ<input maxLength="500" value={profileDraft.address} onChange={e => setProfileDraft({ ...profileDraft, address: e.target.value })} className="mt-1 block w-full rounded-xl border border-slate-300 p-3" /></label>
+                <label className="block text-sm font-semibold">Tình trạng sức khỏe và tiền sử<textarea maxLength="2000" rows="3" value={profileDraft.health_notes} onChange={e => setProfileDraft({ ...profileDraft, health_notes: e.target.value })} className="mt-1 block w-full rounded-xl border border-slate-300 p-3" /></label>
+                <div className="flex gap-3"><button disabled={profileSaving} className="rounded-xl bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">{profileSaving ? 'Đang lưu…' : 'Lưu thay đổi'}</button><button type="button" disabled={profileSaving} onClick={() => setProfileEditing(false)} className="rounded-xl border px-4 py-2">Hủy</button></div>
+              </form> : <dl className="mt-5 grid sm:grid-cols-2 gap-4"><div><dt>Tuổi</dt><dd className="font-semibold">{careProfile?.age ?? 'Chưa cập nhật'}</dd></div><div><dt>Địa chỉ</dt><dd className="font-semibold">{careProfile?.address || 'Chưa cập nhật'}</dd></div><div className="sm:col-span-2"><dt>Tình trạng sức khỏe và tiền sử</dt><dd className="font-semibold">{careProfile?.health_notes || 'Chưa cập nhật'}</dd></div></dl>}
+              <p role="status" className="mt-4 text-sm text-blue-800">{careProfileMessage}</p>
+            </article>
           </section>}
 
           {tab === 'health' && <section>

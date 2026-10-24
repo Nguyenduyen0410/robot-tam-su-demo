@@ -222,6 +222,22 @@ export async function onRequest({ request, env, params }) {
       return json(request, profile);
     }
 
+    if (request.method === 'PUT' && area === 'family' && section === 'elder-profile' && elderId) {
+      const body = await request.json();
+      const age = body.age == null ? null : body.age;
+      if ((age !== null && (!Number.isInteger(age) || age < 1 || age > 130)) ||
+          typeof body.address !== 'string' || body.address.length > 500 ||
+          typeof body.health_notes !== 'string' || body.health_notes.length > 2000) {
+        return json(request, { error: 'Thông tin hồ sơ không hợp lệ.' }, 400);
+      }
+      await ensureElderProfiles(db, elderId);
+      await db.prepare(`INSERT INTO elder_profiles (elder_id, age, address, health_notes, updated_at)
+        VALUES (?, ?, ?, ?, ?) ON CONFLICT(elder_id) DO UPDATE SET
+        age=excluded.age, address=excluded.address, health_notes=excluded.health_notes, updated_at=excluded.updated_at`)
+        .bind(elderId, age, body.address.trim(), body.health_notes.trim(), nowIso()).run();
+      return json(request, await db.prepare('SELECT * FROM elder_profiles WHERE elder_id = ?').bind(elderId).first());
+    }
+
     if (request.method === 'GET' && area === 'family' && section === 'settings' && elderId) {
       await ensureFamilyPreferences(db, elderId);
       const settings = await db.prepare('SELECT dnd_mode, dnd_until, voice_profile, robot_name, updated_at FROM family_preferences WHERE elder_id = ?').bind(elderId).first();

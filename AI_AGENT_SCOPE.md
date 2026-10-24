@@ -38,3 +38,7 @@ Nhật ký trò chuyện hiện dùng dữ liệu tổng hợp minh họa. Chưa
 ## Lưu ý trước khi public
 
 Backend hiện là demo SQLite, chưa có xác thực/ủy quyền server-side cho người dùng hoặc thiết bị. Các API thay đổi cấu hình cần được bảo vệ trước khi đưa dữ liệu hoặc thiết bị thật lên Internet. Không dùng dữ liệu/mật khẩu Wi-Fi thật trong bản demo public; API đọc kết nối không trả lại trường mật khẩu.
+
+## Hồ sơ người cao tuổi
+
+Người thân bổ sung thông tin hồ sơ đã liên kết sau đăng nhập, qua Thêm thông tin hoặc Chỉnh sửa và Lưu thay đổi. GET/PUT `/api/family/elder-profile/{elder_id}` đọc và lưu tuổi, địa chỉ, ghi chú sức khỏe vào backend. Thao tác không tạo hồ sơ liên kết mới và không sửa phép đo. API hiện vẫn thuộc demo chưa có xác thực server-side, chỉ sử dụng dữ liệu minh họa cho tới khi hoàn thiện phân quyền.
