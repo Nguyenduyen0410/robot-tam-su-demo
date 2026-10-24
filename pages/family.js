@@ -350,7 +350,7 @@
       ? new Date(preferences.dnd_until).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
       : '';
     if (connectivity === null) return <div className="min-h-screen grid place-items-center bg-slate-50"><p className="text-slate-600">Đang kiểm tra trạng thái thiết bị Myka…</p></div>;
-    if (setupMode || !devicePaired) return <DeviceSetupScreen apiUrl={apiUrl} onPaired={() => {
+    if (setupMode || !devicePaired) return <DeviceSetupScreen apiUrl={apiUrl} demoMode={Boolean(user?.demoSetupMode)} onPaired={() => {
       if (setupMode) RTS.LS.set(setupCompleteKey, true);
       RTS.LS.set(`myka_device_paired_${user?.id}`, true);
       setSetupMode(false);

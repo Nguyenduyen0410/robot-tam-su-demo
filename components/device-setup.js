@@ -1,9 +1,9 @@
 // Guided onboarding for pairing the Myka device.
 (function () {
-  function DeviceSetupScreen({ apiUrl, onPaired }) {
+  function DeviceSetupScreen({ apiUrl, onPaired, demoMode = false }) {
     const [step, setStep] = React.useState(0);
-    const [serial, setSerial] = React.useState('');
-    const [deviceName, setDeviceName] = React.useState('Máy đo Myka');
+    const [serial, setSerial] = React.useState(demoMode ? 'MYKA-0001' : '');
+    const [deviceName, setDeviceName] = React.useState(demoMode ? 'Myka Care BP-01' : 'Máy đo Myka');
     const [wifiSaved, setWifiSaved] = React.useState(false);
     const [cameraOn, setCameraOn] = React.useState(false);
     const [message, setMessage] = React.useState('');
@@ -51,6 +51,11 @@
       finally { setBusy(false); }
     };
     const savePairing = async () => {
+      if (demoMode) {
+        setMessage('Đã hoàn tất bước ghép nối trong hướng dẫn.');
+        setStep(3);
+        return;
+      }
       if (!serial.trim()) { setMessage('Nhập mã số máy hoặc quét QR trước.'); setStep(1); return; }
       setBusy(true); setMessage('');
       try {
@@ -65,6 +70,11 @@
       finally { setBusy(false); }
     };
     const saveWifi = async ({ ssid, password }) => {
+      if (demoMode) {
+        // The guided account uses a fixed sample password and must not change shared device data.
+        setWifiSaved(true);
+        return;
+      }
       const response = await fetch(apiUrl('/device/wifi/E001'), {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ssid, password }),
       });
@@ -73,13 +83,13 @@
     };
 
     const steps = ['Xác thực thiết bị', 'Ghép nối Bluetooth', 'Kết nối mạng Wi-Fi'];
-    if (!step) return <div className="min-h-screen bg-gradient-to-br from-violet-50 to-sky-50 p-5 grid place-items-center"><section className="w-full max-w-xl bg-white rounded-3xl border border-slate-200 p-7 shadow-xl shadow-violet-100"><div className="text-5xl mb-4">🤖</div><p className="text-sm font-bold text-violet-700">MYKA CARE COMPANION</p><h1 className="text-2xl sm:text-3xl font-extrabold mt-2">Chưa có thiết bị được kết nối</h1><p className="text-slate-600 mt-2">Thiết lập thiết bị Myka của bạn qua 3 bước đơn giản.</p><ol className="mt-7 space-y-3">{steps.map((title, index) => <li key={title} className="flex gap-4 items-center rounded-2xl bg-slate-50 p-4"><span className="w-10 h-10 rounded-full bg-violet-100 text-violet-800 font-bold grid place-items-center">0{index + 1}</span><span className="font-semibold">{title}</span></li>)}</ol><button onClick={startSetup} className="w-full mt-7 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold py-4 shadow-lg shadow-violet-200">Bắt đầu thiết lập</button></section></div>;
+    if (!step) return <div className="min-h-screen bg-gradient-to-br from-sky-50 to-blue-50 p-5 grid place-items-center"><section className="w-full max-w-xl bg-white rounded-3xl border border-blue-100 p-7 shadow-xl shadow-blue-100"><div className="text-5xl mb-4">🤖</div><p className="text-sm font-bold text-blue-700">MYKA CARE COMPANION</p><h1 className="text-2xl sm:text-3xl font-extrabold mt-2">{demoMode ? 'Kết nối máy Myka lần đầu' : 'Chưa có thiết bị được kết nối'}</h1><p className="text-slate-600 mt-2">Thiết lập thiết bị Myka của bạn qua 3 bước đơn giản.</p><ol className="mt-7 space-y-3">{steps.map((title, index) => <li key={title} className="flex gap-4 items-center rounded-2xl bg-slate-50 p-4"><span className="w-10 h-10 rounded-full bg-blue-100 text-blue-800 font-bold grid place-items-center">0{index + 1}</span><span className="font-semibold">{title}</span></li>)}</ol>{demoMode && <p className="mt-4 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">Thông tin máy, mạng và mật khẩu mẫu đã được điền sẵn để bạn lần lượt xem các bước.</p>}<button onClick={startSetup} className="w-full mt-7 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold py-4 shadow-lg shadow-blue-200">Bắt đầu thiết lập</button></section></div>;
 
     return <div className="min-h-screen bg-slate-50 p-4 sm:p-8 grid place-items-center"><section className="w-full max-w-2xl bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-xl"><div className="flex gap-2 mb-7">{steps.map((title, index) => <div key={title} className="flex-1"><div className={`h-2 rounded-full ${step >= index + 1 ? 'bg-violet-600' : 'bg-slate-200'}`} /><p className="text-[11px] sm:text-xs text-slate-500 mt-2">0{index + 1} · {title}</p></div>)}</div>
       <h1 className="text-2xl font-bold">{steps[step - 1]}</h1>
-      {step === 1 && <div className="mt-5 space-y-4"><p className="text-sm text-slate-600">Quét mã QR trên thân máy hoặc nhập mã số máy.</p>{cameraOn && <video ref={videoRef} autoPlay playsInline className="w-full max-h-64 rounded-xl bg-slate-900 object-cover" />}<div className="flex flex-wrap gap-2"><button onClick={() => { setMessage(''); setCameraOn(true); }} className="rounded-lg bg-violet-100 text-violet-800 px-4 py-2 font-semibold">📷 Mở camera quét QR</button><button onClick={() => setCameraOn(false)} className="rounded-lg border px-4 py-2">Tắt camera</button></div><label className="block text-sm font-semibold">Mã số máy<input value={serial} onChange={e => setSerial(e.target.value)} placeholder="Ví dụ: MYKA-0001" className="mt-1 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label><label className="block text-sm font-semibold">Tên thiết bị<input value={deviceName} onChange={e => setDeviceName(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label><button onClick={() => setStep(2)} className="rounded-xl bg-violet-600 text-white px-5 py-3 font-bold">Tiếp tục</button></div>}
-      {step === 2 && <div className="mt-5 space-y-4"><p className="text-sm text-slate-600">Bật máy đo và cho phép trình duyệt tìm thiết bị Bluetooth ở gần. Cần HTTPS và trình duyệt hỗ trợ Web Bluetooth.</p><button disabled={busy} onClick={chooseBluetoothDevice} className="rounded-xl bg-sky-600 text-white px-5 py-3 font-bold disabled:opacity-60">{busy ? 'Đang tìm…' : 'Tìm thiết bị Bluetooth'}</button><div><button onClick={savePairing} disabled={busy} className="rounded-xl bg-violet-600 text-white px-5 py-3 font-bold disabled:opacity-60">Lưu ghép nối và tiếp tục</button><p className="text-xs text-slate-500 mt-2">Thiết bị sẽ hiển thị đã kết nối khi phần cứng xác nhận ghép nối.</p></div></div>}
-      {step === 3 && <div className="mt-5"><WifiNetworkPicker currentSsid="" onSaved={saveWifi} /><p className="text-xs text-slate-500 mt-3">Kết nối Wi-Fi sẽ hoàn tất khi gateway Myka nhận cấu hình.</p></div>}
+      {step === 1 && <div className="mt-5 space-y-4">{demoMode ? <><p className="text-sm text-slate-600">Thông tin máy đã sẵn sàng. Kiểm tra mã máy và tên thiết bị, sau đó tiếp tục.</p><label className="block text-sm font-semibold">Mã số máy<input value={serial} onChange={e => setSerial(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label><label className="block text-sm font-semibold">Tên thiết bị<input value={deviceName} onChange={e => setDeviceName(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label><button onClick={() => setStep(2)} className="rounded-xl bg-blue-700 text-white px-5 py-3 font-bold">Xác nhận thông tin máy</button></> : <><p className="text-sm text-slate-600">Quét mã QR trên thân máy hoặc nhập mã số máy.</p>{cameraOn && <video ref={videoRef} autoPlay playsInline className="w-full max-h-64 rounded-xl bg-slate-900 object-cover" />}<div className="flex flex-wrap gap-2"><button onClick={() => { setMessage(''); setCameraOn(true); }} className="rounded-lg bg-blue-100 text-blue-800 px-4 py-2 font-semibold">📷 Mở camera quét QR</button><button onClick={() => setCameraOn(false)} className="rounded-lg border px-4 py-2">Tắt camera</button></div><label className="block text-sm font-semibold">Mã số máy<input value={serial} onChange={e => setSerial(e.target.value)} placeholder="Ví dụ: MYKA-0001" className="mt-1 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label><label className="block text-sm font-semibold">Tên thiết bị<input value={deviceName} onChange={e => setDeviceName(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 p-3 font-normal" /></label><button onClick={() => setStep(2)} className="rounded-xl bg-blue-700 text-white px-5 py-3 font-bold">Tiếp tục</button></>}</div>}
+      {step === 2 && <div className="mt-5 space-y-4">{demoMode ? <><p className="text-sm text-slate-600">Máy đo Myka BP-01 đã sẵn sàng ghép nối trong hướng dẫn.</p><div className="rounded-xl border border-blue-100 bg-blue-50 p-4"><div className="font-semibold text-slate-800">Myka Care BP-01</div><div className="mt-1 text-sm text-blue-800">Bluetooth · Sẵn sàng ghép nối</div></div><button disabled={busy} onClick={savePairing} className="rounded-xl bg-blue-700 text-white px-5 py-3 font-bold disabled:opacity-60">Xác nhận ghép nối</button><p className="text-xs text-slate-500">Bước này minh họa quy trình trên hồ sơ hướng dẫn; để kết nối phần cứng thật cần máy đo tương thích.</p></> : <><p className="text-sm text-slate-600">Bật máy đo và cho phép trình duyệt tìm thiết bị Bluetooth ở gần. Cần HTTPS và trình duyệt hỗ trợ Web Bluetooth.</p><button disabled={busy} onClick={chooseBluetoothDevice} className="rounded-xl bg-sky-600 text-white px-5 py-3 font-bold disabled:opacity-60">{busy ? 'Đang tìm…' : 'Tìm thiết bị Bluetooth'}</button><div><button onClick={savePairing} disabled={busy} className="rounded-xl bg-blue-700 text-white px-5 py-3 font-bold disabled:opacity-60">Lưu ghép nối và tiếp tục</button><p className="text-xs text-slate-500 mt-2">Thiết bị sẽ hiển thị đã kết nối khi phần cứng xác nhận ghép nối.</p></div></>}</div>}
+      {step === 3 && <div className="mt-5"><WifiNetworkPicker currentSsid={demoMode ? 'Myka-Home-2.4G' : ''} demoMode={demoMode} initialSsid="Myka-Home-2.4G" initialPassword="MykaDemo-2468" onSaved={saveWifi} /><p className="text-xs text-slate-500 mt-3">{demoMode ? 'Mật khẩu mẫu chỉ dùng trong màn hình hướng dẫn, không được gửi hoặc lưu.' : 'Kết nối Wi-Fi sẽ hoàn tất khi gateway Myka nhận cấu hình.'}</p></div>}
       {message && <p role="status" className="mt-4 rounded-xl bg-amber-50 text-amber-900 p-3 text-sm">{message}</p>}
       <div className="mt-6 flex justify-between"><button onClick={() => setStep(Math.max(1, step - 1))} className="rounded-lg border px-4 py-2">Quay lại</button>{step === 3 && <button disabled={!wifiSaved} onClick={onPaired} className="rounded-xl bg-violet-600 text-white px-5 py-2.5 font-bold disabled:opacity-40">{wifiSaved ? 'Hoàn tất thiết lập' : 'Lưu Wi-Fi để hoàn tất'}</button>}</div>
     </section></div>;
