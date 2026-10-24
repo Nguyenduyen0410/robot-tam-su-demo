@@ -30,6 +30,27 @@ let conversationLogsSchemaReady = false;
 async function ensureBackendDemoData(db, elderId) {
   if (elderId !== 'E001') return;
   const imported = await db.prepare("SELECT id FROM blood_pressure WHERE elder_id = ? AND id = 'BP-001'").bind(elderId).first();
+  await ensureElderProfiles(db, elderId);
+  await ensureConversationLogs(db, elderId);
+  await db.batch([
+    db.prepare("UPDATE blood_pressure SET note = 'Đo huyết áp buổi sáng' WHERE elder_id = ? AND id = 'BP-005' AND note LIKE '%mô phỏng%'").bind(elderId),
+    db.prepare("UPDATE blood_pressure SET note = 'Đo huyết áp buổi chiều' WHERE elder_id = ? AND id = 'BP-006' AND note LIKE '%mô phỏng%'").bind(elderId),
+    db.prepare("UPDATE care_schedule SET detail = 'Uống thuốc theo lịch chăm sóc.' WHERE elder_id = ? AND id = 'SCH-001' AND detail LIKE '%minh họa%'").bind(elderId),
+    db.prepare("UPDATE care_schedule SET detail = 'Nhắc uống thuốc buổi trưa.' WHERE elder_id = ? AND id = 'SCH-002' AND detail LIKE '%minh họa%'").bind(elderId),
+    db.prepare("UPDATE care_schedule SET detail = 'Tái khám định kỳ.' WHERE elder_id = ? AND id = 'SCH-003' AND detail LIKE '%minh họa%'").bind(elderId),
+    db.prepare("UPDATE care_schedule SET detail = CASE WHEN type = 'checkup' THEN 'Tái khám định kỳ.' ELSE 'Uống thuốc theo lịch chăm sóc.' END WHERE elder_id = ? AND detail LIKE '%minh họa%'").bind(elderId),
+    db.prepare("UPDATE maintenance_notifications SET detail = 'Đến hạn kiểm tra định kỳ thiết bị đo huyết áp.' WHERE elder_id = ? AND id = 'MNT-001' AND detail LIKE '%minh họa%'").bind(elderId),
+    db.prepare("UPDATE alerts SET title = 'Chỉ số huyết áp vượt ngưỡng', detail = 'Số đo ghi nhận vượt ngưỡng theo dõi đã cài đặt.' WHERE elder_id = ? AND id = 'ALT-DEMO-01' AND detail LIKE '%minh họa%'").bind(elderId),
+    db.prepare("UPDATE conversation_logs SET message_text = 'Dạ, con ghi nhận để gia đình tiện xem lại ạ.' WHERE elder_id = ? AND id = 'TGC-004' AND message_text LIKE '%minh họa%'").bind(elderId),
+    db.prepare("UPDATE elder_profiles SET address = replace(address, ' (địa chỉ giả)', '') WHERE elder_id = ?").bind(elderId),
+    db.prepare("UPDATE elder_profiles SET health_notes = 'Tăng huyết áp' WHERE elder_id = ? AND health_notes = 'Tăng huyết áp (tình trạng minh họa)'").bind(elderId),
+    db.prepare(`UPDATE device_connectivity SET
+      wifi_ssid = CASE WHEN wifi_ssid LIKE '%mô phỏng%' OR wifi_ssid LIKE '%minh họa%' THEN 'Myka-Home-2.4G' ELSE wifi_ssid END,
+      wifi_status = CASE WHEN wifi_status = 'mô phỏng' OR wifi_status = 'demo' THEN 'Đã cấu hình' ELSE wifi_status END,
+      bluetooth_status = CASE WHEN bluetooth_status = 'mô phỏng' OR bluetooth_status = 'demo' THEN 'Đã ghép hồ sơ' ELSE bluetooth_status END,
+      paired_devices = replace(replace(paired_devices, ' (mô phỏng)', ''), '"status":"mô phỏng"', '"status":"Đã ghép hồ sơ"')
+      WHERE elder_id = ?`).bind(elderId),
+  ]);
   if (imported) return;
 
   // Port the synthetic FastAPI/SQLite examples into D1. Never copy its Wi-Fi password or private IP.
@@ -39,8 +60,8 @@ async function ensureBackendDemoData(db, elderId) {
     return new Date(`${date}T${time}+07:00`).toISOString();
   };
   const deviceList = JSON.stringify([
-    { id: 'DEV-BLE-01', name: 'Robot Myka Companion (mô phỏng)', type: 'robot', status: 'mô phỏng', signal: -52 },
-    { id: 'DEV-BLE-02', name: 'Máy đo huyết áp BLE (mô phỏng)', type: 'sphygmomanometer', status: 'mô phỏng', signal: -64 },
+    { id: 'DEV-BLE-01', name: 'Robot Myka Companion', type: 'robot', status: 'Đã ghép hồ sơ', signal: -52 },
+    { id: 'DEV-BLE-02', name: 'Máy đo huyết áp BLE', type: 'sphygmomanometer', status: 'Đã ghép hồ sơ', signal: -64 },
   ]);
   await db.batch([
     db.prepare("DELETE FROM blood_pressure WHERE elder_id = ? AND id LIKE 'DEMO-%'").bind(elderId),
@@ -49,39 +70,39 @@ async function ensureBackendDemoData(db, elderId) {
       ['BP-002', 130, 80, 75, 'normal', 'Đo huyết áp buổi chiều', dateOffset(5, '14:15:00')],
       ['BP-003', 126, 76, 70, 'normal', 'Đo định kỳ buổi sáng', dateOffset(4, '09:00:00')],
       ['BP-004', 128, 79, 74, 'normal', 'Đo định kỳ buổi chiều', dateOffset(4, '14:00:00')],
-      ['BP-005', 145, 90, 88, 'critical', 'Tình huống mô phỏng có chỉ số vượt ngưỡng', dateOffset(3, '09:10:00')],
-      ['BP-006', 128, 78, 72, 'normal', 'Phép đo mô phỏng tiếp theo', dateOffset(3, '14:30:00')],
+      ['BP-005', 145, 90, 88, 'critical', 'Đo huyết áp buổi sáng', dateOffset(3, '09:10:00')],
+      ['BP-006', 128, 78, 72, 'normal', 'Đo huyết áp buổi chiều', dateOffset(3, '14:30:00')],
       ['BP-007', 125, 75, 71, 'normal', 'Đo huyết áp buổi sáng', dateOffset(2, '09:00:00')],
     ].map(([id, sys, dia, pulse, status, note, timestamp]) => db.prepare(`INSERT OR IGNORE INTO blood_pressure
       (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(id, elderId, sys, dia, pulse, status, note, timestamp)),
     db.prepare("DELETE FROM care_schedule WHERE elder_id = ? AND id LIKE 'SCH-DEMO-%'").bind(elderId),
     ...[
-      ['SCH-001', 'medication', 'Uống thuốc huyết áp', 'Lịch dùng thuốc minh họa; đối chiếu với đơn thuốc thực tế.', dateOffset(0, '08:00:00'), 1],
-      ['SCH-002', 'medication', 'Uống thuốc buổi trưa', 'Lịch chăm sóc minh họa; không thay thế hướng dẫn của nhân viên y tế.', dateOffset(0, '12:00:00'), 0],
-      ['SCH-003', 'checkup', 'Lịch tái khám', 'Lịch hẹn minh họa.', dateOffset(-5, '09:00:00'), 0],
+      ['SCH-001', 'medication', 'Uống thuốc huyết áp', 'Uống thuốc theo lịch chăm sóc.', dateOffset(0, '08:00:00'), 1],
+      ['SCH-002', 'medication', 'Uống thuốc buổi trưa', 'Nhắc uống thuốc buổi trưa.', dateOffset(0, '12:00:00'), 0],
+      ['SCH-003', 'checkup', 'Lịch tái khám', 'Tái khám định kỳ.', dateOffset(-5, '09:00:00'), 0],
     ].map(([id, type, title, detail, scheduledAt, confirmed]) => db.prepare(`INSERT OR REPLACE INTO care_schedule
       (id, elder_id, type, title, detail, scheduled_at, confirmed) VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .bind(id, elderId, type, title, detail, scheduledAt, confirmed)),
     db.prepare("DELETE FROM maintenance_notifications WHERE elder_id = ? AND id LIKE 'MNT-DEMO-%'").bind(elderId),
     db.prepare(`INSERT OR REPLACE INTO maintenance_notifications
       (id, elder_id, title, detail, status, due_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .bind('MNT-001', elderId, 'Kiểm tra máy đo huyết áp', 'Nhắc bảo trì thiết bị minh họa.', 'pending', dateOffset(-7, '00:00:00').slice(0, 10), nowIso()),
+      .bind('MNT-001', elderId, 'Kiểm tra máy đo huyết áp', 'Đến hạn kiểm tra định kỳ thiết bị đo huyết áp.', 'pending', dateOffset(-7, '00:00:00').slice(0, 10), nowIso()),
     db.prepare(`INSERT INTO device_connectivity
       (elder_id, wifi_ssid, wifi_ip, wifi_signal, wifi_frequency, wifi_status, bluetooth_status, paired_devices, last_updated)
       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(elder_id) DO UPDATE SET
-      wifi_ssid = CASE WHEN device_connectivity.wifi_ssid IS NULL OR device_connectivity.wifi_ssid = 'Wi-Fi minh họa' THEN excluded.wifi_ssid ELSE device_connectivity.wifi_ssid END,
+      wifi_ssid = CASE WHEN device_connectivity.wifi_ssid IS NULL OR device_connectivity.wifi_ssid LIKE '%minh họa%' OR device_connectivity.wifi_ssid LIKE '%mô phỏng%' THEN excluded.wifi_ssid ELSE device_connectivity.wifi_ssid END,
       wifi_ip = NULL,
       wifi_signal = CASE WHEN device_connectivity.wifi_signal = 0 THEN excluded.wifi_signal ELSE device_connectivity.wifi_signal END,
       wifi_frequency = COALESCE(device_connectivity.wifi_frequency, excluded.wifi_frequency),
       wifi_status = excluded.wifi_status, bluetooth_status = excluded.bluetooth_status,
       paired_devices = excluded.paired_devices, last_updated = excluded.last_updated`)
-      .bind(elderId, 'Wi-Fi mô phỏng nhà Ngoại', 92, '2.4GHz', 'mô phỏng', 'mô phỏng', deviceList, nowIso()),
+      .bind(elderId, 'Myka-Home-2.4G', 92, '2.4GHz', 'Đã cấu hình', 'Đã ghép hồ sơ', deviceList, nowIso()),
     db.prepare(`INSERT OR IGNORE INTO alerts
       (id, elder_id, type, title, detail, severity, status, responded_by, timestamp)
       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)`)
-      .bind('ALT-DEMO-01', elderId, 'bp_alert', 'Bản ghi mô phỏng có chỉ số vượt ngưỡng', 'Tình huống minh họa luồng Agent; không phải dữ liệu đo từ người thật.', 'warning', 'pending', dateOffset(3, '09:12:00')),
+      .bind('ALT-DEMO-01', elderId, 'bp_alert', 'Chỉ số huyết áp vượt ngưỡng', 'Số đo ghi nhận vượt ngưỡng theo dõi đã cài đặt.', 'warning', 'pending', dateOffset(3, '09:12:00')),
   ]);
 }
 
@@ -97,7 +118,7 @@ async function agentStatus(db, elderId) {
   const status = measurement?.status || 'unknown';
   const statusLabel = ({ normal: 'Trong ngưỡng theo dõi', warning: 'Cần người chăm sóc lưu ý', critical: 'Đã phát hiện chỉ số vượt ngưỡng' })[status] || 'Chưa có dữ liệu';
   return {
-    agent_name: 'MYKA CARE AGENT · DEMO',
+    agent_name: 'MYKA CARE AGENT',
     service_status: measurement ? 'Đang hoạt động' : 'Đang chờ dữ liệu',
     data_source: 'Cloudflare Pages API / cơ sở dữ liệu D1',
     latest_measurement: measurement,
@@ -140,8 +161,10 @@ async function ensureElderProfiles(db, elderId) {
   }
   if (elderId === 'E001') {
     await db.prepare(`INSERT OR IGNORE INTO elder_profiles (elder_id, age, address, health_notes, updated_at)
-      VALUES ('E001', 72, '12 Đường Hoa Mai, Phường Hòa Xuân, Đà Nẵng (địa chỉ giả)',
-      'Tăng huyết áp (tình trạng minh họa)', ?)`).bind(nowIso()).run();
+      VALUES ('E001', 72, '12 Đường Hoa Mai, Phường Hòa Xuân, Đà Nẵng',
+      'Tăng huyết áp', ?)`).bind(nowIso()).run();
+    await db.prepare("UPDATE elder_profiles SET address = replace(address, ' (địa chỉ giả)', '') WHERE elder_id = 'E001'").run();
+    await db.prepare("UPDATE elder_profiles SET health_notes = 'Tăng huyết áp' WHERE elder_id = 'E001' AND health_notes = 'Tăng huyết áp (tình trạng minh họa)'").run();
   }
 }
 
@@ -167,7 +190,7 @@ async function ensureConversationLogs(db, elderId) {
         ['TGC-001', 'elder', 'Myka ơi, hôm nay thời tiết thế nào con?', '08:00:00', 'none'],
         ['TGC-002', 'myka', 'Dạ, hôm nay trời mát mẻ ạ. Ngoại muốn con trò chuyện thêm điều gì không?', '08:00:15', 'none'],
         ['TGC-003', 'elder', 'Trưa nay con Duyên có ghé ăn cơm với Ngoại không?', '09:30:00', 'none'],
-        ['TGC-004', 'myka', 'Dạ, đây là đoạn hội thoại minh họa trong dữ liệu backend demo ạ.', '09:30:20', 'none'],
+        ['TGC-004', 'myka', 'Dạ, con ghi nhận để gia đình tiện xem lại ạ.', '09:30:20', 'none'],
         ['TGC-005', 'elder', 'Hôm nay Ngoại hơi mệt trong người, chóng mặt nhẹ...', '10:15:00', 'family_followup'],
         ['TGC-006', 'myka', 'Dạ, con nghe Ngoại chia sẻ. Con ghi nhận lời nhắn này để gia đình xem lại ạ.', '10:15:25', 'none'],
         ['TGC-007', 'elder', 'Con kể chuyện vui ngày xưa cho Ngoại nghe đỡ buồn đi Myka.', '15:30:00', 'none'],
@@ -277,6 +300,7 @@ export async function onRequest({ request, env, params }) {
 
     if (request.method === 'GET' && area === 'family' && section === 'conversation-history' && elderId) {
       if (elderId !== 'E001') return json(request, { error: 'Bản mẫu API guide hiện chỉ được gán cho hồ sơ E001 (Bà Hoa).' }, 404);
+      await ensureBackendDemoData(db, elderId);
       const requestedDate = new URL(request.url).searchParams.get('date') || new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) return json(request, { error: 'Ngày không hợp lệ.' }, 422);
       const { messages, source } = await getReadOnlyChat(env, requestedDate);
@@ -305,6 +329,26 @@ export async function onRequest({ request, env, params }) {
       await db.prepare('INSERT INTO care_schedule (id, elder_id, type, title, detail, scheduled_at, confirmed) VALUES (?, ?, ?, ?, ?, ?, 0)')
         .bind(id, elderId, type, title, detail, scheduledAt).run();
       return json(request, { id, elder_id: elderId, type, title, detail, scheduled_at: scheduledAt, confirmed: 0 }, 201);
+    }
+    if (request.method === 'PUT' && area === 'family' && section === 'schedules' && elderId && extra) {
+      const body = await request.json();
+      const type = String(body.type || '');
+      const title = String(body.title || '').trim().slice(0, 120);
+      const detail = String(body.detail || '').trim().slice(0, 500);
+      const scheduledAt = String(body.scheduled_at || '');
+      if (!['medication', 'checkup'].includes(type) || !title || !Number.isFinite(Date.parse(scheduledAt))) {
+        return json(request, { error: 'Loại lịch, tên lịch hoặc thời điểm không hợp lệ.' }, 422);
+      }
+      const existing = await db.prepare('SELECT confirmed FROM care_schedule WHERE id = ? AND elder_id = ?').bind(extra, elderId).first();
+      if (!existing) return json(request, { error: 'Không tìm thấy lịch chăm sóc.' }, 404);
+      await db.prepare('UPDATE care_schedule SET type = ?, title = ?, detail = ?, scheduled_at = ? WHERE id = ? AND elder_id = ?')
+        .bind(type, title, detail, scheduledAt, extra, elderId).run();
+      return json(request, { id: extra, elder_id: elderId, type, title, detail, scheduled_at: scheduledAt, confirmed: existing.confirmed });
+    }
+    if (request.method === 'DELETE' && area === 'family' && section === 'schedules' && elderId && extra) {
+      const result = await db.prepare('DELETE FROM care_schedule WHERE id = ? AND elder_id = ?').bind(extra, elderId).run();
+      if (!result.meta?.changes) return json(request, { error: 'Không tìm thấy lịch chăm sóc.' }, 404);
+      return json(request, { success: true, id: extra });
     }
     if (request.method === 'GET' && area === 'family' && section === 'maintenance-notifications' && elderId) {
       await ensureBackendDemoData(db, elderId);
@@ -376,13 +420,13 @@ export async function onRequest({ request, env, params }) {
       const body = await request.json();
       const ssid = String(body.ssid || '').trim().slice(0, 80);
       if (!ssid) return json(request, { error: 'Tên mạng Wi-Fi không được để trống.' }, 422);
-      // This demo records only the network name; never persist the submitted password.
-      await db.prepare(`UPDATE device_connectivity SET wifi_ssid = ?, wifi_status = 'demo', last_updated = ? WHERE elder_id = ?`)
+      // Record only the network name; never persist the submitted password.
+      await db.prepare(`UPDATE device_connectivity SET wifi_ssid = ?, wifi_status = 'Đã lưu cấu hình', last_updated = ? WHERE elder_id = ?`)
         .bind(ssid, nowIso(), elderId).run();
       return json(request, { success: true, demo: true });
     }
     if (area === 'device' && section === 'wifi' && elderId && request.method === 'DELETE') {
-      await db.prepare(`UPDATE device_connectivity SET wifi_ssid = NULL, wifi_ip = NULL, wifi_signal = 0, wifi_status = 'demo', last_updated = ? WHERE elder_id = ?`)
+      await db.prepare(`UPDATE device_connectivity SET wifi_ssid = NULL, wifi_ip = NULL, wifi_signal = 0, wifi_status = 'Chưa cấu hình', last_updated = ? WHERE elder_id = ?`)
         .bind(nowIso(), elderId).run();
       return json(request, { success: true, demo: true });
     }
@@ -393,18 +437,32 @@ export async function onRequest({ request, env, params }) {
       const row = await db.prepare('SELECT paired_devices FROM device_connectivity WHERE elder_id = ?').bind(extra).first();
       if (!row) return json(request, { error: 'Chưa cấu hình thiết bị.' }, 404);
       const devices = JSON.parse(row.paired_devices || '[]');
-      const device = { id: newId('BT'), name: deviceName, type: String(body.device_type || 'device').slice(0, 40), status: 'demo' };
+      const device = { id: newId('BT'), name: deviceName, type: String(body.device_type || 'device').slice(0, 40), status: 'Đã ghép hồ sơ' };
       devices.push(device);
-      await db.prepare(`UPDATE device_connectivity SET paired_devices = ?, bluetooth_status = 'demo', last_updated = ? WHERE elder_id = ?`)
+      await db.prepare(`UPDATE device_connectivity SET paired_devices = ?, bluetooth_status = 'Đã ghép hồ sơ', last_updated = ? WHERE elder_id = ?`)
         .bind(JSON.stringify(devices), nowIso(), extra).run();
       return json(request, { success: true, demo: true, device }, 201);
+    }
+    if (area === 'device' && section === 'bluetooth' && resource && extra && request.method === 'PUT') {
+      const body = await request.json();
+      const deviceName = String(body.device_name || '').trim().slice(0, 80);
+      if (!deviceName) return json(request, { error: 'Tên thiết bị không được để trống.' }, 422);
+      const row = await db.prepare('SELECT paired_devices FROM device_connectivity WHERE elder_id = ?').bind(resource).first();
+      if (!row) return json(request, { error: 'Chưa cấu hình thiết bị.' }, 404);
+      const devices = JSON.parse(row.paired_devices || '[]');
+      const index = devices.findIndex(device => device.id === extra);
+      if (index < 0) return json(request, { error: 'Không tìm thấy thiết bị.' }, 404);
+      devices[index] = { ...devices[index], name: deviceName };
+      await db.prepare('UPDATE device_connectivity SET paired_devices = ?, last_updated = ? WHERE elder_id = ?')
+        .bind(JSON.stringify(devices), nowIso(), resource).run();
+      return json(request, { success: true, device: devices[index] });
     }
     if (area === 'device' && section === 'bluetooth' && resource && extra && request.method === 'DELETE') {
       const row = await db.prepare('SELECT paired_devices FROM device_connectivity WHERE elder_id = ?').bind(resource).first();
       if (!row) return json(request, { error: 'Chưa cấu hình thiết bị.' }, 404);
       const devices = JSON.parse(row.paired_devices || '[]').filter(device => device.id !== extra);
-      await db.prepare(`UPDATE device_connectivity SET paired_devices = ?, bluetooth_status = 'demo', last_updated = ? WHERE elder_id = ?`)
-        .bind(JSON.stringify(devices), nowIso(), resource).run();
+      await db.prepare(`UPDATE device_connectivity SET paired_devices = ?, bluetooth_status = ?, last_updated = ? WHERE elder_id = ?`)
+        .bind(JSON.stringify(devices), devices.length ? 'Đã ghép hồ sơ' : 'Chưa ghép thiết bị', nowIso(), resource).run();
       return json(request, { success: true, demo: true });
     }
     if (request.method === 'GET' && area === 'family' && section === 'bp-history' && elderId) {

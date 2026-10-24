@@ -19,7 +19,10 @@
     const [newDeviceName, setNewDeviceName] = React.useState('');
     const [deviceMessage, setDeviceMessage] = React.useState('');
     const [showScheduleEditor, setShowScheduleEditor] = React.useState(false);
+    const [editingSchedule, setEditingSchedule] = React.useState(null);
     const [showPaymentCheckout, setShowPaymentCheckout] = React.useState(false);
+    const [editingDeviceId, setEditingDeviceId] = React.useState('');
+    const [statusUpdatedAt, setStatusUpdatedAt] = React.useState(null);
     const localToday = new Date(Date.now() + 7 * 60 * 60 * 1000);
     const localMonthStart = new Date(Date.UTC(localToday.getUTCFullYear(), localToday.getUTCMonth(), 1)).toISOString().slice(0, 10);
     const previousMonthStart = new Date(Date.UTC(localToday.getUTCFullYear(), localToday.getUTCMonth() - 1, 1)).toISOString().slice(0, 10);
@@ -92,6 +95,30 @@
 
     React.useEffect(() => {
       let active = true;
+      const refreshOperationalStatus = () => Promise.all([
+        fetch(apiUrl(`/family/agent-status/${elderId}`)).then(response => response.ok ? response.json() : Promise.reject()),
+        fetch(apiUrl(`/device/connectivity/${elderId}`)).then(response => response.ok ? response.json() : Promise.reject()),
+        fetch(apiUrl(`/family/health-summary/${elderId}?days=${days}`)).then(response => response.ok ? response.json() : Promise.reject()),
+      ]).then(([agent, device, health]) => {
+        if (!active) return;
+        setAgentStatus(agent);
+        setConnectivity(device);
+        setReadings((health.daily_readings || []).slice().reverse());
+        setHealthDataSource(health.data_source || 'app_demo');
+        setApiAvailable(true);
+        setStatusUpdatedAt(new Date());
+      }).catch(() => {
+        if (!active) return;
+        setApiAvailable(false);
+        setStatusUpdatedAt(new Date());
+      });
+      refreshOperationalStatus();
+      const timer = window.setInterval(refreshOperationalStatus, 30000);
+      return () => { active = false; window.clearInterval(timer); };
+    }, [days]);
+
+    React.useEffect(() => {
+      let active = true;
       setConversationLoading(true);
       setConversationError('');
       fetch(apiUrl(`/family/conversation-history/${elderId}?date=${encodeURIComponent(conversationDate)}`))
@@ -140,21 +167,55 @@
       event.preventDefault();
       const device_name = newDeviceName.trim();
       if (!device_name) return;
-      fetch(apiUrl(`/device/bluetooth/pair/${elderId}`), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ device_name, device_type: 'sphygmomanometer' }),
+      const url = editingDeviceId
+        ? apiUrl(`/device/bluetooth/${elderId}/${encodeURIComponent(editingDeviceId)}`)
+        : apiUrl(`/device/bluetooth/pair/${elderId}`);
+      fetch(url, {
+        method: editingDeviceId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ device_name, device_type: 'sphygmomanometer' }),
       }).then(r => r.ok ? r.json() : Promise.reject())
-        .then(() => { setNewDeviceName(''); setDeviceMessage('Đã thêm thiết bị vào hồ sơ.'); return refreshConnectivity(); })
+        .then(() => { setNewDeviceName(''); setEditingDeviceId(''); setDeviceMessage(editingDeviceId ? 'Đã cập nhật tên thiết bị.' : 'Đã thêm thiết bị vào hồ sơ.'); return refreshConnectivity(); })
         .catch(() => setDeviceMessage('Không kết nối được API backend.'));
     };
-    const createSchedule = row => {
-      fetch(apiUrl(`/family/schedules/${elderId}`), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(row),
+    const persistScheduleLocally = row => {
+      const stored = RTS.LS.get('rts_schedules') || [];
+      const localRow = { ...row, elderId, time: row.scheduled_at };
+      RTS.LS.set('rts_schedules', [...stored.filter(item => item.id !== row.id), localRow]);
+    };
+    const saveSchedule = row => {
+      const editingId = editingSchedule?.id;
+      const url = editingId
+        ? apiUrl(`/family/schedules/${elderId}/${encodeURIComponent(editingId)}`)
+        : apiUrl(`/family/schedules/${elderId}`);
+      fetch(url, {
+        method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(row),
       }).then(response => response.ok ? response.json() : Promise.reject())
-        .then(saved => { setSchedules(current => [...current, saved].sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)))); setShowScheduleEditor(false); })
+        .then(saved => {
+          persistScheduleLocally(saved);
+          setSchedules(current => [...current.filter(item => item.id !== saved.id), saved].sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at))));
+          setShowScheduleEditor(false); setEditingSchedule(null);
+        })
         .catch(() => {
-          setSchedules(current => [...current, row].sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at))));
-          setShowScheduleEditor(false);
-          window.alert('Lịch đã được cập nhật trên thiết bị này nhưng chưa đồng bộ lên máy chủ.');
+          const localRow = { ...row, id: editingId || row.id, elder_id: elderId };
+          persistScheduleLocally(localRow);
+          setSchedules(current => [...current.filter(item => item.id !== localRow.id), localRow].sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at))));
+          setShowScheduleEditor(false); setEditingSchedule(null);
+          window.alert('Lịch đã được lưu trên thiết bị này nhưng chưa đồng bộ lên máy chủ.');
+        });
+    };
+    const deleteSchedule = row => {
+      if (!window.confirm(`Xóa lịch “${row.title}”?`)) return;
+      fetch(apiUrl(`/family/schedules/${elderId}/${encodeURIComponent(row.id)}`), { method: 'DELETE' })
+        .then(response => response.ok ? response.json() : Promise.reject())
+        .then(() => {
+          const stored = RTS.LS.get('rts_schedules') || [];
+          RTS.LS.set('rts_schedules', stored.filter(item => item.id !== row.id));
+          setSchedules(current => current.filter(item => item.id !== row.id));
+        })
+        .catch(() => {
+          const stored = RTS.LS.get('rts_schedules') || [];
+          RTS.LS.set('rts_schedules', stored.filter(item => item.id !== row.id));
+          setSchedules(current => current.filter(item => item.id !== row.id));
+          window.alert('Lịch đã được xóa trên thiết bị này nhưng chưa đồng bộ lên máy chủ.');
         });
     };
     const unpairDevice = deviceId => fetch(apiUrl(`/device/bluetooth/${elderId}/${encodeURIComponent(deviceId)}`), { method: 'DELETE' })
@@ -204,7 +265,7 @@
       { id: 'device', label: 'Bảo trì', icon: 'build' },
       { id: 'connectivity', label: 'Kết nối thiết bị', icon: 'devices' },
       { id: 'service', label: 'Gói & thanh toán', icon: 'credit_card' },
-      { id: 'agent', label: 'AI Agent', icon: 'auto_awesome' },
+      { id: 'agent', label: 'Trạng thái', icon: 'sync' },
       { id: 'conversations', label: 'Nhật ký Myka', icon: 'forum' },
       { id: 'settings', label: 'Cài đặt', icon: 'tune' },
       { id: 'profile', label: 'Hồ sơ', icon: 'account_circle' },
@@ -364,15 +425,15 @@
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden"><h3 className="font-semibold p-4">Lịch sử đo</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Thời gian</th><th className="text-left p-3">Huyết áp</th><th className="text-left p-3">Nhịp tim</th><th className="text-left p-3">Ghi chú</th></tr></thead><tbody>{visibleReadings.slice().reverse().map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{dateLabel(row.timestamp)}</td><td className="p-3 font-semibold">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 text-slate-500">{row.note || '—'}</td></tr>)}</tbody></table>{!visibleReadings.length && <p className="p-6 text-center text-slate-500">Chưa có bản ghi trong khoảng thời gian này.</p>}</div></div>
           </section>}
 
-          {tab === 'schedule' && <section><div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold mb-1">Lịch uống thuốc và tái khám</h2><p className="text-sm text-slate-500">Lịch chăm sóc sắp tới của Ngoại.</p></div><button onClick={() => setShowScheduleEditor(true)} className="rounded-xl bg-blue-600 text-white px-4 py-2.5 font-bold shadow-md shadow-blue-200">＋ Thêm lịch</button></div><div className="space-y-3">{scheduleRows.map(row => <article key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 items-start"><span className="text-2xl">{row.type === 'checkup' ? '🏥' : '💊'}</span><div className="flex-1"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{row.title}</h3><span className="text-sm text-slate-500">{dateLabel(row.scheduled_at)}</span></div><p className="text-sm text-slate-600 mt-1">{row.detail || '—'}</p></div><span className={`text-xs px-2 py-1 rounded-full ${row.confirmed ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>{row.confirmed ? 'Đã xác nhận' : 'Theo lịch'}</span></article>)}{!scheduleRows.length && <p className="bg-white rounded-xl p-6 text-slate-500">Chưa có lịch chăm sóc.</p>}</div></section>}
+          {tab === 'schedule' && <section><div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold mb-1">Lịch uống thuốc và tái khám</h2><p className="text-sm text-slate-500">Lịch chăm sóc sắp tới của Ngoại.</p></div><button onClick={() => { setEditingSchedule(null); setShowScheduleEditor(true); }} className="rounded-xl bg-blue-600 text-white px-4 py-2.5 font-bold shadow-md shadow-blue-200">＋ Thêm lịch</button></div><div className="space-y-3">{scheduleRows.map(row => <article key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap gap-4 items-start"><span className="text-2xl">{row.type === 'checkup' ? '🏥' : '💊'}</span><div className="flex-1 min-w-[12rem]"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{row.title}</h3><span className="text-sm text-slate-500">{dateLabel(row.scheduled_at)}</span></div><p className="text-sm text-slate-600 mt-1">{row.detail || '—'}</p></div><span className={`text-xs px-2 py-1 rounded-full ${row.confirmed ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>{row.confirmed ? 'Đã xác nhận' : 'Theo lịch'}</span><div className="ml-auto flex gap-2"><button type="button" onClick={() => { setEditingSchedule(row); setShowScheduleEditor(true); }} className="rounded-lg border px-3 py-2 text-sm font-semibold text-blue-700">Chỉnh sửa</button><button type="button" onClick={() => deleteSchedule(row)} className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700">Xóa</button></div></article>)}{!scheduleRows.length && <p className="bg-white rounded-xl p-6 text-slate-500">Chưa có lịch chăm sóc.</p>}</div></section>}
 
           {tab === 'device' && <section><h2 className="text-xl font-bold mb-1">Thông báo bảo trì thiết bị</h2><p className="text-sm text-slate-500 mb-4">Các nhắc nhở vận hành thiết bị được gửi từ hệ thống.</p><div className="space-y-3">{maintenance.map(item => <article key={item.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4"><span className="text-2xl">🛠️</span><div className="flex-1"><h3 className="font-semibold">{item.title}</h3><p className="text-sm text-slate-600 mt-1">{item.detail}</p><p className="text-xs text-slate-500 mt-2">Hạn: {item.due_at || 'Chưa xác định'}</p></div><span className="text-xs px-2 py-1 h-fit rounded-full bg-amber-100 text-amber-800">{item.status === 'pending' ? 'Cần chú ý' : 'Đã xử lý'}</span></article>)}{!maintenance.length && <p className="bg-white rounded-xl p-6 text-slate-500">Hiện chưa có thông báo bảo trì.</p>}</div></section>}
           {tab === 'connectivity' && <section>
               <div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold">Kết nối Robot Myka và máy đo</h2><p className="text-sm text-slate-500">Xem trạng thái Wi-Fi và thiết bị Bluetooth đã ghép.</p></div><span className="px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">CHƯA KẾT NỐI THIẾT BỊ THẬT</span></div>
             {connectivity ? <>
               <div className="grid sm:grid-cols-2 gap-3 mb-5"><article className="bg-white border border-slate-200 rounded-xl p-4"><h3 className="font-semibold">Wi-Fi trong nhà</h3><p className="mt-2 text-sm">Mạng: {connectivity.wifi_ssid || 'Chưa cấu hình'}</p><p className="text-sm text-slate-500">Trạng thái: {connectivity.wifi_status || 'Chưa xác định'}{connectivity.wifi_signal ? ` · tín hiệu ${connectivity.wifi_signal}%` : ''}</p></article><article className="bg-white border border-slate-200 rounded-xl p-4"><h3 className="font-semibold">Bluetooth</h3><p className="mt-2 text-sm">Trạng thái: {connectivity.bluetooth_status || 'Chưa xác định'}</p><p className="text-sm text-slate-500">Thiết bị đã ghép: {connectivity.paired_devices?.length || 0}</p></article></div>
-              <div className="space-y-2 mb-5">{(connectivity.paired_devices || []).map(item => <article key={item.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{item.name}</p><p className="text-sm text-slate-500">{item.type} · {item.status}</p></div><button onClick={() => unpairDevice(item.id)} disabled={!apiAvailable} className="px-3 py-2 rounded-lg border border-slate-300 text-sm disabled:opacity-50">Gỡ thiết bị</button></article>)}</div>
-              <div className="grid md:grid-cols-2 gap-4"><WifiNetworkPicker currentSsid={connectivity.wifi_ssid} onSaved={saveWifiNetwork} /><form onSubmit={pairDevice} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3"><h3 className="font-semibold">Ghép máy đo Bluetooth</h3><input required value={newDeviceName} onChange={e => setNewDeviceName(e.target.value)} placeholder="Tên thiết bị đo huyết áp" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /><button disabled={!apiAvailable} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold disabled:opacity-50">Thêm thiết bị</button></form></div>
+              <div className="space-y-2 mb-5">{(connectivity.paired_devices || []).map(item => <article key={item.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{item.name}</p><p className="text-sm text-slate-500">{item.type} · {item.status}</p></div><div className="flex gap-2"><button onClick={() => { setEditingDeviceId(item.id); setNewDeviceName(item.name); setDeviceMessage(''); }} disabled={!apiAvailable} className="px-3 py-2 rounded-lg border border-slate-300 text-sm disabled:opacity-50">Đổi tên</button><button onClick={() => unpairDevice(item.id)} disabled={!apiAvailable} className="px-3 py-2 rounded-lg border border-rose-200 text-sm text-rose-700 disabled:opacity-50">Gỡ thiết bị</button></div></article>)}</div>
+              <div className="grid md:grid-cols-2 gap-4"><WifiNetworkPicker currentSsid={connectivity.wifi_ssid} onSaved={saveWifiNetwork} /><form onSubmit={pairDevice} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3"><h3 className="font-semibold">{editingDeviceId ? 'Đổi tên thiết bị' : 'Ghép máy đo Bluetooth'}</h3><input required value={newDeviceName} onChange={e => setNewDeviceName(e.target.value)} placeholder="Tên thiết bị đo huyết áp" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /><div className="flex gap-2"><button disabled={!apiAvailable} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold disabled:opacity-50">{editingDeviceId ? 'Lưu thay đổi' : 'Thêm thiết bị'}</button>{editingDeviceId && <button type="button" onClick={() => { setEditingDeviceId(''); setNewDeviceName(''); }} className="px-4 py-2 rounded-lg border text-sm">Hủy</button>}</div></form></div>
               {deviceMessage && <p role="status" className="text-sm text-blue-700 mt-3">{deviceMessage}</p>}
             </> : <div className="bg-white border border-slate-200 rounded-xl p-5"><p className="font-semibold">Chưa kết nối được API thiết bị.</p><p className="text-sm text-slate-500 mt-1">Vui lòng thử lại sau. Wi-Fi/Bluetooth sẽ hoạt động khi gateway Myka được kết nối.</p></div>}
           </section>}
@@ -387,24 +448,21 @@
             <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"><div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5"><div><h3 className="font-bold">Lịch sử thanh toán</h3><p className="mt-1 text-xs text-slate-500">Các giao dịch gần đây.</p></div><span className="material-symbols-rounded text-blue-700" aria-hidden="true">receipt_long</span></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-3 text-left">Nội dung</th><th className="p-3 text-left">Số tiền</th><th className="p-3 text-left">Kỳ</th><th className="p-3 text-left">Trạng thái</th></tr></thead><tbody>{paymentRows.map(row => { const paid = row.status === 'paid'; const isInitial = Number(row.amount) === Number(pricing.first_payment_total); return <tr key={row.id} className="border-t border-slate-100"><td className="p-3 font-medium">{row.service_name}</td><td className="p-3 font-bold">{Number(row.amount).toLocaleString('vi-VN')} {row.currency || 'VND'}</td><td className="p-3">{isInitial ? 'Lần đầu' : `Ngày ${pricing.renewal_day} hằng tháng`}</td><td className="p-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${paid ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>{paid ? '✓ Đã thanh toán' : '● Chờ thanh toán'}</span></td></tr>; })}</tbody></table></div></div>
           </section>}
           {tab === 'agent' && (() => {
-            const measured = agentStatus?.latest_measurement || latest;
-            const level = measured?.status || 'unknown';
-            const levelLabel = ({ normal: 'Trong ngưỡng theo dõi', warning: 'Cần người chăm sóc lưu ý', critical: 'Đã phát hiện chỉ số vượt ngưỡng', unknown: 'Chưa có dữ liệu' })[level] || 'Chưa có dữ liệu';
-            const activities = agentStatus?.activities || [
-              { title: 'Thu thập dữ liệu', detail: measured ? `Đã nhận chỉ số huyết áp ${measured.systolic}/${measured.diastolic} mmHg và nhịp tim ${measured.heart_rate || measured.heartRate} bpm.` : 'Đang chờ dữ liệu từ máy đo/robot.' },
-              { title: 'Đối chiếu quy tắc cảnh báo', detail: measured ? levelLabel : 'Chưa có phép đo để đối chiếu.' },
-              { title: 'Lưu lịch sử và cập nhật trạng thái', detail: 'Kết quả được lưu qua API backend để người thân xem lại.' },
-              { title: level === 'critical' || level === 'warning' ? 'Tạo cảnh báo cho người thân' : 'Tiếp tục theo dõi', detail: level === 'critical' || level === 'warning' ? 'Thông tin được chuyển thành cảnh báo; phần tư vấn cần trao đổi với nhân viên y tế qua Telegram.' : 'Không tự đưa ra tư vấn hoặc chẩn đoán sức khỏe.' },
-            ];
+            const newestMeasurement = latest || agentStatus?.latest_measurement;
+            const measurementTime = newestMeasurement?.timestamp ? new Date(newestMeasurement.timestamp) : null;
+            const measurementAgeMinutes = measurementTime && Number.isFinite(measurementTime.getTime()) ? Math.max(0, Math.floor((Date.now() - measurementTime.getTime()) / 60000)) : null;
+            const measurementFreshness = measurementAgeMinutes === null ? 'Chưa có số đo' : measurementAgeMinutes <= 30 ? 'Dữ liệu vừa được cập nhật' : 'Chưa nhận dữ liệu mới';
+            const measurementFreshnessDetail = measurementAgeMinutes === null ? 'Chờ máy đo gửi bản ghi đầu tiên.' : `${measurementAgeMinutes < 60 ? `${measurementAgeMinutes} phút` : `${Math.floor(measurementAgeMinutes / 60)} giờ`} kể từ lần ghi nhận gần nhất.`;
+            const pairedCount = connectivity?.paired_devices?.length || 0;
+            const deviceStatus = pairedCount ? `${pairedCount} thiết bị trong hồ sơ` : 'Chưa thêm thiết bị';
             return <section>
-              <div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold">AI Agent chăm sóc</h2><p className="text-sm text-slate-500">Agent tiếp nhận thông tin, đối chiếu quy tắc theo dõi và lưu kết quả cho gia đình xem lại.</p></div><span className="px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">{agentStatus?.agent_name || 'MYKA CARE AGENT'}</span></div>
-              <div className="grid md:grid-cols-3 gap-3 mb-5">
-                <article className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-sm text-slate-500">Trạng thái dịch vụ</p><p className="text-lg font-bold mt-2 text-green-700">{agentStatus?.service_status || 'Đang xử lý thông tin chăm sóc'}</p></article>
-                <article className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-sm text-slate-500">Kết quả xử lý gần nhất</p><p className="text-lg font-bold mt-2">{levelLabel}</p></article>
-                <article className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-sm text-slate-500">Nguồn dữ liệu</p><p className="text-lg font-bold mt-2">{agentStatus?.data_source || (apiAvailable ? 'API backend / thiết bị' : 'Hồ sơ Myka')}</p></article>
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[.14em] text-blue-700">MYKA CARE · KẾT NỐI</p><h2 className="mt-1 text-2xl font-extrabold">Trạng thái dữ liệu & thiết bị</h2><p className="mt-1 text-sm text-slate-500">Tình trạng truy cập máy chủ, đồng bộ dữ liệu và thiết bị trong hồ sơ.</p></div><span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold ${apiAvailable ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}><span className={`h-2 w-2 rounded-full ${apiAvailable ? 'bg-emerald-500' : 'bg-rose-500'}`} />{apiAvailable ? 'Máy chủ đang phản hồi' : 'Không kết nối được máy chủ'}</span></div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Kết nối máy chủ</p><p className={`mt-2 text-lg font-extrabold ${apiAvailable ? 'text-emerald-700' : 'text-rose-700'}`}>{apiAvailable ? 'Máy chủ đã phản hồi' : 'Đang gián đoạn'}</p><p className="mt-1 text-xs text-slate-500">{statusUpdatedAt ? `Kiểm tra lúc ${statusUpdatedAt.toLocaleTimeString('vi-VN')}` : 'Đang kiểm tra kết nối…'}</p></article>
+                <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Thiết bị đã thêm</p><p className="mt-2 text-lg font-extrabold text-slate-800">{deviceStatus}</p><p className="mt-1 text-xs text-slate-500">{connectivity?.wifi_ssid ? `Wi-Fi: ${connectivity.wifi_ssid}` : 'Chưa cấu hình Wi-Fi'}</p></article>
+                <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Tiếp nhận dữ liệu đo</p><p className={`mt-2 text-lg font-extrabold ${measurementAgeMinutes === null || measurementAgeMinutes > 30 ? 'text-amber-700' : 'text-emerald-700'}`}>{measurementFreshness}</p><p className="mt-1 text-xs text-slate-500">{measurementTime ? `${newestMeasurement.systolic}/${newestMeasurement.diastolic} mmHg · ${measurementFreshnessDetail}` : measurementFreshnessDetail}</p></article>
               </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-4"><h3 className="font-semibold mb-4">Luồng xử lý tự động</h3><ol className="space-y-3">{activities.map((item, index) => <li key={index} className="flex gap-3"><span className="w-8 h-8 shrink-0 rounded-full bg-blue-100 text-blue-800 font-bold grid place-items-center">{index + 1}</span><div><p className="font-semibold">{item.title}</p><p className="text-sm text-slate-600 mt-0.5">{item.detail}</p></div></li>)}</ol></div>
-              <p className="text-xs text-slate-500 mt-3">Agent đối chiếu dữ liệu theo ngưỡng đã cài đặt; thông tin không thay thế việc thăm khám hay tư vấn của nhân viên y tế.</p>
+              <article className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><span className="material-symbols-rounded text-amber-700" aria-hidden="true">info</span><p>Trạng thái máy chủ được làm mới tự động mỗi 30 giây. Tình trạng ghép thiết bị trong hồ sơ không đồng nghĩa phần cứng đang kết nối trực tiếp.</p></article>
             </section>;
           })()}
           {tab === 'conversations' && <section>
@@ -438,7 +496,7 @@
           </section>}
           <footer className="text-xs text-slate-400 mt-8">Myka Care Companion là phân hệ đọc và theo dõi dành cho người thân. Trao đổi tư vấn diễn ra trên Telegram, không có chat bác sĩ–người thân trong ứng dụng.</footer>
         </main>
-        {showScheduleEditor && <ScheduleEditor onClose={() => setShowScheduleEditor(false)} onSave={createSchedule} />}
+          {showScheduleEditor && <ScheduleEditor initialSchedule={editingSchedule} onClose={() => { setShowScheduleEditor(false); setEditingSchedule(null); }} onSave={saveSchedule} />}
         {showPaymentCheckout && <PaymentCheckout amount={pendingPayment?.amount || pricing.monthly_fee} purpose={checkoutPurpose} cycleLabel={initialPaymentPending ? 'Thanh toán lần đầu' : (pendingPayment ? 'Hóa đơn chờ thanh toán' : `${pricing.next_renewal_date} · 1 tháng`)} onClose={() => setShowPaymentCheckout(false)} />}
       </div>
     );
