@@ -7,6 +7,8 @@
     const apiUrl = path => `${apiBase}/api${path}`;
     const [tab, setTab] = React.useState(() => window.matchMedia('(max-width: 767px)').matches ? 'home' : 'health');
     const [moreOpen, setMoreOpen] = React.useState(false);
+    const [scrollToSettings, setScrollToSettings] = React.useState(false);
+    const settingsSectionRef = React.useRef(null);
     const [days, setDays] = React.useState(7);
     const [readings, setReadings] = React.useState(() => RTS.getBP(elderId) || []);
     const [schedules, setSchedules] = React.useState(() => RTS.getSchedules(elderId) || []);
@@ -54,6 +56,12 @@
       const timer = window.setInterval(() => setDndClock(Date.now()), 30000);
       return () => window.clearInterval(timer);
     }, []);
+
+    React.useEffect(() => {
+      if (tab !== 'settings' || !scrollToSettings) return;
+      settingsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setScrollToSettings(false);
+    }, [tab, scrollToSettings]);
 
     React.useEffect(() => {
       let active = true;
@@ -370,7 +378,7 @@
               <div className="flex min-w-0 items-center gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-700"><span className="material-symbols-rounded" aria-hidden="true">sunny</span></span><div><p className="text-[11px] font-bold tracking-[.12em] text-blue-700">CHĂM SÓC HÔM NAY</p><h2 className="mt-0.5 font-bold">Một chút quan tâm mỗi ngày</h2></div></div>
               <span className="hidden rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 sm:inline">{new Date().toLocaleDateString('vi-VN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
             </div>
-            <button type="button" onClick={() => setTab('settings')} aria-label={`Không làm phiền ${dndEnabled ? 'đang bật' : 'đang tắt'}, mở cài đặt`} className={`mt-4 flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-4 ${dndEnabled ? 'border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100/80 focus-visible:ring-amber-200' : 'border-blue-100 bg-white text-slate-800 hover:bg-blue-50/60 focus-visible:ring-blue-200'}`}>
+            <button type="button" onClick={() => { setTab('settings'); setScrollToSettings(true); }} aria-label={`Không làm phiền ${dndEnabled ? 'đang bật' : 'đang tắt'}, mở cài đặt`} className={`mt-4 flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-4 ${dndEnabled ? 'border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100/80 focus-visible:ring-amber-200' : 'border-blue-100 bg-white text-slate-800 hover:bg-blue-50/60 focus-visible:ring-blue-200'}`}>
               <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${dndEnabled ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-700'}`}><span className="material-symbols-rounded" aria-hidden="true">{dndEnabled ? 'notifications_paused' : 'notifications_active'}</span></span>
               <span className="min-w-0 flex-1"><span className="block text-sm font-bold">Không làm phiền: {dndEnabled ? 'Đang bật' : 'Đang tắt'}</span><span className={`mt-0.5 block text-xs ${dndEnabled ? 'text-amber-800' : 'text-slate-500'}`}>{dndEnabled ? (dndUntilLabel ? `Tự bật thông báo lại lúc ${dndUntilLabel}` : 'Tiếp tục đến khi người thân bật lại') : 'Chế độ yên lặng chưa bật'}</span></span>
               <span className="shrink-0 rounded-full bg-white/80 px-3 py-1.5 text-xs font-bold">Cài đặt</span>
@@ -492,7 +500,7 @@
             </div>
             <p className="text-xs text-slate-500 mt-3">Chọn ngày để xem lại các trao đổi đã ghi nhận.</p>
           </section>}
-          {tab === 'settings' && <section>
+          {tab === 'settings' && <section ref={settingsSectionRef} className="scroll-mt-24">
             <div className="mb-5"><p className="text-sm text-blue-700 font-semibold">TÙY CHỈNH CHO GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Cài đặt Myka</h2><p className="text-sm text-slate-500 mt-1">Lựa chọn được lưu theo hồ sơ người thân.</p></div>
             <form onSubmit={savePreferences} className="space-y-5">
               <article className="bg-white border border-slate-200 rounded-xl p-4 md:p-5">
