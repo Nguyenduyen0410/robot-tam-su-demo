@@ -6,7 +6,7 @@
     keywords: [
       {
         keys: ['huyết áp', 'blood pressure', 'chẩn đoán', 'uống thuốc gì', 'bệnh gì', 'chữa bệnh', 'có nguy hiểm không'],
-        response: '⚠️ QUY ĐỊNH PHÁP LÝ Y TẾ:\nCháu là Robot Tâm Sự, không có chức năng tư vấn y khoa hay chẩn đoán bệnh tật. Chỉ số huyết áp của Ngoại được máy đo lưu trữ tự động để Bác sĩ theo dõi.\n\n👉 Nếu Ngoại thấy không khỏe hoặc cần tư vấn điều trị, xin vui lòng liên hệ nhóm Bác sĩ qua Kênh Telegram chính thức (@myka_care_p101_bot) hoặc bấm nút SOS khẩn cấp ạ!'
+        response: '⚠️ Cháu là Robot Tâm Sự, không có chức năng tư vấn y khoa hay chẩn đoán bệnh tật. Chỉ số huyết áp của Ngoại được lưu lại để gia đình xem.\n\n👉 Nếu Ngoại thấy không khỏe hoặc cần tư vấn điều trị, xin vui lòng liên hệ nhân viên y tế qua nhóm Telegram của gia đình hoặc bấm nút SOS khẩn cấp ạ!'
       },
       {
         keys: ['thuốc', 'uống thuốc', 'lịch thuốc'],

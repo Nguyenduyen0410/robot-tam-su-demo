@@ -82,7 +82,7 @@
                   onClick={() => onNavigate('login')}
                   className="px-8 py-4 bg-white text-blue-700 font-bold rounded-xl hover:bg-blue-50 transition shadow-lg text-lg"
                 >
-                  🚀 Trải nghiệm Demo
+                  🚀 Vào ứng dụng
                 </button>
                 <a href="#features" className="px-8 py-4 border-2 border-blue-300 text-white font-semibold rounded-xl hover:bg-blue-600 transition text-center text-lg">
                   Tìm hiểu thêm ↓
@@ -204,7 +204,7 @@
               onClick={() => onNavigate('login')}
               className="px-10 py-4 bg-white text-blue-700 font-bold rounded-xl hover:bg-blue-50 shadow-xl text-lg transition"
             >
-              🚀 Trải nghiệm Demo ngay
+              🚀 Bắt đầu chăm sóc
             </button>
           </div>
         </section>
