@@ -5,7 +5,8 @@
     const familyUserName = user?.id === 'U-DEMO-SETUP' ? 'Chị Duyên' : user?.name || 'Chị Duyên';
     const apiBase = String(window.MYKA_API_BASE || '').replace(/\/$/, '');
     const apiUrl = path => `${apiBase}/api${path}`;
-    const [tab, setTab] = React.useState('health');
+    const [tab, setTab] = React.useState(() => window.matchMedia('(max-width: 767px)').matches ? 'home' : 'health');
+    const [moreOpen, setMoreOpen] = React.useState(false);
     const [days, setDays] = React.useState(7);
     const [readings, setReadings] = React.useState(() => RTS.getBP(elderId) || []);
     const [schedules, setSchedules] = React.useState(() => RTS.getSchedules(elderId) || []);
@@ -113,6 +114,9 @@
     const scheduleRows = apiAvailable ? schedules : schedules.map(s => ({
       ...s, scheduled_at: s.scheduled_at || s.time, type: s.type === 'appointment' ? 'checkup' : s.type,
     })).filter(s => ['medication', 'checkup'].includes(s.type));
+    const upcomingSchedule = scheduleRows
+      .filter(row => row.scheduled_at && new Date(row.scheduled_at).getTime() >= Date.now())
+      .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0];
     const paymentRows = subscription.payments.length ? subscription.payments : [demoPayment];
     const pricing = subscription.pricing || { device_price: 2000000, monthly_fee: 100000, first_payment_total: 2100000, renewal_day: 1, next_renewal_date: nextMonthStart, auto_renew: true };
     const refreshConnectivity = () => fetch(apiUrl(`/device/connectivity/${elderId}`))
@@ -255,7 +259,7 @@
     }} />;
 
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-800">
+      <div className="min-h-screen bg-[#f8f7f4] text-slate-800">
         <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-blue-100 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <img src="assets/avatar-family.png" alt={`Ảnh đại diện ${familyUserName}`} className="w-12 h-12 shrink-0 rounded-full object-cover ring-2 ring-blue-100" />
@@ -267,15 +271,15 @@
             <button type="button" onClick={onLogout} title="Đăng xuất" aria-label="Đăng xuất" className="grid h-11 w-11 place-items-center rounded-full border border-blue-200 bg-blue-50 text-rose-500 hover:bg-rose-50"><span className="material-symbols-rounded">power_settings_new</span></button>
           </div>
         </header>
-        <main className="max-w-6xl mx-auto p-5 md:p-8">
-          <section className="relative mb-6 overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#1d4ed8] via-[#2563eb] to-[#60a5fa] p-5 sm:p-8 text-white shadow-xl shadow-blue-900/15">
+        <main className="max-w-6xl mx-auto px-4 pb-28 pt-4 sm:px-6 sm:pb-28 sm:pt-6 md:p-8 md:pb-8">
+          <section className="relative mb-5 overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#1f5ba7] via-[#357eb8] to-[#70a3cf] p-5 sm:p-8 text-white shadow-xl shadow-blue-900/10">
             <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full border-[28px] border-white/10" aria-hidden="true" />
             <div className="relative">
               <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:gap-5 sm:text-left">
                 <img src="assets/avatar-elder.png" alt="Ảnh đại diện minh họa Ngoại" className="h-28 w-28 shrink-0 rounded-full border-4 border-white/90 object-cover shadow-lg sm:h-24 sm:w-24" />
                 <div className="mt-4 min-w-0 sm:mt-0"><p className="text-xs font-bold tracking-[.16em] text-blue-50">HỒ SƠ CHĂM SÓC · {elder?.id || elderId}</p><h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">{elder?.name || 'Bà Nguyễn Thị Hoa'}</h1><p className="mt-1 text-sm text-blue-50">{elder?.age || careProfile?.age || 72} tuổi</p><p className="mx-auto mt-1 flex max-w-2xl items-start justify-center gap-1 text-sm text-blue-50 sm:mx-0 sm:justify-start"><span className="material-symbols-rounded text-base" aria-hidden="true">location_on</span><span>{elder?.address || '12 Đường Hoa Mai, Phường Hòa Xuân, Đà Nẵng (địa chỉ giả)'}</span></p></div>
               </div>
-              <p className="mx-auto mt-4 max-w-2xl text-center text-sm text-blue-50 sm:mx-0 sm:text-left">Không gian để gia đình xem lại số đo, lịch chăm sóc và thông tin của người thân.</p>
+              <p className="mx-auto mt-4 max-w-2xl text-center text-sm leading-relaxed text-blue-50 sm:mx-0 sm:text-left">Cùng gia đình chăm sóc Ngoại mỗi ngày. Số đo, lịch chăm sóc và thông tin cần thiết được gom tại đây.</p>
               <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
                 <div className="rounded-2xl border border-white/20 bg-white/10 p-3 sm:p-4"><p className="text-[10px] font-semibold uppercase tracking-wide text-blue-50/80 sm:text-xs">Thiết bị</p><p className="mt-1 truncate text-sm font-bold sm:text-lg">{preferences.robot_name?.trim() || elder?.deviceName || 'Myka'}</p><p className="mt-0.5 text-[10px] text-blue-50/80 sm:text-xs">Hồ sơ đã ghép</p></div>
                 <div className="rounded-2xl border border-white/20 bg-white/10 p-3 sm:p-4"><p className="text-[10px] font-semibold uppercase tracking-wide text-blue-50/80 sm:text-xs">Tuổi</p><p className="mt-1 text-2xl font-extrabold sm:text-3xl">{careProfile?.age || elder?.age || 72}</p><p className="mt-0.5 text-[10px] text-blue-50/80 sm:text-xs">Thông tin mẫu</p></div>
@@ -283,7 +287,22 @@
               </div>
             </div>
           </section>
-          <section className="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+          <section className="mb-5 rounded-3xl border border-[#eee6d9] bg-[#fffdf8] p-4 shadow-sm sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-700"><span className="material-symbols-rounded" aria-hidden="true">sunny</span></span><div><p className="text-[11px] font-bold tracking-[.12em] text-blue-700">CHĂM SÓC HÔM NAY</p><h2 className="mt-0.5 font-bold">Một chút quan tâm mỗi ngày</h2></div></div>
+              <span className="hidden rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 sm:inline">{new Date().toLocaleDateString('vi-VN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+            </div>
+            <button type="button" onClick={() => setTab('schedule')} className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50/50">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#fff4e9] text-orange-700"><span className="material-symbols-rounded text-2xl" aria-hidden="true">{upcomingSchedule?.type === 'checkup' ? 'event' : 'medication'}</span></span>
+              <span className="min-w-0 flex-1"><span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">{upcomingSchedule ? (upcomingSchedule.type === 'checkup' ? 'Lịch hẹn tiếp theo' : 'Lịch chăm sóc tiếp theo') : 'Lịch chăm sóc'}</span><span className="mt-0.5 block truncate font-bold text-slate-800">{upcomingSchedule?.title || 'Chưa có lịch sắp tới'}</span><span className="mt-0.5 block truncate text-sm text-slate-500">{upcomingSchedule ? `${dateLabel(upcomingSchedule.scheduled_at)} · ${upcomingSchedule.detail || 'Chạm để xem lịch'}` : 'Gia đình có thể thêm lịch thuốc hoặc lịch hẹn.'}</span></span>
+              <span className="material-symbols-rounded shrink-0 text-blue-500" aria-hidden="true">chevron_right</span>
+            </button>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <button type="button" onClick={() => setTab('health')} className="rounded-2xl bg-blue-50/80 p-3 text-left transition hover:bg-blue-100/80"><span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500"><span className="material-symbols-rounded text-base text-blue-700" aria-hidden="true">favorite</span> Huyết áp gần nhất</span><span className="mt-1 block text-lg font-extrabold text-slate-800">{latest ? `${latest.systolic}/${latest.diastolic}` : 'Chưa có số đo'}</span><span className="text-xs text-slate-500">{latest ? `mmHg · ${dateLabel(latest.timestamp)}` : 'Chạm để mở sức khỏe'}</span></button>
+              <button type="button" onClick={() => setTab('health')} className="rounded-2xl bg-[#fff4e9] p-3 text-left transition hover:bg-[#ffecd8]"><span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500"><span className="material-symbols-rounded text-base text-orange-700" aria-hidden="true">ecg_heart</span> Nhịp tim gần nhất</span><span className="mt-1 block text-lg font-extrabold text-slate-800">{latest ? (latest.heart_rate || latest.heartRate || '—') : '—'}<span className="ml-1 text-xs font-medium text-slate-500">lần/phút</span></span><span className="text-xs text-slate-500">{latest ? dateLabel(latest.timestamp) : 'Chưa có bản ghi gần đây'}</span></button>
+            </div>
+          </section>
+          <section className="bg-[#fffefa] border border-[#ebeef1] rounded-3xl p-4 mb-6 shadow-sm sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h2 className="font-semibold">Kênh trao đổi qua Telegram</h2><p className="text-sm text-slate-500">Trao đổi với đội chăm sóc trong kênh Telegram đã cấu hình.</p></div>
               <div className="flex flex-wrap gap-2">
@@ -295,10 +314,25 @@
               </div>
             </div>
           </section>
-          <nav aria-label="Các chức năng Myka Care" className="grid grid-cols-3 sm:grid-cols-5 xl:grid-cols-9 gap-3 mb-3">
+          <nav aria-label="Các chức năng Myka Care" className="hidden md:grid md:grid-cols-5 xl:grid-cols-9 gap-3 mb-3">
             {tabs.map(item => <button key={item.id} type="button" onClick={() => setTab(item.id)} aria-label={item.label} title={item.label} aria-current={tab === item.id ? 'page' : undefined} className={`min-h-[92px] rounded-2xl border px-2 py-3 flex flex-col items-center justify-center gap-2 text-center transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 ${tab === item.id ? 'bg-blue-700 border-blue-700 text-white shadow-lg shadow-blue-900/15 -translate-y-0.5' : 'bg-white border-blue-100 text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:-translate-y-0.5'}`}><span className={`grid h-11 w-11 place-items-center rounded-2xl ${tab === item.id ? 'bg-white/15 text-white' : 'bg-blue-50 text-blue-800'}`}><span className="material-symbols-rounded" aria-hidden="true">{item.icon}</span></span><span className="text-xs leading-tight font-semibold">{item.label}</span></button>)}
           </nav>
-          <p className="mb-6 text-xs text-slate-500">Chọn một mục để xem thông tin chăm sóc tương ứng.</p>
+          <p className="mb-6 hidden text-xs text-slate-500 md:block">Chọn một mục để xem thông tin chăm sóc tương ứng.</p>
+
+          <nav aria-label="Điều hướng Myka trên điện thoại" className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e9e8e2] bg-[#fffefa]/95 px-3 pt-2 shadow-[0_-8px_24px_rgba(31,61,91,.08)] backdrop-blur-md md:hidden" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}>
+            {moreOpen && <div className="absolute bottom-full left-3 right-3 mb-3 grid grid-cols-3 gap-2 rounded-3xl border border-[#ebeef1] bg-[#fffefa] p-3 shadow-xl">
+              {tabs.filter(item => !['health', 'schedule'].includes(item.id)).map(item => <button key={item.id} type="button" onClick={() => { setTab(item.id); setMoreOpen(false); }} aria-current={tab === item.id ? 'page' : undefined} className={`flex min-h-20 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-3 text-center text-xs font-semibold ${tab === item.id ? 'bg-blue-50 text-blue-800' : 'bg-white text-slate-700 hover:bg-blue-50'}`}><span className="material-symbols-rounded text-blue-700" aria-hidden="true">{item.icon}</span><span>{item.label}</span></button>)}
+            </div>}
+            <div className="grid grid-cols-4 gap-1">
+              {[
+                { id: 'home', label: 'Trang chủ', icon: 'home' },
+                ...tabs.filter(item => ['health', 'schedule'].includes(item.id)),
+                { id: 'more', label: 'Thêm', icon: 'apps' },
+              ].map(item => item.id === 'more'
+                ? <button key={item.id} type="button" aria-expanded={moreOpen} onClick={() => setMoreOpen(open => !open)} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-semibold ${moreOpen || !['home', 'health', 'schedule'].includes(tab) ? 'text-blue-800' : 'text-slate-500'}`}><span className="material-symbols-rounded" aria-hidden="true">{item.icon}</span><span>{item.label}</span></button>
+                : <button key={item.id} type="button" onClick={() => { setTab(item.id === 'home' ? 'home' : item.id); setMoreOpen(false); }} aria-label={item.label} aria-current={tab === item.id ? 'page' : undefined} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-semibold ${tab === item.id ? 'bg-blue-50 text-blue-800' : 'text-slate-500'}`}><span className="material-symbols-rounded" aria-hidden="true">{item.icon}</span><span>{item.label}</span></button>)}
+            </div>
+          </nav>
 
           {tab === 'profile' && <section className="space-y-5">
             <div><p className="text-sm text-blue-700 font-semibold">THÔNG TIN TÀI KHOẢN</p><h2 className="text-2xl font-bold mt-1">Hồ sơ gia đình</h2><p className="text-sm text-slate-500 mt-1">Thông tin dùng để cá nhân hóa trải nghiệm chăm sóc Myka.</p></div>
