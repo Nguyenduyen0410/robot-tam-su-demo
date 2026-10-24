@@ -17,6 +17,7 @@
     const [connectivity, setConnectivity] = React.useState(null);
     const setupCompleteKey = `myka_setup_complete_${user?.id || 'family'}`;
     const [setupMode, setSetupMode] = React.useState(() => Boolean(user?.demoSetupMode && !RTS.LS.get(setupCompleteKey)));
+    const [setupFinished, setSetupFinished] = React.useState(() => Boolean(RTS.LS.get(setupCompleteKey)));
     const [newDeviceName, setNewDeviceName] = React.useState('');
     const [deviceMessage, setDeviceMessage] = React.useState('');
     const [showScheduleEditor, setShowScheduleEditor] = React.useState(false);
@@ -350,10 +351,11 @@
       ? new Date(preferences.dnd_until).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
       : '';
     if (connectivity === null) return <div className="min-h-screen grid place-items-center bg-slate-50"><p className="text-slate-600">Đang kiểm tra trạng thái thiết bị Myka…</p></div>;
-    if (setupMode || !devicePaired) return <DeviceSetupScreen apiUrl={apiUrl} demoMode={Boolean(user?.demoSetupMode)} onPaired={() => {
-      if (setupMode) RTS.LS.set(setupCompleteKey, true);
+    if (setupMode || (!devicePaired && !setupFinished)) return <DeviceSetupScreen apiUrl={apiUrl} demoMode={Boolean(user?.demoSetupMode)} onPaired={() => {
+      RTS.LS.set(setupCompleteKey, true);
       RTS.LS.set(`myka_device_paired_${user?.id}`, true);
       setSetupMode(false);
+      setSetupFinished(true);
       refreshConnectivity();
     }} />;
 
