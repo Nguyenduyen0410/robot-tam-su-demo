@@ -28,7 +28,13 @@
   function App() {
     const [route, navigate] = useHashRoute();
     const [currentUser, setCurrentUser] = React.useState(() => {
-      return RTS.LS.get('rts_current_user') || null;
+      const storedUser = RTS.LS.get('rts_current_user') || null;
+      // The first-time setup account is intentionally not remembered between page visits.
+      if (storedUser?.demoSetupMode) {
+        RTS.LS.set('rts_current_user', null);
+        return null;
+      }
+      return storedUser;
     });
 
     // ---- Auth guard (NO hooks inside conditionals) ----
@@ -54,7 +60,7 @@
       if (user.demoSetupMode) RTS.LS.set(`myka_setup_complete_${user.id}`, null);
       RTS.LS.set(`myka_ever_logged_in_${user.id}`, true);
       setCurrentUser(user);
-      RTS.LS.set('rts_current_user', user);
+      RTS.LS.set('rts_current_user', user.demoSetupMode ? null : user);
       navigate('family');
     }
 
