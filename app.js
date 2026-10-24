@@ -50,6 +50,8 @@
 
     function login(user) {
       if (!user || user.role !== 'family') return;
+      // Each sign-in to the first-time setup demo starts a fresh walkthrough on this browser.
+      if (user.demoSetupMode) RTS.LS.set(`myka_setup_complete_${user.id}`, null);
       RTS.LS.set(`myka_ever_logged_in_${user.id}`, true);
       setCurrentUser(user);
       RTS.LS.set('rts_current_user', user);
