@@ -315,16 +315,30 @@ export async function onRequest({ request, env, params }) {
       const { results } = await db.prepare('SELECT * FROM service_payments WHERE elder_id = ? ORDER BY period_start DESC').bind(elderId).all();
       const nowLocal = new Date(Date.now() + 7 * 60 * 60 * 1000);
       const today = nowLocal.toISOString().slice(0, 10);
+      const currentMonthStart = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth(), 1)).toISOString().slice(0, 10);
+      const previousMonthStart = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth() - 1, 1)).toISOString().slice(0, 10);
+      const previousMonthEnd = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth(), 0)).toISOString().slice(0, 10);
       const nextRenewal = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
       const monthEnd = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
       const payments = results.filter(row => row.status !== 'demo');
-      const displayPayments = payments.length ? payments : [{
+      const demoPurchase = {
         id: `PAY-INITIAL-${elderId}`, elder_id: elderId,
-        service_name: 'Thiết bị Myka (mua đứt) + thuê bao tháng đầu',
-        amount: 2100000, currency: 'VND', status: 'pending',
-        period_start: today, period_end: monthEnd, due_at: today, paid_at: null,
-      }];
-      const current = payments.find(row => row.status === 'paid' && row.period_start <= today && row.period_end >= today) || null;
+        service_name: 'Thiết bị Myka + thuê bao tháng đầu',
+        amount: 2100000, currency: 'VND', status: 'paid',
+        period_start: previousMonthStart, period_end: previousMonthEnd,
+        due_at: previousMonthStart, paid_at: `${previousMonthStart}T09:00:00+07:00`,
+      };
+      const demoCurrentMonth = {
+        id: `PAY-RENEWAL-${elderId}`, elder_id: elderId,
+        service_name: 'Myka Care Companion · kỳ hiện tại',
+        amount: 100000, currency: 'VND', status: 'paid',
+        period_start: currentMonthStart, period_end: monthEnd,
+        due_at: currentMonthStart, paid_at: `${currentMonthStart}T09:00:00+07:00`,
+      };
+      // The signed-in family account represents a customer who has already bought the device
+      // and paid for the first month. Only future monthly renewals are due in this demo.
+      const displayPayments = payments.length ? payments : [demoCurrentMonth, demoPurchase];
+      const current = payments.find(row => row.status === 'paid' && row.period_start <= today && row.period_end >= today) || (payments.length ? null : demoCurrentMonth);
       return json(request, {
         elder_id: elderId,
         current_plan: current,

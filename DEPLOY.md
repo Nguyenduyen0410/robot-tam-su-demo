@@ -41,7 +41,7 @@ Các thao tác Wi-Fi/Bluetooth và ghi phép đo hiện chỉ mô phỏng dữ l
 
 Onboarding chỉ mở Dashboard khi hồ sơ có thiết bị Bluetooth trong trạng thái đã ghép. Camera QR và Web Bluetooth được bật theo khả năng trình duyệt; Wi-Fi gần đó không thể được quét bởi một trang web, nên danh sách hiện tại là mẫu. Lưu thiết bị/mạng ở onboarding chỉ cập nhật dữ liệu demo; kết nối thiết bị thật cần app/gateway và firmware Myka.
 
-CTA thanh toán mở màn hình checkout minh họa có trạng thái đang tải. Chưa cấu hình cổng thanh toán nên không tạo giao dịch, không mở ngân hàng và không đổi trạng thái hóa đơn.
+CTA đăng ký/gia hạn mở luồng chuyển khoản ngân hàng minh họa. Tên ngân hàng, số tài khoản, mã tham chiếu và hình QR trong luồng đều là dữ liệu giả, không dùng để chuyển tiền; thao tác demo không tạo giao dịch hoặc đổi trạng thái hóa đơn. Tài khoản người thân demo được xem là đã thanh toán 2.000.000đ tiền thiết bị và 100.000đ thuê bao tháng đầu; các tháng sau chỉ gia hạn thuê bao 100.000đ/tháng.
 
 `GET /api/family/conversation-history/{elder_id}?date=YYYY-MM-DD` trả nhật ký chỉ đọc. Bản demo tự tạo một số tin nhắn tổng hợp cho hồ sơ E001; chưa nhận lịch sử từ Telegram hoặc robot.
 
