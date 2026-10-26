@@ -70,7 +70,12 @@
         void target.offsetWidth;
         target.classList.add('myka-focus-highlight');
       }
-      const frame = window.requestAnimationFrame(() => target?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      const frame = window.requestAnimationFrame(() => {
+        if (!target) return;
+        const headerOffset = document.querySelector('.myka-family>header')?.getBoundingClientRect().height || 72;
+        const targetTop = target.getBoundingClientRect().top + window.scrollY - headerOffset - 14;
+        window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      });
       const timer = window.setTimeout(() => { target?.classList.remove('myka-focus-highlight'); setHighlightTarget(''); }, 2200);
       return () => { window.cancelAnimationFrame(frame); window.clearTimeout(timer); target?.classList.remove('myka-focus-highlight'); };
     }, [tab, highlightTarget, highlightRequest]);
@@ -539,7 +544,7 @@
             ];
             return <section id="family-section-agent" className="scroll-mt-24">
               <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[.14em] text-blue-700">MYKA CARE · AGENT GIÁM SÁT</p><h2 className="mt-1 text-2xl font-extrabold">Agent theo dõi sức khỏe</h2><p className="mt-1 max-w-2xl text-sm text-slate-600">Chạy một số đo mẫu để xem Agent tiếp nhận dữ liệu, đối chiếu quy tắc, lưu lần chạy và cập nhật kết quả cho người thân.</p></div><span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold ${apiAvailable ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}><span className={`h-2 w-2 rounded-full ${apiAvailable ? 'bg-emerald-500' : 'bg-rose-500'}`} />{apiAvailable ? 'Backend đang kết nối' : 'Backend chưa kết nối'}</span></div>
-              <article className="overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-[#fffdf8] to-[#f1e5d2] shadow-sm">
+              <article className="overflow-hidden rounded-3xl border border-blue-100 bg-[#fffaf2] shadow-sm">
                 <div className="grid gap-0 lg:grid-cols-[1.05fr_.95fr]">
                   <div className="p-5 sm:p-7">
                     <div className="flex items-start gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#17428f] text-white shadow-sm"><span className="material-symbols-rounded" aria-hidden="true">smart_toy</span></span><div><p className="text-xs font-bold uppercase tracking-[.12em] text-[#17428f]">AI CARE AGENT · DEMO</p><h3 className="mt-1 text-xl font-extrabold text-slate-900">Chạy thử một tình huống</h3><p className="mt-1 text-sm text-slate-600">Chọn kịch bản để mô phỏng máy đo gửi chỉ số. Agent sẽ tự xử lý và đưa kết quả lên màn hình.</p></div></div>
