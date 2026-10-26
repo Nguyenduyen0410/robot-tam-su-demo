@@ -6,9 +6,9 @@ AI Care Companion là hệ thống tổng thể. Myka Care Companion App là ứ
 
 ## AI Agent trong bản demo
 
-Mục **AI Agent** trong app người thân trình bày rõ luồng tự động **nhận dữ liệu → đối chiếu quy tắc → lưu nhật ký → cập nhật trạng thái cho gia đình**. Người xem chọn một trong ba kịch bản số đo tổng hợp (ổn định, cần lưu ý, vượt ngưỡng); giao diện chạy từng bước và hiển thị kết quả, hành động tiếp theo cùng năm lần chạy gần nhất. Backend lưu các lần chạy tại bảng `agent_demo_runs`, tách khỏi lịch sử huyết áp và bảng cảnh báo sức khỏe để dữ liệu minh họa không bị hiểu nhầm là số đo thật.
+Trong mục **Trạng thái**, người thân có thể chọn **Tải dữ liệu mới** để minh họa việc nhận một số đo mô phỏng từ thiết bị. Backend kiểm tra dữ liệu, đối chiếu ngưỡng cấu hình, lưu số đo vào lịch sử huyết áp và tạo cảnh báo nếu vượt ngưỡng cao. Giao diện sau đó tải lại dữ liệu để biểu đồ và lịch sử trong mục **Sức khỏe** phản ánh bản ghi mới. Đây là một luồng sử dụng thông thường của app; các bước xử lý Agent diễn ra phía máy chủ, không có trang Agent hoặc nhật ký chạy riêng.
 
-Luồng tiếp nhận số đo thiết bị được mô tả bởi `POST /api/device/bp-record/{elder_id}`: kiểm tra dữ liệu, phân loại theo ngưỡng cấu hình, lưu lịch sử và ghi cảnh báo khi vượt ngưỡng cao. `GET /api/family/agent-status/{elder_id}` trả trạng thái xử lý cho app. Kịch bản trình diễn riêng dùng `GET/POST /api/family/agent-demo/{elder_id}` để ghi nhật ký minh họa tách biệt.
+Luồng tiếp nhận số đo dùng `POST /api/device/bp-record/{elder_id}`; app đánh dấu mẫu minh họa bằng tiền tố `APP-SYNC-DEMO:` để API tổng hợp có thể gộp bản ghi vào dữ liệu biểu đồ vốn đọc từ nguồn hướng dẫn chỉ đọc. `GET /api/family/health-summary/{elder_id}` trả danh sách đã gộp và sắp xếp theo thời gian. `GET /api/family/agent-status/{elder_id}` cung cấp trạng thái mới nhất cho mục Trạng thái.
 
 Đây là Agent giám sát theo quy tắc cấu hình, không phải mô hình học máy hoặc AI chẩn đoán. Kịch bản demo không chứng minh kết nối máy đo thật, gửi thông báo đẩy hay phân tích lâm sàng. Agent không khuyến nghị điều trị và không thay thế bác sĩ. Nội dung tư vấn và trao đổi chăm sóc chuyển sang **nhóm Telegram chung**; app không có chat riêng bác sĩ–người thân.
 
@@ -16,7 +16,7 @@ Luồng tiếp nhận số đo thiết bị được mô tả bởi `POST /api/d
 
 - Đọc lịch sử huyết áp/nhịp tim, tóm tắt theo khoảng thời gian.
 - Đọc lịch uống thuốc, lịch tái khám, nhắc bảo trì, gói dịch vụ và lịch sử thanh toán.
-- Xem trạng thái Agent và cảnh báo do backend ghi nhận.
+- Xem trạng thái máy chủ, thiết bị và lần cập nhật gần nhất; tải số đo mô phỏng để theo dõi luồng tự động.
 - Mở nhóm Telegram chung để trao đổi với đội chăm sóc.
 - Xem nhật ký trò chuyện Myka theo ngày ở chế độ chỉ đọc để người thân xem lại nội dung.
 - Đọc/cập nhật/xóa cấu hình Wi-Fi demo; đọc/ghép/gỡ thiết bị Bluetooth demo qua API.

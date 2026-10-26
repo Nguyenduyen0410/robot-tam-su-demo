@@ -26,24 +26,6 @@ const newId = (prefix) => `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 let familyPreferencesSchemaReady = false;
 let elderProfilesSchemaReady = false;
 let conversationLogsSchemaReady = false;
-let agentDemoSchemaReady = false;
-
-async function ensureAgentDemoRuns(db) {
-  if (agentDemoSchemaReady) return;
-  await db.prepare(`CREATE TABLE IF NOT EXISTS agent_demo_runs (
-    id TEXT PRIMARY KEY,
-    elder_id TEXT NOT NULL,
-    scenario TEXT NOT NULL,
-    systolic INTEGER NOT NULL,
-    diastolic INTEGER NOT NULL,
-    heart_rate INTEGER NOT NULL,
-    status TEXT NOT NULL,
-    family_action TEXT NOT NULL,
-    created_at TEXT NOT NULL
-  )`).run();
-  agentDemoSchemaReady = true;
-}
-
 async function ensureBackendDemoData(db, elderId) {
   if (elderId !== 'E001') return;
   const imported = await db.prepare("SELECT id FROM blood_pressure WHERE elder_id = ? AND id = 'BP-001'").bind(elderId).first();
@@ -258,7 +240,13 @@ export async function onRequest({ request, env, params }) {
     if (request.method === 'GET' && area === 'family' && section === 'health-summary' && elderId) {
       if (elderId !== 'E001') return json(request, { error: 'Bản mẫu API guide hiện chỉ được gán cho hồ sơ E001 (Bà Hoa).' }, 404);
       const days = Math.min(30, Math.max(7, Number(new URL(request.url).searchParams.get('days') || 7)));
-      const { rows: results, source } = await getReadOnlyBpm(env, days);
+      const { rows: sourceReadings, source } = await getReadOnlyBpm(env, days);
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      const { results: syncedRows } = await db.prepare("SELECT id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp FROM blood_pressure WHERE elder_id = ? AND note LIKE 'APP-SYNC-DEMO:%' AND timestamp >= ? ORDER BY timestamp DESC")
+        .bind(elderId, new Date(cutoff).toISOString()).all();
+      const merged = new Map();
+      [...sourceReadings, ...syncedRows].forEach(row => merged.set(String(row.id), row));
+      const results = [...merged.values()].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       if (!results.length) return json(request, { elder_id: elderId, summary: null, daily_readings: [], data_source: source, demo: source !== 'third_party_api' });
       const latest = results[0];
       const avg = (key) => Math.round(results.reduce((sum, row) => sum + Number(row[key] || 0), 0) / results.length * 10) / 10;
@@ -439,41 +427,6 @@ export async function onRequest({ request, env, params }) {
       await ensureBackendDemoData(db, elderId);
       return json(request, await agentStatus(db, elderId));
     }
-    if (area === 'family' && section === 'agent-demo' && elderId) {
-      if (elderId !== 'E001') return json(request, { error: 'Bản demo hiện chỉ có hồ sơ E001.' }, 404);
-      await ensureAgentDemoRuns(db);
-      if (request.method === 'GET') {
-        const { results } = await db.prepare('SELECT * FROM agent_demo_runs WHERE elder_id = ? ORDER BY created_at DESC LIMIT 5').bind(elderId).all();
-        return json(request, results);
-      }
-      if (request.method === 'POST') {
-        const body = await request.json();
-        const scenarios = {
-          normal: { label: 'Chỉ số trong ngưỡng demo', systolic: 118, diastolic: 76, heart_rate: 72 },
-          warning: { label: 'Chỉ số cần người thân lưu ý', systolic: 132, diastolic: 86, heart_rate: 78 },
-          critical: { label: 'Chỉ số vượt ngưỡng demo', systolic: 158, diastolic: 96, heart_rate: 92 },
-        };
-        const sample = scenarios[String(body.scenario || '')];
-        if (!sample) return json(request, { error: 'Vui lòng chọn một kịch bản đo hợp lệ.' }, 422);
-        const status = sample.systolic >= 140 || sample.diastolic >= 90 ? 'critical' : sample.systolic >= 130 || sample.diastolic >= 85 ? 'warning' : 'normal';
-        const familyAction = status === 'critical'
-          ? 'Ghi nhận cảnh báo mô phỏng để người thân mở app xem lại và liên hệ đội chăm sóc.'
-          : status === 'warning'
-            ? 'Đánh dấu cần lưu ý để người thân xem lại số đo và theo dõi thêm.'
-            : 'Lưu trạng thái trong ngưỡng demo; chưa tạo cảnh báo.';
-        const run = {
-          id: newId('AGENT-DEMO'), elder_id: elderId, scenario: sample.label,
-          systolic: sample.systolic, diastolic: sample.diastolic, heart_rate: sample.heart_rate,
-          status, family_action: familyAction, created_at: nowIso(),
-        };
-        await db.prepare(`INSERT INTO agent_demo_runs
-          (id, elder_id, scenario, systolic, diastolic, heart_rate, status, family_action, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .bind(run.id, run.elder_id, run.scenario, run.systolic, run.diastolic, run.heart_rate, run.status, run.family_action, run.created_at).run();
-        const { results } = await db.prepare('SELECT * FROM agent_demo_runs WHERE elder_id = ? ORDER BY created_at DESC LIMIT 5').bind(elderId).all();
-        return json(request, { run, recent_runs: results }, 201);
-      }
-    }
     if (request.method === 'GET' && area === 'family' && section === 'telegram-consultation' && elderId) {
       const row = await db.prepare('SELECT group_name, members_summary, is_active, group_chat_url FROM telegram_consultation WHERE elder_id = ?').bind(elderId).first();
       return row ? json(request, row) : json(request, { error: 'Chưa cấu hình nhóm Telegram.' }, 404);
@@ -547,9 +500,10 @@ export async function onRequest({ request, env, params }) {
       if (!Number.isInteger(systolic) || systolic < 60 || systolic > 240 || !Number.isInteger(diastolic) || diastolic < 40 || diastolic > 140 || !Number.isInteger(heartRate) || heartRate < 40 || heartRate > 200) return json(request, { error: 'Chỉ số không hợp lệ.' }, 422);
       const status = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
       const id = newId('BP'), timestamp = nowIso();
-      await db.prepare('INSERT INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, elderId, systolic, diastolic, heartRate, status, String(body.note || 'Đo thử qua API thiết bị').slice(0, 300), timestamp).run();
+      const reading = { id, elder_id: elderId, systolic, diastolic, heart_rate: heartRate, status, note: String(body.note || 'Đo thử qua API thiết bị').slice(0, 300), timestamp };
+      await db.prepare('INSERT INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(reading.id, reading.elder_id, reading.systolic, reading.diastolic, reading.heart_rate, reading.status, reading.note, reading.timestamp).run();
       if (status === 'critical') await db.prepare('INSERT INTO alerts (id, elder_id, type, title, detail, severity, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(newId('ALT'), elderId, 'bp_critical', 'Đã ghi nhận chỉ số vượt ngưỡng cấu hình', `Đo được ${systolic}/${diastolic} mmHg, nhịp tim ${heartRate} bpm. Cần người chăm sóc xem lại.`, 'critical', 'pending', timestamp).run();
-      return json(request, { success: true, id, status, agent: await agentStatus(db, elderId) }, 201);
+      return json(request, { success: true, id, status, reading, agent: await agentStatus(db, elderId) }, 201);
     }
 
     return json(request, { error: 'Không tìm thấy API.' }, 404);

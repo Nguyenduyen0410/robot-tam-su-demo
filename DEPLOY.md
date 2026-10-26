@@ -27,7 +27,7 @@ Sau khi thêm binding, cần có một deployment mới để Function nhận bi
 
 ## Phạm vi Agent
 
-Mục **AI Agent** trên app cho người xem chạy ba kịch bản số đo giả: ổn định, cần lưu ý và vượt ngưỡng. Giao diện trình bày bốn bước nhận số đo → đối chiếu quy tắc → lưu nhật ký → cập nhật kết quả/cảnh báo. `GET/POST /api/family/agent-demo/{elder_id}` ghi và đọc tối đa năm lần chạy gần nhất trong bảng D1 `agent_demo_runs`; dữ liệu này tách khỏi lịch sử huyết áp và cảnh báo sức khỏe.
+Mục **Trạng thái** giữ thông tin kết nối máy chủ, thiết bị và lần cập nhật gần nhất; nút **Tải dữ liệu mới** gửi một số đo mô phỏng qua luồng ghi nhận hiện có. Backend kiểm tra số đo, áp dụng ngưỡng cấu hình, lưu vào `blood_pressure` và tạo bản ghi `alerts` nếu vượt ngưỡng cao. Số đo mẫu được đánh dấu bằng tiền tố `APP-SYNC-DEMO:`; API `GET /api/family/health-summary/{elder_id}` gộp chúng với dữ liệu hướng dẫn để mục Sức khỏe cập nhật biểu đồ và lịch sử ngay sau khi tải lại. Không có trang Agent hoặc nhật ký Agent tách riêng.
 
 Luồng thiết bị `POST /api/device/bp-record/{elder_id}` vẫn phân loại số đo gửi vào, lưu lịch sử huyết áp và tạo cảnh báo khi vượt ngưỡng cao. Đây là Agent demo theo quy tắc cấu hình, không phải mô hình học máy, chẩn đoán hay tư vấn điều trị. Kịch bản trình diễn không kết nối thiết bị thật và không gửi thông báo đẩy. App không có chat riêng bác sĩ–người thân; trao đổi tư vấn dùng nhóm Telegram chung đã được cấu hình.
 
