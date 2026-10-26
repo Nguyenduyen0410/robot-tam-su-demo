@@ -6,9 +6,11 @@ AI Care Companion là hệ thống tổng thể. Myka Care Companion App là ứ
 
 ## AI Agent trong bản demo
 
-Agent được trình bày như một tiến trình tự động theo luồng **nhận dữ liệu → xử lý theo quy tắc cấu hình → lưu kết quả → tạo trạng thái/cảnh báo để người thân xem**. Ví dụ backend nhận phép đo qua `POST /api/device/bp-record/{elder_id}`, đánh dấu trạng thái theo ngưỡng cấu hình, lưu vào lịch sử và ghi cảnh báo khi thuộc trường hợp được cấu hình. `GET /api/family/agent-status/{elder_id}` cung cấp trạng thái và các bước xử lý gần nhất cho màn hình Agent.
+Mục **AI Agent** trong app người thân trình bày rõ luồng tự động **nhận dữ liệu → đối chiếu quy tắc → lưu nhật ký → cập nhật trạng thái cho gia đình**. Người xem chọn một trong ba kịch bản số đo tổng hợp (ổn định, cần lưu ý, vượt ngưỡng); giao diện chạy từng bước và hiển thị kết quả, hành động tiếp theo cùng năm lần chạy gần nhất. Backend lưu các lần chạy tại bảng `agent_demo_runs`, tách khỏi lịch sử huyết áp và bảng cảnh báo sức khỏe để dữ liệu minh họa không bị hiểu nhầm là số đo thật.
 
-Đây là demo Agent theo quy tắc, không phải mô hình AI chẩn đoán. Agent không trả lời hội thoại sức khỏe, không khuyến nghị điều trị và không thay thế bác sĩ. Nội dung tư vấn và trao đổi chăm sóc chuyển sang **nhóm Telegram chung**; app không có chat riêng bác sĩ–người thân. Không hiển thị link chat riêng đội chăm sóc.
+Luồng tiếp nhận số đo thiết bị được mô tả bởi `POST /api/device/bp-record/{elder_id}`: kiểm tra dữ liệu, phân loại theo ngưỡng cấu hình, lưu lịch sử và ghi cảnh báo khi vượt ngưỡng cao. `GET /api/family/agent-status/{elder_id}` trả trạng thái xử lý cho app. Kịch bản trình diễn riêng dùng `GET/POST /api/family/agent-demo/{elder_id}` để ghi nhật ký minh họa tách biệt.
+
+Đây là Agent giám sát theo quy tắc cấu hình, không phải mô hình học máy hoặc AI chẩn đoán. Kịch bản demo không chứng minh kết nối máy đo thật, gửi thông báo đẩy hay phân tích lâm sàng. Agent không khuyến nghị điều trị và không thay thế bác sĩ. Nội dung tư vấn và trao đổi chăm sóc chuyển sang **nhóm Telegram chung**; app không có chat riêng bác sĩ–người thân.
 
 ## Phạm vi app
 

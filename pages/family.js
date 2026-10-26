@@ -36,6 +36,10 @@
     const demoMonthlyPayment = { id: 'PAY-RENEWAL-E001', service_name: 'Myka Care Companion · kỳ hiện tại', amount: 100000, currency: 'VND', status: 'paid', period_start: localMonthStart, period_end: currentMonthEnd, due_at: localMonthStart, paid_at: `${localMonthStart}T09:00:00+07:00` };
     const [subscription, setSubscription] = React.useState({ current_plan: null, payments: [], pricing: null });
     const [agentStatus, setAgentStatus] = React.useState(null);
+    const [agentDemoRuns, setAgentDemoRuns] = React.useState([]);
+    const [agentDemoBusy, setAgentDemoBusy] = React.useState(false);
+    const [agentDemoProgress, setAgentDemoProgress] = React.useState(0);
+    const [agentDemoError, setAgentDemoError] = React.useState('');
     const [telegramLinks, setTelegramLinks] = React.useState({ group_chat_url: '' });
     const [apiAvailable, setApiAvailable] = React.useState(false);
     const [healthDataSource, setHealthDataSource] = React.useState('app_demo');
@@ -100,6 +104,10 @@
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => { if (active) setAgentStatus(data); })
         .catch(() => { if (active) setAgentStatus(null); });
+      fetch(apiUrl(`/family/agent-demo/${elderId}`))
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => { if (active) setAgentDemoRuns(data); })
+        .catch(() => { if (active) setAgentDemoRuns([]); });
       fetch(apiUrl(`/device/connectivity/${elderId}`))
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => { if (active) { setConnectivity(data); if (data.paired_devices?.length) RTS.LS.set(`myka_device_paired_${user?.id}`, true); } })
@@ -119,11 +127,13 @@
       let active = true;
       const refreshOperationalStatus = () => Promise.all([
         fetch(apiUrl(`/family/agent-status/${elderId}`)).then(response => response.ok ? response.json() : Promise.reject()),
+        fetch(apiUrl(`/family/agent-demo/${elderId}`)).then(response => response.ok ? response.json() : Promise.reject()),
         fetch(apiUrl(`/device/connectivity/${elderId}`)).then(response => response.ok ? response.json() : Promise.reject()),
         fetch(apiUrl(`/family/health-summary/${elderId}?days=${days}`)).then(response => response.ok ? response.json() : Promise.reject()),
-      ]).then(([agent, device, health]) => {
+      ]).then(([agent, demoRuns, device, health]) => {
         if (!active) return;
         setAgentStatus(agent);
+        setAgentDemoRuns(demoRuns);
         setConnectivity(device);
         setReadings((health.daily_readings || []).slice().reverse());
         setHealthDataSource(health.data_source || 'app_demo');
@@ -281,6 +291,32 @@
       } catch { setCareProfileMessage('Chưa lưu được hồ sơ. Thông tin đang nhập được giữ lại để thử lại.'); }
       finally { setProfileSaving(false); }
     };
+    const runAgentDemo = async scenario => {
+      if (agentDemoBusy) return;
+      setAgentDemoBusy(true);
+      setAgentDemoProgress(0);
+      setAgentDemoError('');
+      let step = 0;
+      const progressTimer = window.setInterval(() => {
+        step = Math.min(step + 1, 3);
+        setAgentDemoProgress(step);
+      }, 450);
+      try {
+        const response = await fetch(apiUrl(`/family/agent-demo/${elderId}`), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scenario }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Chưa chạy được kịch bản Agent.');
+        setAgentDemoRuns(result.recent_runs || [result.run, ...agentDemoRuns].slice(0, 5));
+        setAgentDemoProgress(4);
+      } catch (error) {
+        setAgentDemoError(error.message || 'Không kết nối được Agent demo. Vui lòng thử lại.');
+      } finally {
+        window.clearInterval(progressTimer);
+        setAgentDemoBusy(false);
+      }
+    };
     const voiceOptions = [
       { id: 'male_young_warm', label: 'Nam thành niên', detail: 'Ấm áp' },
       { id: 'male_middle_steady', label: 'Nam trung niên', detail: 'Vững chãi' },
@@ -293,7 +329,7 @@
       { id: 'device', label: 'Bảo trì', icon: 'build' },
       { id: 'connectivity', label: 'Kết nối thiết bị', icon: 'devices' },
       { id: 'service', label: 'Gói & thanh toán', icon: 'credit_card' },
-      { id: 'agent', label: 'Trạng thái', icon: 'sync' },
+      { id: 'agent', label: 'AI Agent', icon: 'smart_toy' },
       { id: 'conversations', label: 'Nhật ký Myka', icon: 'forum' },
       { id: 'settings', label: 'Cài đặt', icon: 'tune' },
       { id: 'profile', label: 'Hồ sơ', icon: 'account_circle' },
@@ -494,14 +530,43 @@
             const measurementFreshnessDetail = measurementAgeMinutes === null ? 'Chờ máy đo gửi bản ghi đầu tiên.' : `${measurementAgeMinutes < 60 ? `${measurementAgeMinutes} phút` : `${Math.floor(measurementAgeMinutes / 60)} giờ`} kể từ lần ghi nhận gần nhất.`;
             const pairedCount = connectivity?.paired_devices?.length || 0;
             const deviceStatus = pairedCount ? `${pairedCount} thiết bị trong hồ sơ` : 'Chưa thêm thiết bị';
+            const latestDemoRun = agentDemoRuns[0] || null;
+            const agentSteps = [
+              { title: 'Tiếp nhận số đo', detail: latestDemoRun ? `${latestDemoRun.systolic}/${latestDemoRun.diastolic} mmHg · nhịp tim ${latestDemoRun.heart_rate} lần/phút` : 'Mô phỏng dữ liệu gửi từ máy đo huyết áp.' },
+              { title: 'Đối chiếu ngưỡng cấu hình', detail: latestDemoRun ? ({ normal: 'Trong ngưỡng demo', warning: 'Cần người thân lưu ý', critical: 'Vượt ngưỡng demo' }[latestDemoRun.status]) : 'So sánh số đo với các ngưỡng demo đã cấu hình.' },
+              { title: 'Lưu nhật ký Agent', detail: latestDemoRun ? 'Đã lưu lần chạy riêng trên máy chủ.' : 'Lưu lần chạy tách biệt khỏi lịch sử sức khỏe.' },
+              { title: 'Cập nhật cho gia đình', detail: latestDemoRun ? latestDemoRun.family_action : 'Hiển thị kết quả và cảnh báo mô phỏng ngay trong app.' },
+            ];
             return <section id="family-section-agent" className="scroll-mt-24">
-              <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[.14em] text-blue-700">MYKA CARE · KẾT NỐI</p><h2 className="mt-1 text-2xl font-extrabold">Trạng thái dữ liệu & thiết bị</h2><p className="mt-1 text-sm text-slate-500">Tình trạng truy cập máy chủ, đồng bộ dữ liệu và thiết bị trong hồ sơ.</p></div><span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold ${apiAvailable ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}><span className={`h-2 w-2 rounded-full ${apiAvailable ? 'bg-emerald-500' : 'bg-rose-500'}`} />{apiAvailable ? 'Máy chủ đang phản hồi' : 'Không kết nối được máy chủ'}</span></div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[.14em] text-blue-700">MYKA CARE · AGENT GIÁM SÁT</p><h2 className="mt-1 text-2xl font-extrabold">Agent theo dõi sức khỏe</h2><p className="mt-1 max-w-2xl text-sm text-slate-600">Chạy một số đo mẫu để xem Agent tiếp nhận dữ liệu, đối chiếu quy tắc, lưu lần chạy và cập nhật kết quả cho người thân.</p></div><span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold ${apiAvailable ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}><span className={`h-2 w-2 rounded-full ${apiAvailable ? 'bg-emerald-500' : 'bg-rose-500'}`} />{apiAvailable ? 'Backend đang kết nối' : 'Backend chưa kết nối'}</span></div>
+              <article className="overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-[#fffdf8] to-[#f1e5d2] shadow-sm">
+                <div className="grid gap-0 lg:grid-cols-[1.05fr_.95fr]">
+                  <div className="p-5 sm:p-7">
+                    <div className="flex items-start gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#17428f] text-white shadow-sm"><span className="material-symbols-rounded" aria-hidden="true">smart_toy</span></span><div><p className="text-xs font-bold uppercase tracking-[.12em] text-[#17428f]">AI CARE AGENT · DEMO</p><h3 className="mt-1 text-xl font-extrabold text-slate-900">Chạy thử một tình huống</h3><p className="mt-1 text-sm text-slate-600">Chọn kịch bản để mô phỏng máy đo gửi chỉ số. Agent sẽ tự xử lý và đưa kết quả lên màn hình.</p></div></div>
+                    <div className="mt-5 grid gap-2 sm:grid-cols-3">{[
+                      { id: 'normal', title: 'Ổn định', value: '118/76', pulse: '72', icon: 'check_circle', color: 'border-emerald-200 bg-emerald-50 text-emerald-900' },
+                      { id: 'warning', title: 'Cần lưu ý', value: '132/86', pulse: '78', icon: 'visibility', color: 'border-amber-200 bg-amber-50 text-amber-950' },
+                      { id: 'critical', title: 'Vượt ngưỡng', value: '158/96', pulse: '92', icon: 'notification_important', color: 'border-rose-200 bg-rose-50 text-rose-950' },
+                    ].map(scenario => <button key={scenario.id} type="button" disabled={agentDemoBusy || !apiAvailable} onClick={() => runAgentDemo(scenario.id)} className={`rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-55 ${scenario.color}`}><span className="flex items-center justify-between gap-2"><span className="text-sm font-bold">{scenario.title}</span><span className="material-symbols-rounded text-xl" aria-hidden="true">{agentDemoBusy && agentDemoProgress < 4 ? 'hourglass_top' : scenario.icon}</span></span><span className="mt-2 block text-xl font-extrabold">{scenario.value}</span><span className="text-xs">mmHg · {scenario.pulse} lần/phút</span><span className="mt-2 block text-xs font-bold">{agentDemoBusy ? 'Agent đang xử lý…' : 'Chạy kịch bản →'}</span></button>)}
+                    </div>
+                    {agentDemoError && <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800">{agentDemoError}</p>}
+                    {!apiAvailable && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Cần kết nối máy chủ để lưu và trình diễn luồng Agent.</p>}
+                    <p className="mt-4 text-xs leading-relaxed text-slate-500">Các số đo trên chỉ là dữ liệu mô phỏng. Kết quả minh họa quy tắc demo, không phải chẩn đoán hay hướng dẫn điều trị.</p>
+                  </div>
+                  <div className="border-t border-blue-100 bg-white/70 p-5 sm:p-7 lg:border-l lg:border-t-0">
+                    <div className="flex items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-[.1em] text-slate-500">QUY TRÌNH TỰ ĐỘNG</p><h3 className="mt-1 text-lg font-extrabold">Agent đã làm gì?</h3></div><span className={`rounded-full px-3 py-1.5 text-xs font-bold ${agentDemoBusy ? 'bg-blue-100 text-blue-800' : agentDemoProgress === 4 ? 'bg-emerald-100 text-emerald-800' : 'bg-[#f3eadc] text-[#715c42]'}`}>{agentDemoBusy ? 'Đang xử lý' : agentDemoProgress === 4 ? 'Vừa hoàn tất' : '4 bước'}</span></div>
+                    <ol className="mt-5 space-y-3">{agentSteps.map((step, index) => { const complete = agentDemoProgress === 4 || (!agentDemoBusy && Boolean(latestDemoRun)); const active = agentDemoBusy && index === agentDemoProgress; const reached = complete || (agentDemoBusy && index < agentDemoProgress); return <li key={step.title} className={`flex gap-3 rounded-2xl border p-3 transition ${active ? 'border-blue-300 bg-blue-50 shadow-sm' : reached ? 'border-emerald-100 bg-emerald-50/70' : 'border-slate-100 bg-white'}`}><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-extrabold ${active ? 'bg-[#17428f] text-white' : reached ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{reached ? '✓' : index + 1}</span><span><span className="block text-sm font-bold text-slate-900">{step.title}</span><span className="mt-0.5 block text-xs leading-relaxed text-slate-600">{step.detail}</span></span></li>; })}</ol>
+                  </div>
+                </div>
+              </article>
+              {latestDemoRun && <article className={`mt-4 rounded-2xl border p-4 sm:p-5 ${latestDemoRun.status === 'critical' ? 'border-rose-200 bg-rose-50' : latestDemoRun.status === 'warning' ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`} role="status"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-600">KẾT QUẢ AGENT · {new Date(latestDemoRun.created_at).toLocaleString('vi-VN')}</p><h3 className="mt-1 text-lg font-extrabold text-slate-900">{latestDemoRun.status === 'critical' ? 'Đã tạo cảnh báo mô phỏng cho gia đình' : latestDemoRun.status === 'warning' ? 'Đã đánh dấu số đo cần lưu ý' : 'Số đo trong ngưỡng demo'}</h3><p className="mt-1 text-sm text-slate-700">{latestDemoRun.systolic}/{latestDemoRun.diastolic} mmHg · Nhịp tim {latestDemoRun.heart_rate} lần/phút</p><p className="mt-2 text-sm font-medium text-slate-700">{latestDemoRun.family_action}</p></div><span className={`rounded-full px-3 py-1.5 text-xs font-extrabold uppercase ${latestDemoRun.status === 'critical' ? 'bg-rose-200 text-rose-900' : latestDemoRun.status === 'warning' ? 'bg-amber-200 text-amber-900' : 'bg-emerald-200 text-emerald-900'}`}>{latestDemoRun.status === 'critical' ? 'Cảnh báo demo' : latestDemoRun.status === 'warning' ? 'Cần lưu ý' : 'Ổn định'}</span></div></article>}
+              <div className="mt-5"><div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">NHẬT KÝ CHẠY THỬ</p><h3 className="mt-1 text-lg font-extrabold">Các lần Agent xử lý</h3></div><span className="text-xs text-slate-500">Lưu riêng, không thêm vào lịch sử huyết áp</span></div>{agentDemoRuns.length ? <div className="space-y-2">{agentDemoRuns.slice(0, 5).map(run => <article key={run.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#eee6d9] bg-white p-4"><div><p className="font-bold text-slate-800">{run.scenario} · {run.systolic}/{run.diastolic} mmHg</p><p className="mt-1 text-xs text-slate-500">Nhịp tim {run.heart_rate} lần/phút · {new Date(run.created_at).toLocaleString('vi-VN')}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${run.status === 'critical' ? 'bg-rose-100 text-rose-800' : run.status === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{run.status === 'critical' ? 'Có cảnh báo demo' : run.status === 'warning' ? 'Cần lưu ý' : 'Ổn định'}</span></article>)}</div> : <p className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-5 text-center text-sm text-slate-500">Chưa có lần chạy demo. Chọn một kịch bản ở trên để bắt đầu.</p>}</div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Kết nối máy chủ</p><p className={`mt-2 text-lg font-extrabold ${apiAvailable ? 'text-emerald-700' : 'text-rose-700'}`}>{apiAvailable ? 'Máy chủ đã phản hồi' : 'Đang gián đoạn'}</p><p className="mt-1 text-xs text-slate-500">{statusUpdatedAt ? `Kiểm tra lúc ${statusUpdatedAt.toLocaleTimeString('vi-VN')}` : 'Đang kiểm tra kết nối…'}</p></article>
-                <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Thiết bị đã thêm</p><p className="mt-2 text-lg font-extrabold text-slate-800">{deviceStatus}</p><p className="mt-1 text-xs text-slate-500">{connectivity?.wifi_ssid ? `Wi-Fi: ${connectivity.wifi_ssid}` : 'Chưa cấu hình Wi-Fi'}</p></article>
-                <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Tiếp nhận dữ liệu đo</p><p className={`mt-2 text-lg font-extrabold ${measurementAgeMinutes === null || measurementAgeMinutes > 30 ? 'text-amber-700' : 'text-emerald-700'}`}>{measurementFreshness}</p><p className="mt-1 text-xs text-slate-500">{measurementTime ? `${newestMeasurement.systolic}/${newestMeasurement.diastolic} mmHg · ${measurementFreshnessDetail}` : measurementFreshnessDetail}</p></article>
+                <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Thiết bị trong hồ sơ</p><p className="mt-2 text-lg font-extrabold text-slate-800">{deviceStatus}</p><p className="mt-1 text-xs text-slate-500">Ghép hồ sơ chưa xác nhận thiết bị thật đang truyền dữ liệu.</p></article>
+                <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Số đo gần nhất từ nguồn dữ liệu</p><p className={`mt-2 text-lg font-extrabold ${measurementAgeMinutes === null || measurementAgeMinutes > 30 ? 'text-amber-700' : 'text-emerald-700'}`}>{measurementFreshness}</p><p className="mt-1 text-xs text-slate-500">{measurementTime ? `${newestMeasurement.systolic}/${newestMeasurement.diastolic} mmHg · ${measurementFreshnessDetail}` : measurementFreshnessDetail}</p></article>
               </div>
-              <article className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><span className="material-symbols-rounded text-amber-700" aria-hidden="true">info</span><p>Trạng thái máy chủ được làm mới tự động mỗi 30 giây. Tình trạng ghép thiết bị trong hồ sơ không đồng nghĩa phần cứng đang kết nối trực tiếp.</p></article>
+              <article className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><span className="material-symbols-rounded text-amber-700" aria-hidden="true">info</span><p>Đây là Agent demo xử lý theo quy tắc cấu hình: nhận dữ liệu → phân loại → lưu nhật ký → cập nhật trạng thái/cảnh báo. Chưa kết nối máy đo thật, không dùng mô hình chẩn đoán và không thay thế nhân viên y tế.</p></article>
             </section>;
           })()}
           {tab === 'conversations' && <section id="family-section-conversations" className="scroll-mt-24">
