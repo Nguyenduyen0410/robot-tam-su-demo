@@ -8,6 +8,7 @@
     const [tab, setTab] = React.useState(() => window.matchMedia('(max-width: 767px)').matches ? 'home' : 'health');
     const [moreOpen, setMoreOpen] = React.useState(false);
     const [highlightTarget, setHighlightTarget] = React.useState('');
+    const [highlightRequest, setHighlightRequest] = React.useState(0);
     const [days, setDays] = React.useState(7);
     const [readings, setReadings] = React.useState(() => RTS.getBP(elderId) || []);
     const [schedules, setSchedules] = React.useState(() => RTS.getSchedules(elderId) || []);
@@ -68,7 +69,7 @@
       const frame = window.requestAnimationFrame(() => target?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
       const timer = window.setTimeout(() => { target?.classList.remove('myka-focus-highlight'); setHighlightTarget(''); }, 2200);
       return () => { window.cancelAnimationFrame(frame); window.clearTimeout(timer); target?.classList.remove('myka-focus-highlight'); };
-    }, [tab, highlightTarget]);
+    }, [tab, highlightTarget, highlightRequest]);
 
     React.useEffect(() => {
       let active = true;
@@ -345,7 +346,7 @@
             : { tone: 'emerald', title: 'Chưa ghi nhận lần đo vượt ngưỡng cấu hình', detail: 'Các số đo đã lưu trong khoảng thời gian này đều nằm trong ngưỡng theo dõi đã cài đặt.' };
 
     const devicePaired = Boolean(connectivity?.paired_devices?.length);
-    const focusSection = section => { setTab(section); setMoreOpen(false); setHighlightTarget(section); };
+    const focusSection = section => { setTab(section); setMoreOpen(false); setHighlightTarget(section); setHighlightRequest(current => current + 1); };
     const dndEnabled = preferences.dnd_mode !== 'off' && (!preferences.dnd_until || Date.parse(preferences.dnd_until) > dndClock);
     const dndUntilLabel = dndEnabled && preferences.dnd_until
       ? new Date(preferences.dnd_until).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
@@ -393,7 +394,7 @@
               <div className="flex min-w-0 items-center gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-700"><span className="material-symbols-rounded" aria-hidden="true">sunny</span></span><div><p className="text-[11px] font-bold tracking-[.12em] text-blue-700">CHĂM SÓC HÔM NAY</p><h2 className="mt-0.5 font-bold">Một chút quan tâm mỗi ngày</h2></div></div>
               <span className="hidden rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 sm:inline">{new Date().toLocaleDateString('vi-VN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
             </div>
-            <button type="button" onClick={() => { setTab('settings'); setMoreOpen(false); setHighlightTarget('settings-dnd'); }} aria-label={`Không làm phiền ${dndEnabled ? 'đang bật' : 'đang tắt'}, mở cài đặt`} className={`mt-4 flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-4 ${dndEnabled ? 'border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100/80 focus-visible:ring-amber-200' : 'border-blue-100 bg-white text-slate-800 hover:bg-blue-50/60 focus-visible:ring-blue-200'}`}>
+            <button type="button" onClick={() => { focusSection('settings'); setHighlightTarget('settings-dnd'); }} aria-label={`Không làm phiền ${dndEnabled ? 'đang bật' : 'đang tắt'}, mở cài đặt`} className={`mt-4 flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-4 ${dndEnabled ? 'border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100/80 focus-visible:ring-amber-200' : 'border-blue-100 bg-white text-slate-800 hover:bg-blue-50/60 focus-visible:ring-blue-200'}`}>
               <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${dndEnabled ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-700'}`}><span className="material-symbols-rounded" aria-hidden="true">{dndEnabled ? 'notifications_paused' : 'notifications_active'}</span></span>
               <span className="min-w-0 flex-1"><span className="block text-sm font-bold">Không làm phiền: {dndEnabled ? 'Đang bật' : 'Đang tắt'}</span><span className={`mt-0.5 block text-xs ${dndEnabled ? 'text-amber-800' : 'text-slate-500'}`}>{dndEnabled ? (dndUntilLabel ? `Tự bật thông báo lại lúc ${dndUntilLabel}` : 'Tiếp tục đến khi người thân bật lại') : 'Chế độ yên lặng chưa bật'}</span></span>
               <span className="shrink-0 rounded-full bg-white/80 px-3 py-1.5 text-xs font-bold">Cài đặt</span>
