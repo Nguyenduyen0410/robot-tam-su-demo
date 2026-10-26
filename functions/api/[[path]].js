@@ -24,6 +24,7 @@ const json = (request, data, status = 200) => new Response(JSON.stringify(data),
 const nowIso = () => new Date().toISOString();
 const newId = (prefix) => `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 let familyPreferencesSchemaReady = false;
+let bpDemoScheduleSchemaReady = false;
 let elderProfilesSchemaReady = false;
 let conversationLogsSchemaReady = false;
 async function ensureBackendDemoData(db, elderId) {
@@ -163,6 +164,23 @@ async function ensureFamilyPreferences(db, elderId) {
     VALUES (?, 'off', NULL, 'female_young_sweet', '', ?)`).bind(elderId, nowIso()).run();
 }
 
+async function ensureBpDemoSchedule(db, elderId) {
+  if (!bpDemoScheduleSchemaReady) {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS bp_demo_schedules (
+      elder_id TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      morning_time TEXT NOT NULL DEFAULT '09:00',
+      evening_time TEXT NOT NULL DEFAULT '19:00',
+      timezone TEXT NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
+      updated_at TEXT NOT NULL
+    )`).run();
+    bpDemoScheduleSchemaReady = true;
+  }
+  await db.prepare("INSERT OR IGNORE INTO bp_demo_schedules (elder_id, enabled, morning_time, evening_time, timezone, updated_at) VALUES (?, 0, '09:00', '19:00', 'Asia/Ho_Chi_Minh', ?)")
+    .bind(elderId, nowIso()).run();
+  return db.prepare('SELECT enabled, morning_time, evening_time, timezone, updated_at FROM bp_demo_schedules WHERE elder_id = ?').bind(elderId).first();
+}
+
 async function ensureElderProfiles(db, elderId) {
   if (!elderProfilesSchemaReady) {
     await db.prepare(`CREATE TABLE IF NOT EXISTS elder_profiles (
@@ -284,6 +302,7 @@ export async function onRequest({ request, env, params }) {
 
     if (request.method === 'GET' && area === 'family' && section === 'settings' && elderId) {
       await ensureFamilyPreferences(db, elderId);
+      const bpDemoSchedule = await ensureBpDemoSchedule(db, elderId);
       const settings = await db.prepare('SELECT dnd_mode, dnd_until, voice_profile, robot_name, updated_at FROM family_preferences WHERE elder_id = ?').bind(elderId).first();
       if (!settings) return json(request, { error: 'Chưa có cài đặt cho hồ sơ này.' }, 404);
       if (settings.dnd_until && Date.parse(settings.dnd_until) <= Date.now()) {
@@ -292,11 +311,12 @@ export async function onRequest({ request, env, params }) {
         settings.dnd_until = null;
         settings.updated_at = nowIso();
       }
-      return json(request, { ...settings, dnd_enabled: settings.dnd_mode !== 'off' });
+      return json(request, { ...settings, bp_demo_schedule_enabled: Boolean(bpDemoSchedule?.enabled), bp_demo_morning_time: bpDemoSchedule?.morning_time || '09:00', bp_demo_evening_time: bpDemoSchedule?.evening_time || '19:00', dnd_enabled: settings.dnd_mode !== 'off' });
     }
 
     if (request.method === 'PUT' && area === 'family' && section === 'settings' && elderId) {
       await ensureFamilyPreferences(db, elderId);
+      await ensureBpDemoSchedule(db, elderId);
       const body = await request.json();
       const allowedModes = new Set(['off', '2h', '5h', 'custom', 'until_off']);
       const allowedVoices = new Set(['male_young_warm', 'male_middle_steady', 'female_young_sweet', 'female_middle_calm']);
@@ -310,13 +330,51 @@ export async function onRequest({ request, env, params }) {
         : mode === '5h' ? new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString()
           : mode === 'custom' && Number.isFinite(requestedDndUntil) && requestedDndUntil > Date.now() && requestedDndUntil <= Date.now() + 24 * 60 * 60 * 1000 ? new Date(requestedDndUntil).toISOString() : null;
       if (mode === 'custom' && !dndUntil) return json(request, { error: 'Thời lượng Không làm phiền không hợp lệ.' }, 422);
+      const bpDemoEnabled = body.bp_demo_schedule_enabled === true || body.bp_demo_schedule_enabled === 1;
       const updatedAt = nowIso();
       await db.prepare(`INSERT INTO family_preferences (elder_id, dnd_mode, dnd_until, voice_profile, robot_name, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(elder_id) DO UPDATE SET dnd_mode = excluded.dnd_mode, dnd_until = excluded.dnd_until,
         voice_profile = excluded.voice_profile, robot_name = excluded.robot_name, updated_at = excluded.updated_at`)
         .bind(elderId, mode, dndUntil, voice, robotName, updatedAt).run();
-      return json(request, { success: true, dnd_mode: mode, dnd_until: dndUntil, dnd_enabled: mode !== 'off', voice_profile: voice, robot_name: robotName, updated_at: updatedAt });
+      await db.prepare('UPDATE bp_demo_schedules SET enabled = ?, updated_at = ? WHERE elder_id = ?').bind(bpDemoEnabled ? 1 : 0, updatedAt, elderId).run();
+      return json(request, { success: true, dnd_mode: mode, dnd_until: dndUntil, dnd_enabled: mode !== 'off', voice_profile: voice, robot_name: robotName, bp_demo_schedule_enabled: bpDemoEnabled, bp_demo_morning_time: '09:00', bp_demo_evening_time: '19:00', updated_at: updatedAt });
+    }
+
+    if (request.method === 'POST' && area === 'demo-scheduler' && section === 'tick' && elderId) {
+      if (elderId !== 'E001') return json(request, { error: 'Lịch đo mô phỏng hiện chỉ áp dụng cho hồ sơ E001.' }, 404);
+      const origin = request.headers.get('Origin') || '';
+      if (!['https://myka-care-companion.pages.dev', 'http://localhost:8765', 'http://127.0.0.1:8765'].includes(origin)) return json(request, { error: 'Nguồn gửi lịch không được phép.' }, 403);
+      const slot = new URL(request.url).searchParams.get('slot');
+      if (!['morning', 'evening'].includes(slot)) return json(request, { error: 'Khung giờ không hợp lệ.' }, 422);
+      const schedule = await ensureBpDemoSchedule(db, elderId);
+      if (!schedule?.enabled) return json(request, { success: true, skipped: true, reason: 'schedule_disabled' });
+      const now = new Date();
+      const localParts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      }).formatToParts(now).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+      const localDate = `${localParts.year}-${localParts.month}-${localParts.day}`;
+      const scheduledTime = slot === 'morning' ? schedule.morning_time : schedule.evening_time;
+      const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
+      const localMinuteOfDay = Number(localParts.hour) * 60 + Number(localParts.minute);
+      const scheduledMinuteOfDay = scheduledHour * 60 + scheduledMinute;
+      const elapsedMinutes = localMinuteOfDay - scheduledMinuteOfDay;
+      if (elapsedMinutes < 0 || elapsedMinutes > 180) return json(request, { success: true, skipped: true, reason: 'outside_schedule_window', local_date: localDate, scheduled_time: scheduledTime });
+      const dayIndex = Math.floor(Date.parse(`${localDate}T00:00:00Z`) / 86400000);
+      const eveningOffset = slot === 'evening' ? 3 : 0;
+      const systolic = 118 + (dayIndex % 8) + eveningOffset;
+      const diastolic = 75 + (dayIndex % 6) + (slot === 'evening' ? 2 : 0);
+      const heartRate = 70 + (dayIndex % 9) + (slot === 'evening' ? 3 : 0);
+      const status = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
+      const id = `BP-SCHEDULE-${elderId}-${localDate.replaceAll('-', '')}-${slot.toUpperCase()}`;
+      const timestamp = new Date(`${localDate}T${scheduledTime}:00+07:00`).toISOString();
+      const note = `APP-SYNC-DEMO: Số đo mô phỏng tự động lúc ${scheduledTime}.`;
+      const inserted = await db.prepare('INSERT OR IGNORE INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(id, elderId, systolic, diastolic, heartRate, status, note, timestamp).run();
+      if (!inserted.meta?.changes) return json(request, { success: true, skipped: true, reason: 'already_recorded', local_date: localDate, slot });
+      if (status === 'critical') await db.prepare('INSERT INTO alerts (id, elder_id, type, title, detail, severity, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(newId('ALT'), elderId, 'bp_critical', 'Đã ghi nhận chỉ số vượt ngưỡng cấu hình', `Đo mô phỏng ${systolic}/${diastolic} mmHg, nhịp tim ${heartRate} bpm. Cần người chăm sóc xem lại.`, 'critical', 'pending', timestamp).run();
+      return json(request, { success: true, skipped: false, slot, reading: { id, elder_id: elderId, systolic, diastolic, heart_rate: heartRate, status, note, timestamp }, agent: await agentStatus(db, elderId) }, 201);
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'conversation-history' && elderId) {

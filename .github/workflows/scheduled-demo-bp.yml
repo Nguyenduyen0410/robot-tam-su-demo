@@ -1,0 +1,29 @@
+name: Tạo số đo huyết áp mô phỏng theo lịch
+
+on:
+  schedule:
+    # 09:00 và 19:00 tại Việt Nam (UTC+7).
+    - cron: '0 2,12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-demo-reading:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Gửi số đo đến backend theo lịch đã bật trong app
+        shell: bash
+        run: |
+          hour="$(TZ=Asia/Ho_Chi_Minh date +%H)"
+          case "$hour" in
+            09) slot="morning" ;;
+            19) slot="evening" ;;
+            *) echo "Ngoài giờ chạy 09:00/19:00 giờ Việt Nam; bỏ qua."; exit 0 ;;
+          esac
+          curl --fail-with-body --silent --show-error --retry 3 --retry-delay 5 \
+            -X POST \
+            -H 'Origin: https://myka-care-companion.pages.dev' \
+            "https://myka-care-companion.pages.dev/api/demo-scheduler/tick/E001?slot=${slot}"

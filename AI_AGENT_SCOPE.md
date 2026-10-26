@@ -17,6 +17,7 @@ Luồng tiếp nhận số đo dùng `POST /api/device/bp-record/{elder_id}`; ap
 - Đọc lịch sử huyết áp/nhịp tim, tóm tắt theo khoảng thời gian.
 - Đọc lịch uống thuốc, lịch tái khám, nhắc bảo trì, gói dịch vụ và lịch sử thanh toán.
 - Xem trạng thái máy chủ, thiết bị và lần cập nhật gần nhất; tải số đo mô phỏng để theo dõi luồng tự động.
+- Bật/tắt lịch tự ghi số đo mô phỏng lúc 09:00 và 19:00 giờ Việt Nam trong Cài đặt; bản ghi được gửi thẳng đến backend, không phụ thuộc app đang mở.
 - Mở nhóm Telegram chung để trao đổi với đội chăm sóc.
 - Xem nhật ký trò chuyện Myka theo ngày ở chế độ chỉ đọc để người thân xem lại nội dung.
 - Đọc/cập nhật/xóa cấu hình Wi-Fi demo; đọc/ghép/gỡ thiết bị Bluetooth demo qua API.
@@ -34,7 +35,7 @@ Nhật ký trò chuyện hiện dùng dữ liệu tổng hợp minh họa. Chưa
 - Telegram: `GET /api/family/telegram-consultation/{elder_id}` chỉ trả link nhóm dùng bởi app.
 - Kết nối demo: `GET /api/device/connectivity/{elder_id}`, `PUT` và `DELETE /api/device/wifi/{elder_id}`, `POST /api/device/bluetooth/pair/{elder_id}`, `DELETE /api/device/bluetooth/{elder_id}/{device_id}`.
 - Thiết bị ghi phép đo: `POST /api/device/bp-record/{elder_id}`.
-- Cài đặt hồ sơ: `GET/PUT /api/family/settings/{elder_id}`.
+- Cài đặt hồ sơ/lịch số đo mẫu: `GET/PUT /api/family/settings/{elder_id}`; lịch tự động gọi `POST /api/demo-scheduler/tick/E001?slot=morning|evening`.
 - Nhật ký đọc theo ngày: `GET /api/family/conversation-history/{elder_id}?date=YYYY-MM-DD`.
 
 ## Lưu ý trước khi public

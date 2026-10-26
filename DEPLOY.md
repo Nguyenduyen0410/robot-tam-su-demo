@@ -29,6 +29,8 @@ Sau khi thêm binding, cần có một deployment mới để Function nhận bi
 
 Mục **Trạng thái** giữ thông tin kết nối máy chủ, thiết bị và lần cập nhật gần nhất; nút **Tải dữ liệu mới** gửi một số đo mô phỏng qua luồng ghi nhận hiện có. Backend kiểm tra số đo, áp dụng ngưỡng cấu hình, lưu vào `blood_pressure` và tạo bản ghi `alerts` nếu vượt ngưỡng cao. Số đo mẫu được đánh dấu bằng tiền tố `APP-SYNC-DEMO:`; API `GET /api/family/health-summary/{elder_id}` gộp chúng với dữ liệu hướng dẫn để mục Sức khỏe cập nhật biểu đồ và lịch sử ngay sau khi tải lại. Không có trang Agent hoặc nhật ký Agent tách riêng.
 
+Trong **Cài đặt**, người thân có thể bật/tắt lịch tạo hai số đo giả mỗi ngày lúc **09:00** và **19:00** (múi giờ `Asia/Ho_Chi_Minh`). GitHub Actions chạy `.github/workflows/scheduled-demo-bp.yml` theo lịch UTC 02:00/12:00 và gọi `POST /api/demo-scheduler/tick/E001?slot=morning|evening`; Pages Function chỉ ghi dữ liệu nếu lịch đang bật, chỉ ghi một lần cho mỗi ngày/khung giờ và lưu trực tiếp vào D1. GitHub Actions chạy lịch trên nhánh mặc định; thời gian bắt đầu có thể trễ khi hệ thống hàng đợi bận. Đây chỉ là số đo mô phỏng để demo, không đại diện cho máy đo hoặc dữ liệu bệnh nhân thật.
+
 Luồng thiết bị `POST /api/device/bp-record/{elder_id}` vẫn phân loại số đo gửi vào, lưu lịch sử huyết áp và tạo cảnh báo khi vượt ngưỡng cao. Đây là Agent demo theo quy tắc cấu hình, không phải mô hình học máy, chẩn đoán hay tư vấn điều trị. Kịch bản trình diễn không kết nối thiết bị thật và không gửi thông báo đẩy. App không có chat riêng bác sĩ–người thân; trao đổi tư vấn dùng nhóm Telegram chung đã được cấu hình.
 
 Các thao tác Wi-Fi/Bluetooth và ghi phép đo hiện chỉ mô phỏng dữ liệu qua API; chưa kết nối thiết bị thật. Trang Telegram sẽ chỉ mở nhóm khi có URL nhóm được cấu hình.
@@ -37,7 +39,7 @@ Các thao tác Wi-Fi/Bluetooth và ghi phép đo hiện chỉ mô phỏng dữ l
 
 `GET/PUT /api/family/elder-profile/{elder_id}` đọc và lưu thông tin bổ sung của hồ sơ người cao tuổi đã liên kết: tuổi, địa chỉ và ghi chú sức khỏe. Người thân mở Hồ sơ, chọn Thêm thông tin hoặc Chỉnh sửa rồi Lưu thay đổi. API kiểm tra giới hạn dữ liệu, lưu vào D1 và trả hồ sơ đã cập nhật. Bản public hiện là demo dùng dữ liệu minh họa theo giới hạn bên dưới.
 
-`GET/PUT /api/family/settings/{elder_id}` lưu lựa chọn Không làm phiền (thời lượng tùy chỉnh tối đa 24 giờ hoặc đến khi bật lại), kiểu giọng và tên robot tùy chọn. Đây là cấu hình hồ sơ demo: app chưa có push notification để tắt rung/âm thanh thực tế; giọng và tên chỉ được áp dụng khi tích hợp phần cứng.
+`GET/PUT /api/family/settings/{elder_id}` lưu lựa chọn Không làm phiền (thời lượng tùy chỉnh tối đa 24 giờ hoặc đến khi bật lại), kiểu giọng, tên robot và trạng thái lịch số đo mô phỏng. Lịch được lưu trong bảng D1 `bp_demo_schedules` do API tự tạo khi đọc cài đặt, không cần chạy migration thủ công. Đây là cấu hình hồ sơ demo: app chưa có push notification để tắt rung/âm thanh thực tế; giọng và tên chỉ được áp dụng khi tích hợp phần cứng.
 
 `GET/POST /api/family/schedules/{elder_id}` đọc và tạo lịch thuốc/tái khám trong D1. Hàm `scheduleNotification()` hiện chỉ là điểm nối minh họa, chưa gửi push notification.
 
