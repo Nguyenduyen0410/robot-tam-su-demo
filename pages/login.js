@@ -46,128 +46,62 @@
     }
 
     return (
-      <div className="min-h-screen bg-[#f4f8f7] flex items-center justify-center p-4 md:p-8">
-        <div className="w-full max-w-5xl overflow-hidden rounded-[30px] bg-white shadow-[0_24px_80px_rgba(21,81,72,.12)] border border-blue-950/5 flex flex-col lg:flex-row">
-          {/* Left - Login form */}
-          <div className="w-full lg:w-[440px] flex-shrink-0 p-6 sm:p-10">
-            {/* Logo */}
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-3 px-2 py-2 rounded-2xl">
-                <span className="w-12 h-12 rounded-2xl bg-blue-700 text-white grid place-items-center text-2xl">✿</span>
-                <div className="text-left">
-                  <div className="text-slate-900 font-extrabold text-xl leading-tight">Myka Care</div>
-                  <div className="text-blue-700 text-xs">Đồng hành chăm sóc gia đình</div>
-                </div>
-              </div>
+      <main className="myka-login">
+        <div className="myka-login-shell">
+          <aside className="myka-login-story" aria-label="Myka đồng hành cùng gia đình">
+            <div className="myka-story-top"><span className="myka-story-dot" /> CHĂM SÓC TỪ NHỮNG ĐIỀU NHỎ</div>
+            <div className="myka-story-copy"><h2>Ở xa một chút.<br /><em>Quan tâm gần hơn.</em></h2><p>Cùng Myka giữ kết nối với sức khỏe và những điều thường ngày của người thân.</p></div>
+            <div className="myka-robot-scene" aria-hidden="true">
+              <div className="myka-scene-orbit" />
+              <svg className="myka-login-robot" viewBox="0 0 320 310" fill="none">
+                <ellipse cx="160" cy="282" rx="94" ry="12" fill="#153e51" opacity=".12" />
+                <path d="M100 205C88 212 76 233 77 246C85 258 98 253 111 239M220 205C232 212 244 233 243 246C235 258 222 253 209 239" fill="#dcebe5" stroke="#c5d9d1" strokeWidth="2"/>
+                <path d="M117 193H203L216 252C218 265 207 276 194 276H126C113 276 102 265 104 252L117 193Z" fill="#f8fbf9" stroke="#d4e1dc" strokeWidth="2"/>
+                <rect x="140" y="249" width="40" height="5" rx="2.5" fill="#c9ddd4"/>
+                <rect x="155" y="41" width="10" height="27" rx="5" fill="#bad6ca"/><circle cx="160" cy="37" r="10" fill="#f4cda4"/>
+                <rect x="55" y="111" width="25" height="57" rx="12.5" fill="#dae9e1"/><rect x="240" y="111" width="25" height="57" rx="12.5" fill="#dae9e1"/>
+                <rect x="71" y="68" width="178" height="139" rx="49" fill="#fcfdfa" stroke="#d6e4de" strokeWidth="2"/>
+                <rect x="90" y="89" width="140" height="93" rx="33" fill="#193c4a"/>
+                <path d="M116 131Q126 117 136 131M184 131Q194 117 204 131" stroke="#b9e4d2" strokeWidth="7" strokeLinecap="round"/>
+                <path d="M148 153Q160 165 172 153" stroke="#b9e4d2" strokeWidth="5" strokeLinecap="round"/>
+                <circle cx="109" cy="148" r="6" fill="#f2c3ad" opacity=".8"/><circle cx="211" cy="148" r="6" fill="#f2c3ad" opacity=".8"/>
+                <path d="M160 238L150 229C140 219 151 210 160 220C169 210 180 219 170 229L160 238Z" fill="#e9ac95"/>
+              </svg>
+              <div className="myka-scene-note myka-scene-note-top"><span className="material-symbols-rounded">favorite</span><div><strong>Thêm một chút an tâm</strong><small>Từ những lần hỏi han mỗi ngày</small></div></div>
+              <div className="myka-scene-note myka-scene-note-bottom"><span className="material-symbols-rounded">calendar_today</span><div><strong>Nhớ những điều quan trọng</strong><small>Lịch thuốc, lịch khám của người thân</small></div></div>
             </div>
-
-            <div className="rounded-2xl p-1">
-              <p className="text-xs font-bold tracking-[.18em] text-blue-700 mb-2">KHÔNG GIAN GIA ĐÌNH</p>
-              <h2 className="text-3xl font-bold text-slate-800 mb-1">Chào mừng trở lại</h2>
-              <p className="text-slate-500 text-sm mb-7">Đăng nhập để xem thông tin chăm sóc người thân.</p>
-
-              {recoveryStep > 0 ? <div className="space-y-4">
+            <div className="myka-story-footer"><span className="material-symbols-rounded">spa</span> Một người bạn của Ngoại. Một kết nối của gia đình.</div>
+          </aside>
+          <section className="myka-login-form-panel" aria-labelledby="myka-login-title">
+            <a href="#/landing" className="myka-login-brand" onClick={event => { event.preventDefault(); onNavigate('landing'); }} aria-label="Myka Care — về trang chủ">
+              <span className="myka-login-brand-mark"><span className="material-symbols-rounded" aria-hidden="true">volunteer_activism</span></span><span><strong>Myka<span>Care</span></strong><small>Đồng hành chăm sóc gia đình</small></span>
+            </a>
+            <div className="myka-login-intro"><span className="myka-login-eyebrow">KHÔNG GIAN GIA ĐÌNH</span><h1 id="myka-login-title">{recoveryStep ? 'Kết nối lại với Myka' : 'Chào mừng trở lại.'}</h1><p>{recoveryStep ? 'Lấy lại quyền truy cập để tiếp tục chăm sóc người thân.' : 'Một nơi để bạn luôn gần người mình thương.'}</p></div>
+            <div className="myka-login-fields">
+{recoveryStep > 0 ? <div className="space-y-4">
                 <div className="flex items-center justify-between"><h3 className="font-bold text-xl text-slate-800">{recoveryStep === 1 ? 'Khôi phục mật khẩu' : recoveryStep === 2 ? 'Xác nhận email' : 'Tạo mật khẩu mới'}</h3><button type="button" onClick={() => { setRecoveryStep(0); setRecoveryMessage(''); }} className="text-sm text-blue-700">Quay lại</button></div>
                 {recoveryStep === 1 && <><label className="block text-sm font-semibold">Email tài khoản<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="ten@email.com" className="mt-2 w-full px-4 py-3 border border-slate-200 rounded-xl" /></label><p className="text-xs text-slate-500">Chỉ khôi phục sau khi tài khoản đã đăng nhập và máy đo đã ghép nối trên thiết bị này.</p><button type="button" onClick={() => { const account = RTS.getUsers().find(u => u.role === 'family' && u.email === email.trim()) || (DEMO_ACCOUNTS.some(a => a.email === email.trim()) ? { id: email.trim() === 'caidat@demo.com' ? 'U-DEMO-SETUP' : 'U002' } : null); if (!account) { setRecoveryMessage('Email chưa khớp tài khoản.'); return; } if (!RTS.LS.get(`myka_ever_logged_in_${account.id}`) || !RTS.LS.get(`myka_device_paired_${account.id}`)) { setRecoveryMessage('Tài khoản cần đăng nhập và ghép máy đo ít nhất một lần trước khi khôi phục.'); return; } setRecoveryStep(2); setRecoveryMessage('Mã xác nhận: 246810. Email chưa được gửi.'); }} className="w-full rounded-xl bg-blue-700 text-white font-bold py-3">Gửi mã xác nhận</button></>}
                 {recoveryStep === 2 && <><p className="text-sm text-slate-600">Nhập mã xác nhận gửi tới <b>{email}</b>.</p><input inputMode="numeric" maxLength="6" value={recoveryCode} onChange={e => setRecoveryCode(e.target.value.replace(/\D/g, ''))} placeholder="••••••" className="w-full px-4 py-3 border border-slate-200 rounded-xl tracking-[.5em] text-center" /><p className="text-xs text-slate-500">Mã xác nhận: 246810. Email chưa được gửi.</p><button type="button" onClick={() => recoveryCode === '246810' ? (setRecoveryStep(3), setRecoveryMessage('')) : setRecoveryMessage('Mã chưa đúng. Vui lòng kiểm tra lại.')} className="w-full rounded-xl bg-blue-700 text-white font-bold py-3">Xác nhận email</button></>}
                 {recoveryStep === 3 && <><label className="block text-sm font-semibold">Mật khẩu mới<input type="password" minLength="8" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Ít nhất 8 ký tự" className="mt-2 w-full px-4 py-3 border border-slate-200 rounded-xl" /></label><button type="button" onClick={() => { if (newPassword.length < 8) { setRecoveryMessage('Mật khẩu cần ít nhất 8 ký tự.'); return; } const demo = DEMO_ACCOUNTS.find(a => a.email === email.trim()); if (demo) { const saved = RTS.LS.get('myka_demo_passwords') || {}; RTS.LS.set('myka_demo_passwords', { ...saved, [email.trim()]: newPassword }); } else { const users = RTS.getUsers().map(u => u.email === email.trim() ? { ...u, password: newPassword } : u); RTS.LS.set('rts_users', users); } setRecoveryStep(0); setPassword(''); setRecoveryMessage('Đã đổi mật khẩu trên thiết bị này.'); }} className="w-full rounded-xl bg-blue-700 text-white font-bold py-3">Lưu mật khẩu mới</button></>}
                 {recoveryMessage && <p role="status" className="text-sm text-blue-800 bg-blue-50 rounded-xl p-3">{recoveryMessage}</p>}
-              </div> : <>
-
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="Email gia đình"
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu</label>
-                  <div className="relative">
-                    <input
-                      type={showPass ? 'text' : 'password'}
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="••••••"
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 pr-12"
-                      required
-                    />
-                    <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-lg">
-                      {showPass ? '🙈' : '👁️'}
-                    </button>
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                    ⚠️ {error}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 bg-blue-700 text-white font-bold rounded-xl hover:bg-blue-800 transition disabled:opacity-60 shadow-md shadow-blue-900/10"
-                >
-                  {loading ? '⏳ Đang đăng nhập...' : '🚀 Đăng nhập'}
-                </button>
+              </div> : <React.Fragment>
+              <form onSubmit={handleLogin} className="myka-auth-form">
+                <div className="myka-auth-field"><label htmlFor="myka-email">Email</label><div className="myka-auth-input"><span className="material-symbols-rounded" aria-hidden="true">mail</span><input id="myka-email" type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} placeholder="Nhập email của bạn" required /></div></div>
+                <div className="myka-auth-field"><div className="myka-auth-label-row"><label htmlFor="myka-password">Mật khẩu</label><button type="button" className="myka-auth-forgot" onClick={() => { setRecoveryStep(1); setRecoveryMessage(''); }}>Quên mật khẩu?</button></div><div className="myka-auth-input"><span className="material-symbols-rounded" aria-hidden="true">lock</span><input id="myka-password" type={showPass ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Nhập mật khẩu" required /><button type="button" onClick={() => setShowPass(!showPass)} aria-label={showPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} aria-pressed={showPass} className="myka-password-toggle"><span className="material-symbols-rounded" aria-hidden="true">{showPass ? 'visibility_off' : 'visibility'}</span></button></div></div>
+                {error && <div role="alert" className="myka-login-error"><span className="material-symbols-rounded" aria-hidden="true">error</span>{error}</div>}
+                {recoveryMessage && <p role="status" className="myka-login-feedback">{recoveryMessage}</p>}
+                <button type="submit" disabled={loading} className="myka-auth-submit"><span>{loading ? 'Đang đăng nhập…' : 'Đăng nhập'}</span><span className={`material-symbols-rounded ${loading ? 'myka-login-loading' : ''}`} aria-hidden="true">{loading ? 'progress_activity' : 'arrow_forward'}</span></button>
               </form>
-
-              <button type="button" onClick={() => { setRecoveryStep(1); setRecoveryMessage(''); }} className="mt-5 w-full text-center text-sm font-semibold text-blue-700 hover:text-blue-900">Quên mật khẩu?</button>
-
-              <div className="mt-5 pt-4 border-t border-slate-100 text-center">
-                <button onClick={() => onNavigate('landing')} className="text-blue-700 hover:underline text-sm">
-                  ← Quay về trang chủ
-                </button>
-              </div>
-              </>}
+              <div className="myka-login-divider"><span>Hoặc khám phá Myka</span></div>
+              <div className="myka-login-demos" aria-label="Truy cập nhanh">{DEMO_ACCOUNTS.map((acc,index) => <button key={acc.email} type="button" onClick={() => fillDemo(acc)} aria-pressed={email === acc.email} className={`myka-demo-option ${email === acc.email ? 'is-selected' : ''}`}><span className="material-symbols-rounded myka-demo-icon" aria-hidden="true">{index === 0 ? 'home_health' : 'smart_toy'}</span><span><strong>{acc.roleLabel}</strong><small>{index === 0 ? 'Xem không gian chăm sóc' : 'Thử kết nối thiết bị'}</small></span><span className="material-symbols-rounded myka-demo-check" aria-hidden="true">{email === acc.email ? 'check_circle' : 'chevron_right'}</span></button>)}</div>
+              <p className="myka-login-demo-hint">Chọn một trải nghiệm để điền tài khoản demo.</p>
+            </React.Fragment>}
             </div>
-          </div>
-
-          {/* Quick family access */}
-          <div className="flex-1 w-full bg-gradient-to-br from-blue-800 via-blue-700 to-indigo-800 p-6 sm:p-10 flex flex-col justify-center">
-            <div className="rounded-3xl p-2">
-              <p className="text-blue-100 text-xs font-bold tracking-[.2em] mb-3">MYKA CARE COMPANION</p>
-              <h3 className="text-white font-bold text-3xl mb-2">Chăm sóc bắt đầu từ sự quan tâm.</h3>
-              <p className="text-blue-50/80 text-sm mb-7 max-w-lg">Một nơi để gia đình xem lại thông tin sức khỏe, lịch chăm sóc và thiết bị Myka của người thân.</p>
-              <h4 className="text-white font-semibold mb-3">Truy cập nhanh</h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {DEMO_ACCOUNTS.map(acc => (
-                  <button
-                    key={acc.email}
-                    onClick={() => fillDemo(acc)}
-                    className={`flex items-center gap-3 p-4 rounded-xl border-2 bg-white hover:shadow-md transition-all text-left ${
-                      email === acc.email ? 'ring-2 ring-blue-300 shadow-lg' : ''
-                    }`}
-                  >
-                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-2xl flex-shrink-0">
-                      {acc.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-slate-800 text-sm">{acc.roleLabel}</div>
-                    </div>
-                    {email === acc.email && (
-                      <span className="text-green-500 text-lg flex-shrink-0">✓</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-6 border-t border-white/20 pt-4 text-xs leading-relaxed text-blue-50/80">
-                Dành cho người thân · Thông tin sức khỏe và lịch chăm sóc · Không có giám sát té ngã hoặc theo dõi trực tiếp.
-              </div>
-            </div>
-          </div>
+            <div className="myka-login-bottom"><button type="button" onClick={() => onNavigate('landing')}><span className="material-symbols-rounded" aria-hidden="true">arrow_back</span> Về trang chủ</button><span>MYKA CARE COMPANION</span></div>
+          </section>
         </div>
-      </div>
+      </main>
     );
   }
-
   window.LoginPage = LoginPage;
 })();

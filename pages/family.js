@@ -360,7 +360,7 @@
     }} />;
 
     return (
-      <div className="min-h-screen bg-[#f8f7f4] text-slate-800">
+      <div className="myka-family min-h-screen bg-[#f8f7f4] text-slate-800">
         <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-blue-100 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <img src="assets/avatar-family.png" alt={`Ảnh đại diện ${familyUserName}`} className="w-12 h-12 shrink-0 rounded-full object-cover ring-2 ring-blue-100" />
@@ -378,7 +378,7 @@
             <div className="relative">
               <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:gap-5 sm:text-left">
                 <img src="assets/avatar-elder.png" alt="Ảnh đại diện của Ngoại" className="h-28 w-28 shrink-0 rounded-full border-4 border-white/90 object-cover shadow-lg sm:h-24 sm:w-24" />
-                <div className="mt-4 min-w-0 sm:mt-0"><p className="text-xs font-bold tracking-[.16em] text-blue-50">HỒ SƠ CHĂM SÓC · {elder?.id || elderId}</p><h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">{elder?.name || 'Bà Nguyễn Thị Hoa'}</h1><p className="mt-1 text-sm text-blue-50">{elder?.age || careProfile?.age || 72} tuổi</p><p className="mx-auto mt-1 flex max-w-2xl items-start justify-center gap-1 text-sm text-blue-50 sm:mx-0 sm:justify-start"><span className="material-symbols-rounded text-base" aria-hidden="true">location_on</span><span>{elder?.address || '12 Đường Hoa Mai, Phường Hòa Xuân, Đà Nẵng'}</span></p></div>
+                <div className="mt-4 min-w-0 sm:mt-0"><p className="text-xs font-bold tracking-[.16em] text-blue-50">HỒ SƠ CHĂM SÓC · {elder?.id || elderId}</p><h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">{elder?.name || 'Bà Nguyễn Thị Hoa'}</h1><p className="mt-1 text-sm text-blue-50">{careProfile?.age ?? elder?.age ?? 72} tuổi</p><p className="mx-auto mt-1 flex max-w-2xl items-start justify-center gap-1 text-sm text-blue-50 sm:mx-0 sm:justify-start"><span className="material-symbols-rounded text-base" aria-hidden="true">location_on</span><span>{careProfile?.address || elder?.address || 'Chưa cập nhật địa chỉ'}</span></p></div>
               </div>
               <p className="mx-auto mt-4 max-w-2xl text-center text-sm leading-relaxed text-blue-50 sm:mx-0 sm:text-left">Cùng gia đình chăm sóc Ngoại mỗi ngày. Số đo, lịch chăm sóc và thông tin cần thiết được gom tại đây.</p>
               <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
@@ -532,7 +532,7 @@
               <div className="flex flex-wrap items-center gap-3"><button type="submit" disabled={!apiAvailable || settingsSaving} className="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">{settingsSaving ? 'Đang lưu…' : 'Lưu cài đặt'}</button>{settingsMessage && <p role="status" className="text-sm text-blue-700">{settingsMessage}</p>}</div>
             </form>
           </section>}
-          <footer className="text-xs text-slate-400 mt-8">Myka Care Companion là phân hệ đọc và theo dõi dành cho người thân. Trao đổi tư vấn diễn ra trên Telegram, không có chat bác sĩ–người thân trong ứng dụng.</footer>
+          <footer className="text-xs text-slate-400 mt-8">Myka Care Companion · Cùng gia đình chăm sóc người thân. Trao đổi chăm sóc qua Telegram.</footer>
         </main>
           {showScheduleEditor && <ScheduleEditor initialSchedule={editingSchedule} onClose={() => { setShowScheduleEditor(false); setEditingSchedule(null); }} onSave={saveSchedule} />}
         {showPaymentCheckout && <PaymentCheckout amount={pendingPayment?.amount || pricing.monthly_fee} purpose={checkoutPurpose} cycleLabel={initialPaymentPending ? 'Thanh toán lần đầu' : (pendingPayment ? 'Hóa đơn chờ thanh toán' : `${pricing.next_renewal_date} · 1 tháng`)} onClose={() => setShowPaymentCheckout(false)} />}

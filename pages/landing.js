@@ -1,235 +1,38 @@
-// ============================================================
-// pages/landing.js - Landing Page (US-00)
-// ============================================================
 (function () {
   const FEATURES = [
-    { icon: '🤖', title: 'Robot Đồng hành', desc: 'Robot thông minh trò chuyện, lắng nghe và đồng hành cùng người cao tuổi 24/7. Hỗ trợ giọng nói tự nhiên tiếng Việt.', color: 'from-blue-500 to-blue-600' },
-    { icon: '💓', title: 'Theo dõi Huyết áp', desc: 'Đo và lưu trữ chỉ số huyết áp tự động, cảnh báo khi vượt ngưỡng an toàn. Biểu đồ xu hướng 7-30 ngày.', color: 'from-red-500 to-red-600' },
-    { icon: '🆘', title: 'SOS Khẩn cấp', desc: 'Nút SOS một chạm, thông báo tức thời đến gia đình và điều dưỡng. Phản hồi trong vòng 3 phút.', color: 'from-orange-500 to-orange-600' },
-    { icon: '📅', title: 'Lịch Chăm sóc', desc: 'Nhắc nhở uống thuốc, đo huyết áp và lịch hẹn khám theo thời gian thực. Xác nhận dễ dàng.', color: 'from-green-500 to-green-600' },
-    { icon: '👨‍👩‍👧', title: 'Kết nối Gia đình', desc: 'Gia đình theo dõi sức khỏe và trò chuyện cùng người thân mọi lúc mọi nơi qua ứng dụng.', color: 'from-purple-500 to-purple-600' },
-    { icon: '👥', title: 'Nhóm Chăm sóc', desc: 'Kết nối gia đình, điều dưỡng và bác sĩ trong một nhóm chăm sóc, chia sẻ thông tin liền mạch.', color: 'from-teal-500 to-teal-600' },
+    { icon:'monitor_heart', title:'Sức khỏe', desc:'Xem lịch sử huyết áp, nhịp tim và xu hướng trong 7 hoặc 30 ngày.', tag:'HIỂU THÊM MỖI NGÀY' },
+    { icon:'calendar_month', title:'Lịch chăm sóc', desc:'Thêm, sửa và theo dõi lịch uống thuốc, lịch tái khám của người thân.', tag:'NHỚ ĐIỀU QUAN TRỌNG' },
+    { icon:'person_book', title:'Hồ sơ người cao tuổi', desc:'Bổ sung tuổi, địa chỉ và tiền sử để thông tin chăm sóc luôn ở cùng một nơi.', tag:'CHĂM SÓC PHÙ HỢP' },
+    { icon:'devices', title:'Kết nối thiết bị', desc:'Quản lý thiết bị trong hồ sơ, tên thiết bị và cấu hình Wi-Fi, Bluetooth.', tag:'KẾT NỐI THUẬN TIỆN' },
+    { icon:'build', title:'Bảo trì', desc:'Xem những nhắc nhở bảo trì và thời hạn cần lưu ý cho thiết bị Myka.', tag:'ĐỒNG HÀNH LÂU DÀI' },
+    { icon:'sync', title:'Trạng thái dữ liệu', desc:'Kiểm tra phản hồi máy chủ và thời gian cập nhật số đo gần nhất.', tag:'THÔNG TIN RÕ RÀNG' },
+    { icon:'forum', title:'Nhật ký Myka', desc:'Đọc lại những cuộc trò chuyện theo ngày, lưu ý nội dung gia đình cần xem lại.', tag:'LẮNG NGHE NHIỀU HƠN' },
+    { icon:'tune', title:'Cài đặt', desc:'Chọn thời lượng Không làm phiền, kiểu giọng và tên robot hiển thị.', tag:'THEO CÁCH CỦA GIA ĐÌNH' },
+    { icon:'receipt_long', title:'Gói & thanh toán', desc:'Xem phí dịch vụ, kỳ gia hạn và lịch sử thanh toán một cách rõ ràng.', tag:'DỄ DÀNG QUẢN LÝ' },
   ];
-
-  const STATS = [
-    { num: '1,200+', label: 'Người cao tuổi' },
-    { num: '98%', label: 'Độ hài lòng' },
-    { num: '< 3 phút', label: 'Thời gian phản hồi SOS' },
-    { num: '24/7', label: 'Hỗ trợ liên tục' },
+  const QUESTIONS = [
+    ['Ai sử dụng Myka Care Companion?', 'Người cao tuổi tương tác với robot Myka tại nhà. Ứng dụng dành cho người thân để xem thông tin sức khỏe, lịch chăm sóc và thiết bị của người cao tuổi đã liên kết.'],
+    ['Gia đình có thể trao đổi với đội chăm sóc ở đâu?', 'Trao đổi với bác sĩ, điều dưỡng diễn ra qua nhóm Telegram riêng khi kênh đã được cấu hình. Ứng dụng không có hộp chat tư vấn nội bộ.'],
+    ['Có thể trải nghiệm khi chưa có thiết bị không?', 'Có. Màn hình đăng nhập có hai tài khoản demo: Đã cài đặt robot và Cài đặt từ đầu. Bạn có thể xem không gian chăm sóc hoặc đi qua hướng dẫn thiết lập với dữ liệu minh họa.'],
+    ['Phiên bản hiện tại hỗ trợ đến đâu?', 'Bản demo minh họa các luồng theo dõi và quản lý thông tin. Kết nối phần cứng thật, thông báo đẩy và xác nhận thanh toán ngân hàng chưa được hoàn thiện. Số đo và tóm tắt không thay thế tư vấn của nhân viên y tế.'],
   ];
-
-  const PLANS = [
-    { name: 'Tiêu chuẩn', price: '1.500.000', period: 'tháng', color: 'border-slate-200', btnColor: 'bg-slate-700', features: ['Robot Đồng hành cơ bản', 'Đo huyết áp tự động', 'Cảnh báo SOS', 'Kết nối 1 người thân', 'Nhắc nhở thuốc'] },
-    { name: 'Nâng cao', price: '2.800.000', period: 'tháng', color: 'border-blue-500', btnColor: 'bg-blue-600', badge: 'Phổ biến nhất', features: ['Tất cả tính năng Tiêu chuẩn', 'Nhóm chăm sóc đầy đủ', 'Kết nối bác sĩ chuyên khoa', 'Báo cáo sức khỏe hàng tuần', 'Kết nối 5 người thân', 'Ưu tiên hỗ trợ'] },
-    { name: 'Cao cấp', price: '4.500.000', period: 'tháng', color: 'border-purple-400', btnColor: 'bg-purple-600', features: ['Tất cả tính năng Nâng cao', 'Bác sĩ riêng tư', 'Điều dưỡng 24/7', 'Không giới hạn người thân', 'Báo cáo theo yêu cầu', 'Hỗ trợ tận nhà'] },
-  ];
-
   function LandingPage({ onNavigate }) {
-    const [menuOpen, setMenuOpen] = React.useState(false);
-
-    return (
-      <div className="min-h-screen bg-white">
-        {/* Navbar */}
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm border-b border-slate-100">
-          <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-3xl">🤖</span>
-              <div>
-                <div className="font-bold text-slate-800 text-lg leading-tight">Robot Tâm Sự</div>
-                <div className="text-xs text-slate-500">Hệ thống chăm sóc người cao tuổi</div>
-              </div>
-            </div>
-            <div className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-slate-600 hover:text-blue-600 transition-colors text-sm font-medium">Tính năng</a>
-              <a href="#stats" className="text-slate-600 hover:text-blue-600 transition-colors text-sm font-medium">Thống kê</a>
-              <a href="#pricing" className="text-slate-600 hover:text-blue-600 transition-colors text-sm font-medium">Gói dịch vụ</a>
-              <button
-                onClick={() => onNavigate('login')}
-                className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm"
-              >
-                Đăng nhập
-              </button>
-            </div>
-            <button className="md:hidden p-2 rounded-lg hover:bg-slate-100" onClick={() => setMenuOpen(!menuOpen)}>☰</button>
-          </div>
-          {menuOpen && (
-            <div className="md:hidden bg-white border-t border-slate-100 px-4 py-3 space-y-2">
-              <a href="#features" className="block py-2 text-slate-600">Tính năng</a>
-              <a href="#pricing" className="block py-2 text-slate-600">Gói dịch vụ</a>
-              <button onClick={() => onNavigate('login')} className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold">Đăng nhập</button>
-            </div>
-          )}
-        </nav>
-
-        {/* Hero */}
-        <section className="pt-24 pb-16 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
-          <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center gap-10">
-            <div className="flex-1 text-center md:text-left">
-              <div className="inline-flex items-center gap-2 bg-blue-500 bg-opacity-40 text-blue-100 px-4 py-1.5 rounded-full text-sm mb-4 border border-blue-400">
-                <span className="w-2 h-2 bg-green-400 rounded-full inline-block animate-pulse"></span>
-                Hệ thống chăm sóc người cao tuổi thế hệ mới
-              </div>
-              <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-4">
-                Robot Tâm Sự <br />
-                <span className="text-blue-200">với Người Cao Tuổi</span>
-              </h1>
-              <p className="text-blue-100 text-lg mb-8 leading-relaxed max-w-xl">
-                Đồng hành chăm sóc sức khỏe 24/7, kết nối gia đình và đội ngũ y tế chuyên nghiệp.
-                Theo dõi huyết áp thông minh, nhắc nhở thuốc và ứng phó khẩn cấp nhanh chóng.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
-                <button
-                  onClick={() => onNavigate('login')}
-                  className="px-8 py-4 bg-white text-blue-700 font-bold rounded-xl hover:bg-blue-50 transition shadow-lg text-lg"
-                >
-                  🚀 Vào ứng dụng
-                </button>
-                <a href="#features" className="px-8 py-4 border-2 border-blue-300 text-white font-semibold rounded-xl hover:bg-blue-600 transition text-center text-lg">
-                  Tìm hiểu thêm ↓
-                </a>
-              </div>
-            </div>
-            <div className="flex-shrink-0 text-center">
-              <div className="w-56 h-56 md:w-72 md:h-72 bg-white bg-opacity-10 rounded-full flex items-center justify-center border-4 border-blue-300 border-opacity-40 shadow-2xl mx-auto">
-                <span className="text-8xl md:text-9xl">🤖</span>
-              </div>
-              <div className="mt-4 flex justify-center gap-3 text-sm">
-                <span className="bg-green-400 text-white px-3 py-1 rounded-full font-medium">✓ Đang hoạt động</span>
-                <span className="bg-blue-400 bg-opacity-60 text-white px-3 py-1 rounded-full">1,200+ Người dùng</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Stats */}
-        <section id="stats" className="py-12 bg-slate-800">
-          <div className="max-w-5xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6">
-            {STATS.map(s => (
-              <div key={s.num} className="text-center text-white">
-                <div className="text-3xl md:text-4xl font-extrabold text-blue-400">{s.num}</div>
-                <div className="text-slate-300 text-sm mt-1">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Features */}
-        <section id="features" className="py-16 bg-white">
-          <div className="max-w-6xl mx-auto px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-slate-800 mb-3">6 Nhóm Tính Năng Chính</h2>
-              <p className="text-slate-500 max-w-xl mx-auto">Giải pháp toàn diện cho việc chăm sóc sức khỏe và tinh thần của người cao tuổi</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {FEATURES.map(f => (
-                <div key={f.title} className="group bg-white border border-slate-100 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                  <div className={`w-14 h-14 bg-gradient-to-br ${f.color} rounded-xl flex items-center justify-center text-3xl mb-4 shadow-md`}>
-                    {f.icon}
-                  </div>
-                  <h3 className="font-bold text-slate-800 text-xl mb-2">{f.title}</h3>
-                  <p className="text-slate-500 text-sm leading-relaxed">{f.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* How it works */}
-        <section className="py-16 bg-blue-50">
-          <div className="max-w-5xl mx-auto px-4">
-            <h2 className="text-3xl font-bold text-slate-800 mb-10 text-center">Cách hoạt động</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[
-                { step: '1', icon: '📦', title: 'Cài đặt Robot', desc: 'Thiết bị Robot Tâm Sự được giao và cài đặt tại nhà/phòng của người cao tuổi' },
-                { step: '2', icon: '👤', title: 'Tạo hồ sơ', desc: 'Điền thông tin sức khỏe, danh sách thuốc và liên kết với gia đình' },
-                { step: '3', icon: '💬', title: 'Bắt đầu chăm sóc', desc: 'Robot tự động nhắc nhở, đo huyết áp và trò chuyện mỗi ngày' },
-                { step: '4', icon: '📊', title: 'Theo dõi & Cảnh báo', desc: 'Gia đình và bác sĩ nhận báo cáo và cảnh báo kịp thời qua ứng dụng' },
-              ].map(s => (
-                <div key={s.step} className="text-center">
-                  <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-2xl mx-auto mb-3 shadow-lg">
-                    {s.step}
-                  </div>
-                  <div className="text-3xl mb-2">{s.icon}</div>
-                  <h4 className="font-bold text-slate-800 mb-1">{s.title}</h4>
-                  <p className="text-slate-500 text-sm">{s.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Pricing */}
-        <section id="pricing" className="py-16 bg-white">
-          <div className="max-w-5xl mx-auto px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-slate-800 mb-3">Gói Dịch vụ</h2>
-              <p className="text-slate-500">Lựa chọn gói phù hợp với nhu cầu chăm sóc của gia đình bạn</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {PLANS.map(p => (
-                <div key={p.name} className={`border-2 ${p.color} rounded-2xl p-6 relative ${p.badge ? 'shadow-xl scale-105' : ''}`}>
-                  {p.badge && (
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-1 rounded-full font-semibold">{p.badge}</div>
-                  )}
-                  <h3 className="font-bold text-xl text-slate-800 mb-1">{p.name}</h3>
-                  <div className="mb-4">
-                    <span className="text-3xl font-extrabold text-slate-800">{p.price}</span>
-                    <span className="text-slate-500 text-sm"> ₫/{p.period}</span>
-                  </div>
-                  <ul className="space-y-2 mb-6">
-                    {p.features.map(f => (
-                      <li key={f} className="text-sm text-slate-600 flex items-start gap-2">
-                        <span className="text-green-500 flex-shrink-0 mt-0.5">✓</span>{f}
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    onClick={() => onNavigate('login')}
-                    className={`w-full py-3 ${p.btnColor} text-white rounded-xl font-semibold hover:opacity-90 transition`}
-                  >
-                    Đăng ký ngay
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* CTA */}
-        <section className="py-14 bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-center">
-          <div className="max-w-2xl mx-auto px-4">
-            <h2 className="text-3xl font-bold mb-4">Bắt đầu chăm sóc người thân ngay hôm nay</h2>
-            <p className="text-blue-200 mb-8">Dùng thử miễn phí 30 ngày. Không cần thẻ tín dụng.</p>
-            <button
-              onClick={() => onNavigate('login')}
-              className="px-10 py-4 bg-white text-blue-700 font-bold rounded-xl hover:bg-blue-50 shadow-xl text-lg transition"
-            >
-              🚀 Bắt đầu chăm sóc
-            </button>
-          </div>
-        </section>
-
-        {/* Footer */}
-        <footer className="bg-slate-900 text-slate-400 py-8">
-          <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🤖</span>
-              <div>
-                <div className="text-white font-bold">Robot Tâm Sự</div>
-                <div className="text-xs">© 2024 RobotCare Vietnam</div>
-              </div>
-            </div>
-            <div className="text-sm text-center">Hệ thống chăm sóc người cao tuổi thông minh • Hotline: 1800 1234</div>
-            <div className="flex gap-4 text-sm">
-              <a href="#" className="hover:text-white">Chính sách</a>
-              <a href="#" className="hover:text-white">Điều khoản</a>
-              <a href="#" className="hover:text-white">Liên hệ</a>
-            </div>
-          </div>
-        </footer>
-      </div>
-    );
+    const [menuOpen,setMenuOpen] = React.useState(false);
+    const [openQuestion,setOpenQuestion] = React.useState(0);
+    const goTo = id => { setMenuOpen(false); document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'}); };
+    return <div className="myka-welcome">
+      <header className="care-site-header"><div className="care-container care-site-nav"><a className="care-brand" href="#/landing" aria-label="Myka Care — trang chủ"><span className="care-brand-mark material-symbols-rounded" aria-hidden="true">volunteer_activism</span><span><strong>Myka<span>Care</span></strong><small>Đồng hành cùng gia đình</small></span></a><nav className="care-desktop-nav" aria-label="Điều hướng trang giới thiệu"><button onClick={() => goTo('care-features')}>Cùng Myka chăm sóc</button><button onClick={() => goTo('care-how')}>Cách hoạt động</button><button onClick={() => goTo('care-pricing')}>Chi phí</button></nav><div className="care-nav-actions"><button className="care-nav-login" onClick={() => onNavigate('login')}>Đăng nhập<span className="material-symbols-rounded" aria-hidden="true">arrow_forward</span></button><button className="care-menu-toggle" aria-label={menuOpen?'Đóng menu':'Mở menu'} aria-expanded={menuOpen} aria-controls="care-mobile-menu" onClick={() => setMenuOpen(!menuOpen)}><span className="material-symbols-rounded" aria-hidden="true">{menuOpen?'close':'menu'}</span></button></div></div>{menuOpen && <nav id="care-mobile-menu" className="care-mobile-menu" aria-label="Menu điện thoại"><button onClick={() => goTo('care-features')}>Cùng Myka chăm sóc</button><button onClick={() => goTo('care-how')}>Cách hoạt động</button><button onClick={() => goTo('care-pricing')}>Chi phí</button><button onClick={() => goTo('care-faq')}>Câu hỏi thường gặp</button></nav>}</header>
+      <main>
+        <section className="care-hero care-container"><div className="care-hero-copy"><div className="care-eyebrow"><span/> DÀNH CHO NGƯỜI CAO TUỔI & GIA ĐÌNH</div><h1>Dù ở đâu,<br/>vẫn gần <em>người thương.</em></h1><p>Một người bạn bên ông bà. Một không gian để gia đình cùng quan tâm, theo dõi sức khỏe và chăm sóc từ những điều nhỏ mỗi ngày.</p><div className="care-hero-actions"><button className="care-primary" onClick={() => onNavigate('login')}>Khám phá Myka Care<span className="material-symbols-rounded" aria-hidden="true">arrow_forward</span></button><button className="care-text-button" onClick={() => goTo('care-features')}>Tìm hiểu thêm<span className="material-symbols-rounded" aria-hidden="true">south</span></button></div><div className="care-hero-note"><span className="material-symbols-rounded" aria-hidden="true">spa</span> Lắng nghe. Quan tâm. Đồng hành.</div></div><div className="care-hero-visual"><div className="care-photo-frame"><img src="assets/family-care-hero.png" alt="Bà và con gái nắm tay, cùng trò chuyện trong không gian gia đình ấm áp" fetchPriority="high"/><div className="care-photo-caption">Ở bên nhau, theo một cách gần gũi hơn.</div></div><div className="care-photo-flower" aria-hidden="true">✳</div><div className="care-connection-note"><span className="material-symbols-rounded" aria-hidden="true">favorite</span><div><strong>Sự an tâm bắt đầu từ quan tâm</strong><small>Cùng gia đình chăm sóc ông bà</small></div></div></div></section>
+        <section className="care-values"><div className="care-container care-value-grid">{[['elderly','Người cao tuổi ở trung tâm','Gần gũi, tôn trọng và dễ tiếp cận.'],['diversity_1','Gia đình cùng chăm sóc','Thông tin cần thiết ở cùng một nơi.'],['favorite','Quan tâm từ điều nhỏ','Số đo, lịch thuốc, những lời hỏi han.']].map(([icon,title,desc])=><div className="care-value" key={title}><span className="material-symbols-rounded" aria-hidden="true">{icon}</span><div><strong>{title}</strong><p>{desc}</p></div></div>)}</div></section>
+        <section id="care-features" className="care-section care-container"><div className="care-section-heading"><span className="care-eyebrow">MỘT KHÔNG GIAN CHĂM SÓC GẦN GŨI</span><h2>Thêm thấu hiểu.<br/><em>Thêm những ngày an tâm.</em></h2><p>Những công cụ thiết thực dành cho người thân, để việc quan tâm ông bà trở thành một phần tự nhiên trong ngày.</p></div><div className="care-feature-grid">{FEATURES.map((item,index)=><article className="care-feature" key={item.title}><div className={`care-feature-icon care-tone-${index%3}`}><span className="material-symbols-rounded" aria-hidden="true">{item.icon}</span></div><small>{item.tag}</small><h3>{item.title}</h3><p>{item.desc}</p></article>)}</div><div className="care-telegram"><span className="care-telegram-icon material-symbols-rounded" aria-hidden="true">send</span><div><h3>Kết nối với nhóm chăm sóc qua Telegram</h3><p>Một kênh riêng để người thân trao đổi cùng bác sĩ, điều dưỡng khi nhóm đã được thiết lập.</p></div><span className="care-telegram-badge">KÊNH TRAO ĐỔI BÊN NGOÀI APP</span></div></section>
+        <section id="care-how" className="care-how-section"><div className="care-container"><div className="care-section-heading"><span className="care-eyebrow">BẮT ĐẦU THẬT NHẸ NHÀNG</span><h2>Chăm sóc gần hơn,<br/><em>từ ba bước đơn giản.</em></h2></div><div className="care-steps">{[['01','Kết nối Myka','Đăng nhập và thực hiện hướng dẫn thiết lập thiết bị theo hồ sơ chăm sóc.','smart_toy'],['02','Thêm thông tin người thân','Bổ sung hồ sơ người cao tuổi, lịch uống thuốc và những buổi tái khám.','person_book'],['03','Cùng theo dõi mỗi ngày','Xem số đo, nhật ký và thông tin cần lưu ý trong không gian gia đình.','potted_plant']].map(([n,title,desc,icon])=><article key={n}><div className="care-step-top"><span>{n}</span><span className="material-symbols-rounded" aria-hidden="true">{icon}</span></div><h3>{title}</h3><p>{desc}</p></article>)}</div></div></section>
+        <section id="care-pricing" className="care-section care-container"><div className="care-section-heading"><span className="care-eyebrow">CHI PHÍ RÕ RÀNG</span><h2>Đầu tư cho <em>sự quan tâm.</em></h2><p>Một thiết bị đồng hành tại nhà, cùng gói ứng dụng để gia đình theo dõi và chăm sóc.</p></div><div className="care-price-grid"><article className="care-device-price"><span className="care-price-label">THIẾT BỊ · MUA MỘT LẦN</span><span className="material-symbols-rounded care-price-icon" aria-hidden="true">smart_toy</span><h3>Robot Myka</h3><p className="care-price">2.000.000<span>đ</span></p><p>Thiết bị đồng hành dành cho người cao tuổi tại nhà.</p><div className="care-price-foot"><span className="material-symbols-rounded" aria-hidden="true">check_circle</span> Gia đình sở hữu thiết bị sau khi mua</div></article><article className="care-monthly-price"><span className="care-price-label">ỨNG DỤNG · GIA HẠN HÀNG THÁNG</span><span className="material-symbols-rounded care-price-icon" aria-hidden="true">volunteer_activism</span><h3>Myka Care Companion</h3><p className="care-price">100.000<span>đ / tháng</span></p><p>Không gian theo dõi và chăm sóc dành cho người thân.</p><ul>{['Số đo và lịch sử sức khỏe','Hồ sơ, lịch thuốc và lịch khám','Thiết bị, nhật ký và cài đặt'].map(t=><li key={t}><span className="material-symbols-rounded" aria-hidden="true">check</span>{t}</li>)}</ul><button className="care-primary" onClick={() => onNavigate('login')}>Trải nghiệm ứng dụng<span className="material-symbols-rounded" aria-hidden="true">arrow_forward</span></button></article></div><p className="care-pricing-note">Chi phí lần đầu: <strong>2.100.000đ</strong> gồm thiết bị và tháng dịch vụ đầu tiên. Từ kỳ tiếp theo: 100.000đ/tháng. Mức phí đang được minh họa trong bản demo.</p></section>
+        <section id="care-faq" className="care-faq-section care-container"><div className="care-faq-intro"><span className="care-eyebrow">HIỂU THÊM VỀ MYKA</span><h2>Gia đình có<br/><em>thể muốn biết.</em></h2><p>Một vài thông tin trước khi bắt đầu.</p></div><div className="care-faq-list">{QUESTIONS.map(([q,a],index)=><article className="care-faq" key={q}><h3><button aria-expanded={openQuestion===index} aria-controls={`care-answer-${index}`} onClick={() => setOpenQuestion(openQuestion===index?null:index)}>{q}<span className="material-symbols-rounded" aria-hidden="true">{openQuestion===index?'remove':'add'}</span></button></h3><div id={`care-answer-${index}`} hidden={openQuestion!==index}><p>{a}</p></div></article>)}</div></section>
+        <section className="care-last-call care-container"><span className="material-symbols-rounded" aria-hidden="true">spa</span><h2>Quan tâm hôm nay.<br/><em>Gần nhau thêm mỗi ngày.</em></h2><p>Cùng Myka mở một không gian chăm sóc cho người mình thương.</p><button className="care-primary" onClick={() => onNavigate('login')}>Bắt đầu cùng Myka<span className="material-symbols-rounded" aria-hidden="true">arrow_forward</span></button></section>
+      </main>
+      <footer className="care-site-footer care-container"><div className="care-brand"><span className="care-brand-mark material-symbols-rounded" aria-hidden="true">volunteer_activism</span><span><strong>Myka<span>Care</span></strong><small>Đồng hành cùng gia đình</small></span></div><p>AI Care Companion cho người cao tuổi.<br/>Thông tin theo dõi không thay thế tư vấn y tế.</p><button onClick={() => onNavigate('login')}>Vào ứng dụng<span className="material-symbols-rounded" aria-hidden="true">arrow_forward</span></button></footer>
+    </div>;
   }
-
-  window.LandingPage = LandingPage;
+  window.LandingPage=LandingPage;
 })();
