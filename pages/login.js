@@ -94,7 +94,7 @@
               </form>
               <div className="myka-login-divider"><span>Hoặc khám phá Myka</span></div>
               <div className="myka-login-demos" aria-label="Truy cập nhanh">{DEMO_ACCOUNTS.map((acc,index) => <button key={acc.email} type="button" onClick={() => fillDemo(acc)} aria-pressed={email === acc.email} className={`myka-demo-option ${email === acc.email ? 'is-selected' : ''}`}><span className="material-symbols-rounded myka-demo-icon" aria-hidden="true">{index === 0 ? 'home_health' : 'smart_toy'}</span><span><strong>{acc.roleLabel}</strong><small>{index === 0 ? 'Xem không gian chăm sóc' : 'Thử kết nối thiết bị'}</small></span><span className="material-symbols-rounded myka-demo-check" aria-hidden="true">{email === acc.email ? 'check_circle' : 'chevron_right'}</span></button>)}</div>
-              <p className="myka-login-demo-hint">Chọn một trải nghiệm để điền tài khoản demo.</p>
+              <p className="myka-login-demo-hint">Chọn một trải nghiệm để điền sẵn thông tin đăng nhập.</p>
             </React.Fragment>}
             </div>
             <div className="myka-login-bottom"><button type="button" onClick={() => onNavigate('landing')}><span className="material-symbols-rounded" aria-hidden="true">arrow_back</span> Về trang chủ</button><span>MYKA CARE COMPANION</span></div>
