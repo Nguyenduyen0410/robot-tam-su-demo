@@ -46,7 +46,9 @@
         return;
       }
       if (!currentUser && PROTECTED.includes(route)) {
-        navigate('login');
+        // A public deep link to the family area should start at the welcome page.
+        // From there, the user chooses to continue to login before entering the app.
+        navigate('landing');
       }
       if (currentUser && route === 'login') {
         navigate('family');
