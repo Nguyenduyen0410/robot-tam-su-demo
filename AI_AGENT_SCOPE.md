@@ -56,3 +56,8 @@ Tóm tắt so sánh 7 ngày gần nhất với 7 ngày trước theo trung bình
 ## Cập nhật lịch gửi số đo mô phỏng (02/11/2026)
 
 GitHub Actions kiểm tra hai khung giờ 09:00/19:00 (Việt Nam) khoảng 20 phút/lần. Backend bỏ qua khung giờ chưa đến, gửi bù khung giờ đã đến trong cùng ngày và dùng ID theo ngày/khung giờ để chống ghi trùng. Dịch vụ có thể chạy trễ; chưa bảo đảm đúng phút hoặc gửi bù các ngày trước khi dịch vụ ngừng cả ngày. Lịch vẫn phụ thuộc cờ bật trong cài đặt hồ sơ E001. Số đo lưu D1 khi app đóng; app đang mở tải lại mỗi 30 giây. Đây là robot mô phỏng, chưa có kết nối máy đo thật.
+
+
+## Nguồn chỉ số sức khỏe (02/11/2026)
+
+Theo yêu cầu mới nhất, chỉ Robot Myka là nguồn ghi nhận chỉ số sức khỏe; người thân chỉ nhận/xem trên app. HealthJournal không còn form ghi nhật ký, không đọc/ghi nhật ký localStorage và không có lựa chọn nguồn người thân. Dữ liệu cũ trên trình duyệt không được sử dụng hoặc đổi nhãn thành dữ liệu robot. Chỉ số mở rộng vẫn là dữ liệu robot mô phỏng, chưa được thu thực tế từ phần cứng. Nội dung này thay thế mô tả nhập nhật ký ở các bản thử trước.
