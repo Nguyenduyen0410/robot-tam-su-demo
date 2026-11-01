@@ -6,14 +6,13 @@
     return Array.from({length: 60}, (_, i) => {
       const d = new Date(end + 'T12:00:00+07:00'); d.setUTCDate(d.getUTCDate() - 59 + i);
       const recent = i >= 53;
-      const isOmron = scenario === 'omron_alert';
       return {
         date: new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Ho_Chi_Minh'}).format(d),
         weight: +(57 + (i % 5) / 10).toFixed(1),
-        sleep: +(7 + (i % 3) / 10 - (scenario === 'change' && recent ? 1.8 : 0) - (isOmron && recent ? 1.4 : 0)).toFixed(1),
-        activity: 30 + i % 7 - (scenario === 'change' && recent ? 18 : 0) - (isOmron && recent ? 10 : 0),
-        mood: scenario === 'change' && recent ? 2 : (isOmron && recent ? 3 : 4),
-        symptoms: isOmron && recent ? 'Ngoại hơi mệt, máy Omron báo vòng bít lỏng lúc 15:45' : '',
+        sleep: +(7 + (i % 3) / 10 - (scenario === 'change' && recent ? 1.8 : 0)).toFixed(1),
+        activity: 30 + i % 7 - (scenario === 'change' && recent ? 18 : 0),
+        mood: scenario === 'change' && recent ? 2 : 4,
+        symptoms: scenario === 'change' && recent ? 'Ngoại hơi mệt, khó ngủ' : '',
         source: 'Dữ liệu mô phỏng'
       };
     }).filter((_, i) => scenario !== 'missing' || i < 53 || i % 3 === 0);
@@ -60,10 +59,8 @@
       const actStr = actVal ? actVal.toFixed(0) + ' phút/ngày' : '30 phút/ngày';
       const moodVal = report.changes.find(c => c.key === 'mood')?.now;
       const moodStr = moodVal ? moodVal.toFixed(1) + '/5' : '4/5';
-      const bpStr = latestReading ? `${latestReading.systolic}/${latestReading.diastolic} mmHg (Nhịp tim ${latestReading.heart_rate || latestReading.heartRate || 92} bpm)` : '126/92 mmHg (Nhịp tim 92 bpm)';
-      const hasCuffAlert = Boolean(latestReading?.cuffAlert || latestReading?.cuff_alert || latestReading?.note?.includes('vòng bít') || scenario === 'omron_alert');
-      const cuffStr = hasCuffAlert ? ' [Cảnh báo: Vòng bít quấn lỏng]' : ' [Kỹ thuật: Đạt chuẩn]';
-      const text = `[MYKA CARE - TÓM TẮT SỨC KHỎE NGOẠI (E001)]\nKính gửi Bác sĩ / Điều dưỡng phụ trách,\nEm là Duyên (người thân của Ngoại - E001). Em xin gửi tóm tắt chỉ số sức khỏe của Ngoại từ hệ thống Myka:\n• Số đo gần nhất từ máy Omron: ${bpStr}${cuffStr}\n• Giấc ngủ 7 ngày qua: ${sleepStr}\n• Mức vận động: ${actStr}\n• Tâm trạng đàm thoại Robot: ${moodStr}\n• Tình trạng: ${scenario === 'change' ? 'Ngoại ngủ ít hơn tuần trước 1.8 giờ, huyết áp có dao động.' : (hasCuffAlert ? 'Máy Omron báo vòng bít chưa chặt, Ngoại ngủ hơi trằn trọc.' : 'Thể trạng nhìn chung ổn định, uống thuốc đúng giờ.')}\nNhờ Bác sĩ xem và tư vấn giúp em trong nhóm Telegram nhé ạ. Em cảm ơn Bác sĩ!`;
+      const bpStr = latestReading ? `${latestReading.systolic}/${latestReading.diastolic} mmHg (Nhịp tim ${latestReading.heart_rate || latestReading.heartRate || 74} bpm)` : '128/80 mmHg (Nhịp tim 74 bpm)';
+      const text = `[MYKA CARE - TÓM TẮT SỨC KHỎE NGOẠI (E001)]\nKính gửi Bác sĩ / Điều dưỡng phụ trách,\nEm là Duyên (người thân của Ngoại - E001). Em xin gửi tóm tắt chỉ số sức khỏe của Ngoại từ hệ thống Myka:\n• Huyết áp & Nhịp tim gần nhất: ${bpStr}\n• Giấc ngủ 7 ngày qua: ${sleepStr}\n• Mức vận động: ${actStr}\n• Tâm trạng đàm thoại: ${moodStr}\n• SpO2: ${scenario === 'change' ? '96%' : '98%'} · Đường huyết đói: ${scenario === 'change' ? '6.4 mmol/L' : '5.6 mmol/L'}\n• Tuân thủ uống thuốc: ${scenario === 'change' ? '85% (Quên 1 cữ)' : '100% (Đầy đủ)'}\n• Tình trạng: ${scenario === 'change' ? 'Ngoại ngủ ít hơn tuần trước 1.8 giờ, huyết áp có dao động.' : 'Thể trạng nhìn chung ổn định, ăn ngủ tốt và uống thuốc đúng giờ.'}\nNhờ Bác sĩ xem và tư vấn giúp em trong nhóm Telegram nhé ạ. Em cảm ơn Bác sĩ!`;
       
       const onDone = () => { setCopiedTelegram(true); setTimeout(() => setCopiedTelegram(false), 3500); };
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -80,7 +77,7 @@
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-blue-700">MYKA · CHĂM SÓC MỖI NGÀY</p>
           <h2 className="mt-1 text-xl font-bold">Sức khỏe hằng ngày</h2>
-          <p className="mt-1 text-sm text-slate-600">Kết nối thể trạng, sinh hoạt, cảm xúc và dữ liệu từ máy đo Omron trong một góc nhìn.</p>
+          <p className="mt-1 text-sm text-slate-600">Theo dõi toàn diện thể trạng, sinh hoạt, cảm xúc và các chỉ số sức khỏe của Ngoại.</p>
         </div>
         <button type="button" onClick={() => setShowForm(!showForm)} className="rounded-xl bg-blue-700 px-4 py-2.5 font-semibold text-white transition hover:bg-blue-800">
           {showForm ? 'Đóng nhật ký' : '+ Ghi nhật ký'}
@@ -96,16 +93,15 @@
         </label>
         {mode === 'demo' && <label className="text-sm">Kịch bản
           <select aria-label="Kịch bản sức khỏe" value={scenario} onChange={e => setScenario(e.target.value)} className="ml-2 rounded-lg border bg-white p-2">
-            <option value="stable">Sinh hoạt đều đặn</option>
-            <option value="change">Ngủ ít, giảm vận động</option>
+            <option value="stable">Sinh hoạt đều đặn (Ổn định)</option>
+            <option value="change">Ngủ ít, giảm vận động (Cần lưu ý)</option>
             <option value="missing">Thiếu nhật ký gần đây</option>
-            <option value="omron_alert">Máy Omron cảnh báo vòng bít & ngủ ít</option>
           </select>
         </label>}
       </div>
 
       <p className="text-xs text-slate-500">
-        {mode === 'demo' ? 'Dữ liệu giả lập đa kịch bản để trải nghiệm tính năng, kết hợp máy đo Omron và Robot đàm thoại.' : 'Nhật ký do người thân nhập, chỉ lưu trên trình duyệt này; chưa đồng bộ máy chủ.'}
+        {mode === 'demo' ? 'Dữ liệu mô phỏng 60 ngày giúp theo dõi xu hướng biến thiên sức khỏe và hỗ trợ người thân chăm sóc kịp thời.' : 'Nhật ký do người thân nhập, chỉ lưu trên trình duyệt này; chưa đồng bộ máy chủ.'}
       </p>
 
       {message && <p role="status" className="rounded-lg bg-white p-3 text-sm text-blue-800 border border-blue-200">{message}</p>}
@@ -147,16 +143,10 @@
         </div>
         <div className="rounded-xl border border-blue-100 bg-white p-3 flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase">Máy đo Omron Bluetooth (ID: 11)</p>
-            <p className="text-sm font-bold mt-0.5 flex items-center gap-1 text-slate-800">
-              {(scenario === 'omron_alert' || latestReading?.cuffAlert || latestReading?.note?.includes('vòng bít')) ? (
-                <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-semibold text-xs border border-amber-200">⚠️ Vòng bít quấn lỏng</span>
-              ) : (
-                <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-semibold text-xs border border-emerald-200">✓ Vòng bít chuẩn</span>
-              )}
-            </p>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase">Đường huyết lúc đói</p>
+            <p className="text-lg font-bold text-slate-800 mt-0.5">{scenario === 'change' ? '6.4' : '5.6'} <span className="text-xs font-normal text-slate-500">mmol/L</span> <span className={`text-xs font-semibold ${scenario === 'change' ? 'text-amber-700' : 'text-emerald-700'}`}>{scenario === 'change' ? '• Cần theo dõi' : '✓ Chuẩn'}</span></p>
           </div>
-          <span className="text-xl">🩺</span>
+          <span className="text-xl">🩸</span>
         </div>
       </div>
 
@@ -177,11 +167,11 @@
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-blue-900 font-black text-xs shadow-md">AI</span>
               <div>
                 <h4 className="font-extrabold text-white text-sm sm:text-base tracking-tight" style={{ color: '#ffffff' }}>Phân tích chuyên sâu từ AI Myka · Đa chiều & Tương quan</h4>
-                <p className="text-xs text-blue-100 font-medium" style={{ color: '#dbeafe' }}>Mô hình AI đối chiếu tương quan giữa thói quen sinh hoạt và dữ liệu máy đo Omron.</p>
+                <p className="text-xs text-blue-100 font-medium" style={{ color: '#dbeafe' }}>Mô hình AI đối chiếu tương quan giữa thói quen sinh hoạt và chỉ số sức khỏe.</p>
               </div>
             </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${scenario === 'change' || scenario === 'omron_alert' ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-emerald-100 text-emerald-900 border border-emerald-300'}`}>
-              {scenario === 'change' ? 'Điểm thể trạng: 72/100 · Cần chú ý' : scenario === 'omron_alert' ? 'Điểm thể trạng: 76/100 · Chỉnh vòng bít' : 'Điểm thể trạng: 88/100 · Ổn định'}
+            <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${scenario === 'change' ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-emerald-100 text-emerald-900 border border-emerald-300'}`}>
+              {scenario === 'change' ? 'Điểm thể trạng: 72/100 · Cần chú ý' : 'Điểm thể trạng: 88/100 · Ổn định'}
             </span>
           </div>
 
@@ -194,11 +184,6 @@
                 AI phát hiện: <strong className="text-blue-950 font-bold">Thời lượng ngủ sụt giảm (-1.8 tiếng)</strong> kết hợp giảm vận động trong tuần có tương quan thuận với sự gia tăng huyết áp tâm trương (+8 mmHg) và nhịp tim (+12 bpm). Khi thiếu ngủ kéo dài, trương lực giao cảm tăng gây co mạch ngoại vi. Đề xuất: Người thân gọi điện hỏi thăm và nhắc cụ ngủ sớm trước 22h00.
               </p>
             )}
-            {scenario === 'omron_alert' && (
-              <p className="text-slate-800">
-                AI phát hiện: Số đo gần nhất từ <strong className="text-blue-950 font-bold">máy Omron (ID: 11)</strong> ghi nhận <strong className="text-blue-950 font-bold">126/92 mmHg, nhịp tim 92 bpm</strong> kèm <strong className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">cảnh báo vòng bít quấn lỏng</strong>. Vòng bít lỏng làm chỉ số tâm trương cao giả tạo từ 4-8 mmHg. Đề xuất: Nhắc cụ nghỉ ngơi 15 phút, quấn lại vòng bít sát bắp tay (cách nếp khuỷu 1-2cm) và đo lại.
-              </p>
-            )}
             {scenario === 'missing' && (
               <p className="text-slate-800">
                 AI phát hiện: Dữ liệu ghi nhận bị gián đoạn (chưa ghi nhận đủ nhật ký tuần). Mức độ giám sát chuỗi thời gian chưa tối ưu để đưa ra dự báo. Đề xuất: Nhắc Ngoại tương tác với Robot Myka trong các buổi sáng để cập nhật tự động.
@@ -206,7 +191,7 @@
             )}
             {scenario === 'stable' && (
               <p className="text-slate-800">
-                AI phát hiện: Các chỉ số huyết áp và nhịp tim từ máy Omron duy trì trong ngưỡng mục tiêu của Hội Tim Mạch. Tỷ lệ tuân thủ thuốc đạt 100%. Thời lượng ngủ đạt chuẩn và tâm trạng ghi nhận qua giọng nói Robot đạt 4/5 (Vui vẻ, minh mẫn).
+                AI phát hiện: Các chỉ số sinh hoạt và huyết áp duy trì trong ngưỡng mục tiêu của Hội Tim Mạch. Tỷ lệ tuân thủ thuốc đạt 100%. Thời lượng ngủ đạt chuẩn và tâm trạng ghi nhận qua giọng nói Robot đạt 4/5 (Vui vẻ, minh mẫn).
               </p>
             )}
           </div>
