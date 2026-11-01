@@ -359,7 +359,7 @@ export async function onRequest({ request, env, params }) {
       const localMinuteOfDay = Number(localParts.hour) * 60 + Number(localParts.minute);
       const scheduledMinuteOfDay = scheduledHour * 60 + scheduledMinute;
       const elapsedMinutes = localMinuteOfDay - scheduledMinuteOfDay;
-      if (elapsedMinutes < 0 || elapsedMinutes > 180) return json(request, { success: true, skipped: true, reason: 'outside_schedule_window', local_date: localDate, scheduled_time: scheduledTime });
+      if (elapsedMinutes < 0) return json(request, { success: true, skipped: true, reason: 'outside_schedule_window', local_date: localDate, scheduled_time: scheduledTime });
       const dayIndex = Math.floor(Date.parse(`${localDate}T00:00:00Z`) / 86400000);
       const eveningOffset = slot === 'evening' ? 3 : 0;
       const systolic = 118 + (dayIndex % 8) + eveningOffset;
