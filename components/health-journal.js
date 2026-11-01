@@ -171,56 +171,56 @@
         <p className="mt-3 text-sm font-medium text-blue-900">Gợi ý theo dõi: {report.missing ? 'bổ sung các ngày còn thiếu và hỏi thăm tình trạng hiện tại.' : 'trao đổi với người cao tuổi về thay đổi sinh hoạt, ghi nhận thêm triệu chứng nếu có.'}</p>
 
         {/* AI Health Intelligence Feature Box */}
-        <div className="mt-4 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-blue-50/90 to-sky-50/90 p-4">
+        <div className="mt-4 rounded-2xl border border-blue-400/30 bg-gradient-to-br p-4 sm:p-5 text-white shadow-md" style={{ color: '#ffffff' }}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-indigo-700 text-white font-bold text-xs shadow-sm">AI</span>
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-blue-900 font-black text-xs shadow-md">AI</span>
               <div>
-                <h4 className="font-bold text-indigo-950 text-sm">Phân tích chuyên sâu từ AI Myka · Đa chiều & Tương quan</h4>
-                <p className="text-xs text-indigo-700">Mô hình AI đối chiếu tương quan giữa thói quen sinh hoạt và dữ liệu máy đo Omron.</p>
+                <h4 className="font-extrabold text-white text-sm sm:text-base tracking-tight" style={{ color: '#ffffff' }}>Phân tích chuyên sâu từ AI Myka · Đa chiều & Tương quan</h4>
+                <p className="text-xs text-blue-100 font-medium" style={{ color: '#dbeafe' }}>Mô hình AI đối chiếu tương quan giữa thói quen sinh hoạt và dữ liệu máy đo Omron.</p>
               </div>
             </div>
-            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${scenario === 'change' || scenario === 'omron_alert' ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'}`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${scenario === 'change' || scenario === 'omron_alert' ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-emerald-100 text-emerald-900 border border-emerald-300'}`}>
               {scenario === 'change' ? 'Điểm thể trạng: 72/100 · Cần chú ý' : scenario === 'omron_alert' ? 'Điểm thể trạng: 76/100 · Chỉnh vòng bít' : 'Điểm thể trạng: 88/100 · Ổn định'}
             </span>
           </div>
 
-          <div className="mt-3 text-sm text-slate-700 bg-white/85 rounded-xl p-3 border border-indigo-100 space-y-1.5 leading-relaxed">
-            <p className="font-semibold text-indigo-900 flex items-center gap-1.5 text-xs uppercase tracking-wide">
-              <span>🔍 Phát hiện tương quan chéo:</span>
+          <div className="mt-3.5 text-sm text-slate-800 bg-white rounded-xl p-3.5 border border-blue-100 shadow-sm space-y-1.5 leading-relaxed" style={{ color: '#1e293b' }}>
+            <p className="font-bold text-blue-900 flex items-center gap-1.5 text-xs uppercase tracking-wide">
+              <span>🔍 PHÁT HIỆN TƯƠNG QUAN CHÉO (CROSS-METRIC AI):</span>
             </p>
             {scenario === 'change' && (
-              <p>
-                AI phát hiện: <strong>Thời lượng ngủ sụt giảm (-1.8 tiếng)</strong> kết hợp giảm vận động trong tuần có tương quan thuận với sự gia tăng huyết áp tâm trương (+8 mmHg) và nhịp tim (+12 bpm). Khi thiếu ngủ kéo dài, trương lực giao cảm tăng gây co mạch ngoại vi. Đề xuất: Người thân gọi điện hỏi thăm và nhắc cụ ngủ sớm trước 22h00.
+              <p className="text-slate-800">
+                AI phát hiện: <strong className="text-blue-950 font-bold">Thời lượng ngủ sụt giảm (-1.8 tiếng)</strong> kết hợp giảm vận động trong tuần có tương quan thuận với sự gia tăng huyết áp tâm trương (+8 mmHg) và nhịp tim (+12 bpm). Khi thiếu ngủ kéo dài, trương lực giao cảm tăng gây co mạch ngoại vi. Đề xuất: Người thân gọi điện hỏi thăm và nhắc cụ ngủ sớm trước 22h00.
               </p>
             )}
             {scenario === 'omron_alert' && (
-              <p>
-                AI phát hiện: Số đo gần nhất từ <strong>máy Omron (ID: 11)</strong> ghi nhận <strong>126/92 mmHg, nhịp tim 92 bpm</strong> kèm <strong>cảnh báo vòng bít quấn lỏng</strong>. Vòng bít lỏng làm chỉ số tâm trương cao giả tạo từ 4-8 mmHg. Đề xuất: Nhắc cụ nghỉ ngơi 15 phút, quấn lại vòng bít sát bắp tay (cách nếp khuỷu 1-2cm) và đo lại.
+              <p className="text-slate-800">
+                AI phát hiện: Số đo gần nhất từ <strong className="text-blue-950 font-bold">máy Omron (ID: 11)</strong> ghi nhận <strong className="text-blue-950 font-bold">126/92 mmHg, nhịp tim 92 bpm</strong> kèm <strong className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">cảnh báo vòng bít quấn lỏng</strong>. Vòng bít lỏng làm chỉ số tâm trương cao giả tạo từ 4-8 mmHg. Đề xuất: Nhắc cụ nghỉ ngơi 15 phút, quấn lại vòng bít sát bắp tay (cách nếp khuỷu 1-2cm) và đo lại.
               </p>
             )}
             {scenario === 'missing' && (
-              <p>
+              <p className="text-slate-800">
                 AI phát hiện: Dữ liệu ghi nhận bị gián đoạn (chưa ghi nhận đủ nhật ký tuần). Mức độ giám sát chuỗi thời gian chưa tối ưu để đưa ra dự báo. Đề xuất: Nhắc Ngoại tương tác với Robot Myka trong các buổi sáng để cập nhật tự động.
               </p>
             )}
             {scenario === 'stable' && (
-              <p>
+              <p className="text-slate-800">
                 AI phát hiện: Các chỉ số huyết áp và nhịp tim từ máy Omron duy trì trong ngưỡng mục tiêu của Hội Tim Mạch. Tỷ lệ tuân thủ thuốc đạt 100%. Thời lượng ngủ đạt chuẩn và tâm trạng ghi nhận qua giọng nói Robot đạt 4/5 (Vui vẻ, minh mẫn).
               </p>
             )}
           </div>
 
           {/* Telegram Care Handover */}
-          <div className="mt-3 pt-3 border-t border-indigo-100 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-slate-600 max-w-sm">
-              <strong className="text-slate-800">Tư vấn y tế:</strong> Bác sĩ & điều dưỡng hỗ trợ khi người thân chủ động gửi thông tin vào nhóm Telegram.
+          <div className="mt-3.5 pt-3.5 border-t border-white/20 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-blue-100 max-w-sm leading-relaxed" style={{ color: '#eff6ff' }}>
+              <strong className="text-white font-bold" style={{ color: '#ffffff' }}>Tư vấn y tế:</strong> Bác sĩ & điều dưỡng hỗ trợ khi người thân chủ động gửi thông tin vào nhóm Telegram.
             </p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={copyForTelegram}
-                className="rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                className="rounded-xl bg-white hover:bg-blue-50 text-blue-900 px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5 shadow-md border border-white/30"
               >
                 <span>📋</span> {copiedTelegram ? '✓ Đã sao chép vào Clipboard!' : 'Sao chép tóm tắt gửi Bác sĩ qua Telegram'}
               </button>
@@ -228,7 +228,7 @@
                 href={telegramUrl || 'https://t.me/'}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                className="rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-900 px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5 shadow-md"
               >
                 <span>✈️</span> Mở Telegram
               </a>
