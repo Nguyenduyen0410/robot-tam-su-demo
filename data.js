@@ -35,6 +35,25 @@
   // ---- BP readings chuẩn theo Testcase TC-001 ~ TC-004 & TC-010 ----
   function getInitialBP() {
     return [
+      // Dữ liệu đo thực tế từ máy Omron Bluetooth (Test phần cứng ID: 11)
+      {
+        id: 'BP-OMRON-011',
+        elderId: 'E001',
+        deviceId: '11',
+        deviceName: 'Omron HEM-7142T (ID: 11)',
+        systolic: 126,
+        diastolic: 92,
+        heartRate: 92,
+        timestamp: todayAt(15, 45),
+        status: 'warning',
+        cuffAlert: true,
+        movementAlert: false,
+        irregularHeartbeat: false,
+        batteryStatus: 'normal',
+        recordedBy: 'device',
+        tcRef: 'HW-TEST-011',
+        note: 'Số đo thực tế từ máy Omron Bluetooth (ID: 11). Vòng bít có cảnh báo quấn lỏng; nhịp tim 92 bpm.'
+      },
       // TC-001, TC-002: Ngoại đo huyết áp buổi sáng thành công
       {
         id: 'BP-TC-002',
@@ -533,7 +552,7 @@
   ];
 
   // ---- seedData với version tag mới để tự động cập nhật dữ liệu testcase ----
-  const SEED_VERSION = 'rts_seeded_tc001_053_v2';
+  const SEED_VERSION = 'rts_seeded_tc001_053_v3_omron';
   function seedData(force) {
     if (!force && LS.get('rts_seed_ver') === SEED_VERSION) return;
 

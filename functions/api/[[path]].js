@@ -555,7 +555,7 @@ export async function onRequest({ request, env, params }) {
       if (!['https://myka-care-companion.pages.dev', 'http://localhost:8765', 'http://127.0.0.1:8765'].includes(origin)) return json(request, { error: 'Nguồn gửi không được phép.' }, 403);
       const body = await request.json();
       const systolic = Number(body.systolic), diastolic = Number(body.diastolic), heartRate = Number(body.heart_rate);
-      if (!Number.isInteger(systolic) || systolic < 60 || systolic > 240 || !Number.isInteger(diastolic) || diastolic < 40 || diastolic > 140 || !Number.isInteger(heartRate) || heartRate < 40 || heartRate > 200) return json(request, { error: 'Chỉ số không hợp lệ.' }, 422);
+      if (!Number.isInteger(systolic) || systolic < 60 || systolic > 240 || !Number.isInteger(diastolic) || diastolic < 40 || diastolic > 140 || systolic <= diastolic || !Number.isInteger(heartRate) || heartRate < 40 || heartRate > 200) return json(request, { error: 'Chỉ số không hợp lệ.' }, 422);
       const status = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
       const id = newId('BP'), timestamp = nowIso();
       const reading = { id, elder_id: elderId, systolic, diastolic, heart_rate: heartRate, status, note: String(body.note || 'Đo thử qua API thiết bị').slice(0, 300), timestamp };
