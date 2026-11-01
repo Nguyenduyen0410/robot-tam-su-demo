@@ -77,11 +77,23 @@
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-blue-700">MYKA · CHĂM SÓC MỖI NGÀY</p>
           <h2 className="mt-1 text-xl font-bold">Sức khỏe hằng ngày</h2>
-          <p className="mt-1 text-sm text-slate-600">Theo dõi toàn diện thể trạng, sinh hoạt, cảm xúc và các chỉ số sức khỏe của Ngoại.</p>
+          <p className="mt-1 text-sm text-slate-600">Robot Myka tự động thu thập tại nhà Ngoại qua đàm thoại; người thân đi làm xa theo dõi từ xa trên app.</p>
         </div>
         <button type="button" onClick={() => setShowForm(!showForm)} className="rounded-xl bg-blue-700 px-4 py-2.5 font-semibold text-white transition hover:bg-blue-800">
           {showForm ? 'Đóng nhật ký' : '+ Ghi nhật ký'}
         </button>
+      </div>
+
+      {/* Context banner explaining ambient collection via Robot & IoT */}
+      <div className="rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50/70 border border-blue-200/80 p-3.5 text-xs text-blue-950 flex items-start gap-3">
+        <span className="text-xl shrink-0 mt-0.5">🤖</span>
+        <div className="leading-relaxed">
+          <p className="font-bold text-blue-900">Cơ chế thu thập tự động — Người già không cần gõ app, Người thân không cần ở cạnh:</p>
+          <p className="text-slate-700 mt-1">
+            <strong>1. Huyết áp:</strong> Ngoại chỉ cần bấm 1 nút đo bắp tay, số đo tự đồng bộ lên Cloud qua Myka. <br />
+            <strong>2. Giấc ngủ, Cảm xúc & Nhắc thuốc:</strong> Robot Myka tự động ghi nhận qua các cuộc đàm thoại giọng nói hằng ngày (chào buổi sáng, chúc ngủ ngon, phân tích cảm xúc câu từ và nhắc uống thuốc). Người thân mở app là thấy ngay mà không cần cụ tự điền hay người thân phải đoán.
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">
@@ -107,30 +119,44 @@
       {message && <p role="status" className="rounded-lg bg-white p-3 text-sm text-blue-800 border border-blue-200">{message}</p>}
 
       {showForm && <form onSubmit={save} className="rounded-xl border bg-white p-4 space-y-3">
-        <p className="text-sm text-slate-600">Mỗi ngày có một bản ghi. Lưu cùng ngày sẽ thay thế nhật ký cũ.</p>
+        <div className="rounded-lg bg-blue-50/60 p-3 border border-blue-200 text-xs text-blue-900 leading-relaxed">
+          <strong className="text-blue-950 font-semibold">📝 Nhật ký bổ sung của Người thân:</strong> Dùng khi bạn về thăm nhà hoặc gọi điện hỏi thăm tình hình Ngoại. Dữ liệu thường ngày (huyết áp, giấc ngủ, cảm xúc, nhắc thuốc) đã được Robot Myka tự động tổng hợp từ nhà.
+        </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="text-sm">Ngày<input required type="date" max={today()} value={draft.date} onChange={e => setDraft({...draft,date:e.target.value})} className="block w-full rounded-lg border p-2" /></label>
           {fields.map(([key,label,unit,min,max,step]) => <label key={key} className="text-sm">{label} ({unit})<input required type="number" min={min} max={max} step={step} value={draft[key]} onChange={e => setDraft({...draft,[key]:e.target.value})} className="block w-full rounded-lg border p-2" /></label>)}
         </div>
-        <label className="block text-sm">Triệu chứng / ghi chú<textarea maxLength={500} value={draft.symptoms} onChange={e => setDraft({...draft,symptoms:e.target.value})} className="block w-full rounded-lg border p-2" /></label>
+        <label className="block text-sm">Triệu chứng / ghi chú của người thân<textarea maxLength={500} value={draft.symptoms} onChange={e => setDraft({...draft,symptoms:e.target.value})} placeholder="Ví dụ: Cuối tuần về thăm thấy cụ vui, khen robot nhắc uống thuốc đúng giờ..." className="block w-full rounded-lg border p-2 text-sm" /></label>
         <button className="rounded-lg bg-blue-700 px-4 py-2 text-white font-semibold">Lưu nhật ký</button>
       </form>}
 
       {/* Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {fields.map(([key,label,unit]) => <article key={key} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500">{label}</p>
-          <p className="mt-2 text-2xl font-bold text-slate-800">{latest ? latest[key] : '—'} <span className="text-xs font-normal text-slate-500">{unit}</span></p>
-          <p className="mt-1 text-xs text-slate-500">{latest ? latest.date.split('-').reverse().join('/') : 'Chưa ghi nhận'}</p>
-        </article>)}
+        {fields.map(([key,label,unit]) => {
+          const sourceBadge = key === 'weight' ? 'Thăm nhà / Khám định kỳ'
+            : key === 'sleep' ? '🤖 Robot ước tính qua đàm thoại'
+            : key === 'activity' ? '🤖 Tương tác cử động với Robot'
+            : '🤖 AI phân tích giọng nói Myka';
+          return (
+            <article key={key} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between">
+              <div>
+                <p className="text-xs font-semibold text-slate-500">{label}</p>
+                <p className="mt-2 text-2xl font-bold text-slate-800">{latest ? latest[key] : '—'} <span className="text-xs font-normal text-slate-500">{unit}</span></p>
+                <p className="mt-1 text-[11px] text-slate-400">{latest ? latest.date.split('-').reverse().join('/') : 'Chưa ghi nhận'}</p>
+              </div>
+              <p className="mt-3 pt-2 border-t border-slate-100 text-[10px] font-medium text-blue-700">{sourceBadge}</p>
+            </article>
+          );
+        })}
       </div>
 
-      {/* Complementary Live Indicators (SpO2, Medication Adherence, Omron Cuff) */}
+      {/* Complementary Live Indicators (SpO2, Medication Adherence, Blood Glucose) */}
       <div className="grid sm:grid-cols-3 gap-3">
         <div className="rounded-xl border border-blue-100 bg-white p-3 flex items-center justify-between">
           <div>
             <p className="text-[11px] font-semibold text-slate-500 uppercase">SpO2 (Nồng độ oxy máu)</p>
             <p className="text-lg font-bold text-slate-800 mt-0.5">{scenario === 'change' ? '96%' : '98%'} <span className="text-xs font-normal text-emerald-600">✓ An toàn</span></p>
+            <p className="text-[10px] text-slate-400 mt-0.5">Kẹp ngón định kỳ tại nhà</p>
           </div>
           <span className="text-xl">🫁</span>
         </div>
@@ -138,6 +164,7 @@
           <div>
             <p className="text-[11px] font-semibold text-slate-500 uppercase">Tuân thủ uống thuốc (7 ngày)</p>
             <p className="text-lg font-bold text-slate-800 mt-0.5">{scenario === 'change' ? '85%' : '100%'} <span className="text-xs font-normal text-blue-600">{scenario === 'change' ? '• Quên 1 cữ' : '• Đầy đủ'}</span></p>
+            <p className="text-[10px] text-blue-700 font-medium mt-0.5">🤖 Ngoại xác nhận với Myka</p>
           </div>
           <span className="text-xl">💊</span>
         </div>
@@ -145,6 +172,7 @@
           <div>
             <p className="text-[11px] font-semibold text-slate-500 uppercase">Đường huyết lúc đói</p>
             <p className="text-lg font-bold text-slate-800 mt-0.5">{scenario === 'change' ? '6.4' : '5.6'} <span className="text-xs font-normal text-slate-500">mmol/L</span> <span className={`text-xs font-semibold ${scenario === 'change' ? 'text-amber-700' : 'text-emerald-700'}`}>{scenario === 'change' ? '• Cần theo dõi' : '✓ Chuẩn'}</span></p>
+            <p className="text-[10px] text-slate-400 mt-0.5">Theo dõi định kỳ</p>
           </div>
           <span className="text-xl">🩸</span>
         </div>
