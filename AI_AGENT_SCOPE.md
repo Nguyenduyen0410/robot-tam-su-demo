@@ -51,3 +51,8 @@ Người thân bổ sung thông tin hồ sơ đã liên kết sau đăng nhập,
 Mục Sức khỏe bổ sung cân nặng, thời lượng ngủ, vận động, tâm trạng tự đánh giá và ghi chú triệu chứng. Ba kịch bản mô phỏng 60 ngày được tách khỏi lịch sử huyết áp từ API. Nhật ký do người thân nhập lưu theo ngày trong localStorage, chỉ trên trình duyệt hiện tại; lưu cùng ngày thay thế bản cũ. Chưa đồng bộ backend.
 
 Tóm tắt so sánh 7 ngày gần nhất với 7 ngày trước theo trung bình các ngày có dữ liệu; cần tối thiểu 3 ngày mỗi kỳ để so sánh. Hiển thị số ngày thiếu và bảng dữ liệu đối chiếu. Đây là phân tích bằng quy tắc, chưa tích hợp mô hình AI, chưa dự báo hoặc chẩn đoán bệnh. Các thông tin nhập tay không thể hiện kết quả đo tự động từ robot.
+
+
+## Cập nhật lịch gửi số đo mô phỏng (02/11/2026)
+
+GitHub Actions kiểm tra hai khung giờ 09:00/19:00 (Việt Nam) khoảng 20 phút/lần. Backend bỏ qua khung giờ chưa đến, gửi bù khung giờ đã đến trong cùng ngày và dùng ID theo ngày/khung giờ để chống ghi trùng. Dịch vụ có thể chạy trễ; chưa bảo đảm đúng phút hoặc gửi bù các ngày trước khi dịch vụ ngừng cả ngày. Lịch vẫn phụ thuộc cờ bật trong cài đặt hồ sơ E001. Số đo lưu D1 khi app đóng; app đang mở tải lại mỗi 30 giây. Đây là robot mô phỏng, chưa có kết nối máy đo thật.

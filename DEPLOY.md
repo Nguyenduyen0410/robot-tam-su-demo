@@ -56,3 +56,8 @@ CTA đăng ký/gia hạn mở luồng chuyển khoản ngân hàng minh họa. T
 - Dữ liệu trong migration là dữ liệu tổng hợp giả, không phải hồ sơ bệnh nhân.
 - Demo hiện chưa có xác thực/ủy quyền server-side; đăng nhập giao diện không bảo vệ API. Chỉ dùng dữ liệu giả, không đưa thông tin sức khỏe, danh tính, mật khẩu Wi-Fi hoặc thiết bị thật lên bản public.
 - Trước khi triển khai thật cần bổ sung xác thực server-side, phân quyền theo hồ sơ, bảo vệ API thiết bị và quy trình bảo mật dữ liệu.
+
+
+## Cập nhật lịch gửi số đo mô phỏng (02/11/2026)
+
+GitHub Actions kiểm tra hai khung giờ 09:00/19:00 (Việt Nam) khoảng 20 phút/lần. Backend bỏ qua khung giờ chưa đến, gửi bù khung giờ đã đến trong cùng ngày và dùng ID theo ngày/khung giờ để chống ghi trùng. Dịch vụ có thể chạy trễ; chưa bảo đảm đúng phút hoặc gửi bù các ngày trước khi dịch vụ ngừng cả ngày. Lịch vẫn phụ thuộc cờ bật trong cài đặt hồ sơ E001. Số đo lưu D1 khi app đóng; app đang mở tải lại mỗi 30 giây. Đây là robot mô phỏng, chưa có kết nối máy đo thật.
