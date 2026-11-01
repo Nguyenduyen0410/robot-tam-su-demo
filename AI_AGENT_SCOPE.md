@@ -45,3 +45,9 @@ Backend hiện là demo SQLite, chưa có xác thực/ủy quyền server-side c
 ## Hồ sơ người cao tuổi
 
 Người thân bổ sung thông tin hồ sơ đã liên kết sau đăng nhập, qua Thêm thông tin hoặc Chỉnh sửa và Lưu thay đổi. GET/PUT `/api/family/elder-profile/{elder_id}` đọc và lưu tuổi, địa chỉ, ghi chú sức khỏe vào backend. Thao tác không tạo hồ sơ liên kết mới và không sửa phép đo. API hiện vẫn thuộc demo chưa có xác thực server-side, chỉ sử dụng dữ liệu minh họa cho tới khi hoàn thiện phân quyền.
+
+## Bản thử nhật ký sức khỏe mở rộng (01/11/2026)
+
+Mục Sức khỏe bổ sung cân nặng, thời lượng ngủ, vận động, tâm trạng tự đánh giá và ghi chú triệu chứng. Ba kịch bản mô phỏng 60 ngày được tách khỏi lịch sử huyết áp từ API. Nhật ký do người thân nhập lưu theo ngày trong localStorage, chỉ trên trình duyệt hiện tại; lưu cùng ngày thay thế bản cũ. Chưa đồng bộ backend.
+
+Tóm tắt so sánh 7 ngày gần nhất với 7 ngày trước theo trung bình các ngày có dữ liệu; cần tối thiểu 3 ngày mỗi kỳ để so sánh. Hiển thị số ngày thiếu và bảng dữ liệu đối chiếu. Đây là phân tích bằng quy tắc, chưa tích hợp mô hình AI, chưa dự báo hoặc chẩn đoán bệnh. Các thông tin nhập tay không thể hiện kết quả đo tự động từ robot.
