@@ -13,7 +13,7 @@
         activity: 30 + i % 7 - (scenario === 'change' && recent ? 18 : 0),
         mood: scenario === 'change' && recent ? 2 : 4,
         symptoms: scenario === 'change' && recent ? 'Ngoại hơi mệt, khó ngủ' : '',
-        source: 'Robot Myka · mô phỏng'
+        source: 'Dữ liệu mô phỏng'
       };
     }).filter((_, i) => scenario !== 'missing' || i < 53 || i % 3 === 0);
   }
@@ -27,12 +27,30 @@
   }
   window.MykaWellness = {seed, summarize};
   window.HealthJournal = function HealthJournal({ elderId, telegramUrl, latestReading }) {
+    const storageKey = 'myka_wellness_v1_' + elderId;
+    const [saved, setSaved] = React.useState(() => RTS.LS.get(storageKey) || []);
     const [scenario, setScenario] = React.useState('stable');
+    const [mode, setMode] = React.useState('demo');
+    const [draft, setDraft] = React.useState({date:today(),weight:'',sleep:'',activity:'',mood:'',symptoms:''});
+    const [message, setMessage] = React.useState('');
     const [expanded, setExpanded] = React.useState(false);
+    const [showForm, setShowForm] = React.useState(false);
     const [copiedTelegram, setCopiedTelegram] = React.useState(false);
-    const rows = seed(scenario).slice().sort((a,b) => a.date.localeCompare(b.date));
+    const rows = (mode === 'demo' ? seed(scenario) : saved).slice().sort((a,b) => a.date.localeCompare(b.date));
     const report = summarize(rows);
     const latest = rows[rows.length - 1];
+
+    function save(e) {
+      e.preventDefault();
+      const row = {...draft, source:'Người thân ghi nhận'};
+      for (const [key,label,,min,max] of fields) {
+        row[key] = Number(draft[key]);
+        if (draft[key] === '' || !Number.isFinite(row[key]) || row[key] < min || row[key] > max || (key === 'mood' && !Number.isInteger(row[key]))) { setMessage('Vui lòng kiểm tra ' + label.toLowerCase() + '.'); return; }
+      }
+      if (!row.date || row.date > today()) {setMessage('Ngày ghi nhận phải từ hôm nay trở về trước.');return;}
+      const next = [...saved.filter(r => r.date !== row.date),row];
+      try { RTS.LS.set(storageKey,next); setSaved(next); setMode('personal'); setMessage('Đã lưu nhật ký trên trình duyệt này.'); setShowForm(false); } catch {setMessage('Không lưu được. Vui lòng kiểm tra dung lượng trình duyệt.');}
+    }
 
     const copyForTelegram = () => {
       const sleepVal = report.changes.find(c => c.key === 'sleep')?.now;
@@ -59,36 +77,66 @@
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-blue-700">ỨNG DỤNG HỖ TRỢ NGƯỜI THÂN · HỆ THỐNG AI CARE COMPANION</p>
           <h2 className="mt-1 text-xl font-bold">Sức khỏe hằng ngày</h2>
-          <p className="mt-1 text-sm text-slate-600">Dữ liệu được ghi nhận từ Robot Myka và gửi lên app để người thân theo dõi từ xa.</p>
+          <p className="mt-1 text-sm text-slate-600">Robot Myka tự động thu thập tại nhà Ngoại qua đàm thoại; người thân đi làm xa theo dõi từ xa trên app.</p>
         </div>
+        <button type="button" onClick={() => setShowForm(!showForm)} className="rounded-xl bg-blue-700 px-4 py-2.5 font-semibold text-white transition hover:bg-blue-800">
+          {showForm ? 'Đóng nhật ký' : '+ Ghi nhật ký'}
+        </button>
       </div>
 
       {/* Context banner explaining ambient collection via Robot & IoT */}
       <div className="rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50/70 border border-blue-200/80 p-3.5 text-xs text-blue-950 flex items-start gap-3">
         <span className="text-xl shrink-0 mt-0.5">🤖</span>
         <div className="leading-relaxed">
-          <p className="font-bold text-blue-900">Robot Myka ghi nhận → Máy chủ lưu trữ → Người thân xem trên app</p>
-          <p className="text-slate-700 mt-1">Huyết áp và nhịp tim theo luồng máy đo kết nối Myka. Các chỉ số sinh hoạt minh họa luồng robot ghi nhận qua tương tác; không phải tất cả đều được đo bằng cảm biến. Bản demo hiện dùng dữ liệu mô phỏng.</p>
+          <p className="font-bold text-blue-900">Cơ chế thu thập tự động — Người già không cần gõ app, Người thân không cần ở cạnh:</p>
+          <p className="text-slate-700 mt-1">
+            <strong>1. Huyết áp:</strong> Ngoại chỉ cần bấm 1 nút đo bắp tay, số đo tự đồng bộ lên Cloud qua Myka. <br />
+            <strong>2. Giấc ngủ, Cảm xúc & Nhắc thuốc:</strong> Robot Myka tự động ghi nhận qua các cuộc đàm thoại giọng nói hằng ngày (chào buổi sáng, chúc ngủ ngon, phân tích cảm xúc câu từ và nhắc uống thuốc). Người thân mở app là thấy ngay mà không cần cụ tự điền hay người thân phải đoán.
+          </p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">
-        <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-900">Nguồn ghi nhận: Robot Myka</div>
-        <label className="text-sm">Kịch bản mô phỏng
+        <label className="text-sm font-semibold">Nguồn dữ liệu
+          <select aria-label="Nguồn nhật ký" value={mode} onChange={e => {setMode(e.target.value);setMessage('');}} className="ml-2 rounded-lg border bg-white p-2">
+            <option value="demo">Dữ liệu mô phỏng · 60 ngày</option>
+            <option value="personal">Nhật ký đã lưu ({saved.length} ngày)</option>
+          </select>
+        </label>
+        {mode === 'demo' && <label className="text-sm">Kịch bản
           <select aria-label="Kịch bản sức khỏe" value={scenario} onChange={e => setScenario(e.target.value)} className="ml-2 rounded-lg border bg-white p-2">
             <option value="stable">Sinh hoạt đều đặn (Ổn định)</option>
             <option value="change">Ngủ ít, giảm vận động (Cần lưu ý)</option>
             <option value="missing">Thiếu nhật ký gần đây</option>
           </select>
-        </label>
+        </label>}
       </div>
 
-      <p className="text-xs text-slate-500">Dữ liệu robot mô phỏng trong 60 ngày. Người thân chỉ nhận và xem dữ liệu; không nhập hoặc sửa chỉ số sức khỏe trên app. Chưa kết nối robot thật.</p>
+      <p className="text-xs text-slate-500">
+        {mode === 'demo' ? 'Dữ liệu mô phỏng 60 ngày giúp theo dõi xu hướng biến thiên sức khỏe và hỗ trợ người thân chăm sóc kịp thời.' : 'Nhật ký do người thân nhập, chỉ lưu trên trình duyệt này; chưa đồng bộ máy chủ.'}
+      </p>
+
+      {message && <p role="status" className="rounded-lg bg-white p-3 text-sm text-blue-800 border border-blue-200">{message}</p>}
+
+      {showForm && <form onSubmit={save} className="rounded-xl border bg-white p-4 space-y-3">
+        <div className="rounded-lg bg-blue-50/60 p-3 border border-blue-200 text-xs text-blue-900 leading-relaxed">
+          <strong className="text-blue-950 font-semibold">📝 Nhật ký bổ sung của Người thân:</strong> Dùng khi bạn về thăm nhà hoặc gọi điện hỏi thăm tình hình Ngoại. Dữ liệu thường ngày (huyết áp, giấc ngủ, cảm xúc, nhắc thuốc) đã được Robot Myka tự động tổng hợp từ nhà.
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="text-sm">Ngày<input required type="date" max={today()} value={draft.date} onChange={e => setDraft({...draft,date:e.target.value})} className="block w-full rounded-lg border p-2" /></label>
+          {fields.map(([key,label,unit,min,max,step]) => <label key={key} className="text-sm">{label} ({unit})<input required type="number" min={min} max={max} step={step} value={draft[key]} onChange={e => setDraft({...draft,[key]:e.target.value})} className="block w-full rounded-lg border p-2" /></label>)}
+        </div>
+        <label className="block text-sm">Triệu chứng / ghi chú của người thân<textarea maxLength={500} value={draft.symptoms} onChange={e => setDraft({...draft,symptoms:e.target.value})} placeholder="Ví dụ: Cuối tuần về thăm thấy cụ vui, khen robot nhắc uống thuốc đúng giờ..." className="block w-full rounded-lg border p-2 text-sm" /></label>
+        <button className="rounded-lg bg-blue-700 px-4 py-2 text-white font-semibold">Lưu nhật ký</button>
+      </form>}
 
       {/* Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {fields.map(([key,label,unit]) => {
-          const sourceBadge = '🤖 Robot Myka · mô phỏng';
+          const sourceBadge = key === 'weight' ? 'Thăm nhà / Khám định kỳ'
+            : key === 'sleep' ? '🤖 Robot ước tính qua đàm thoại'
+            : key === 'activity' ? '🤖 Tương tác cử động với Robot'
+            : '🤖 AI phân tích giọng nói Myka';
           return (
             <article key={key} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between">
               <div>
@@ -108,7 +156,7 @@
           <div>
             <p className="text-[11px] font-semibold text-slate-500 uppercase">SpO2 (Nồng độ oxy máu)</p>
             <p className="text-lg font-bold text-slate-800 mt-0.5">{scenario === 'change' ? '96%' : '98%'} <span className="text-xs font-normal text-emerald-600">✓ An toàn</span></p>
-            <p className="text-[10px] text-slate-400 mt-0.5">Robot Myka · mô phỏng</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">Kẹp ngón định kỳ tại nhà</p>
           </div>
           <span className="text-xl">🫁</span>
         </div>
@@ -116,7 +164,7 @@
           <div>
             <p className="text-[11px] font-semibold text-slate-500 uppercase">Tuân thủ uống thuốc (7 ngày)</p>
             <p className="text-lg font-bold text-slate-800 mt-0.5">{scenario === 'change' ? '85%' : '100%'} <span className="text-xs font-normal text-blue-600">{scenario === 'change' ? '• Quên 1 cữ' : '• Đầy đủ'}</span></p>
-            <p className="text-[10px] text-blue-700 font-medium mt-0.5">🤖 Xác nhận qua Myka · mô phỏng</p>
+            <p className="text-[10px] text-blue-700 font-medium mt-0.5">🤖 Ngoại xác nhận với Myka</p>
           </div>
           <span className="text-xl">💊</span>
         </div>
@@ -124,7 +172,7 @@
           <div>
             <p className="text-[11px] font-semibold text-slate-500 uppercase">Đường huyết lúc đói</p>
             <p className="text-lg font-bold text-slate-800 mt-0.5">{scenario === 'change' ? '6.4' : '5.6'} <span className="text-xs font-normal text-slate-500">mmol/L</span> <span className={`text-xs font-semibold ${scenario === 'change' ? 'text-amber-700' : 'text-emerald-700'}`}>{scenario === 'change' ? '• Cần theo dõi' : '✓ Chuẩn'}</span></p>
-            <p className="text-[10px] text-slate-400 mt-0.5">Robot Myka · mô phỏng</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">Theo dõi định kỳ</p>
           </div>
           <span className="text-xl">🩸</span>
         </div>
@@ -138,7 +186,7 @@
         </div>
         <p className="mt-2 text-sm">Có nhật ký {report.current.length}/7 ngày; {report.missing ? `thiếu ${report.missing} ngày, cần bổ sung trước khi đánh giá đầy đủ.` : 'đủ nhật ký trong tuần.'}</p>
         {report.changes.map(c => <p key={c.key} className="mt-2 text-sm text-slate-700">{c.label}: {report.current.length < 3 || report.previous.length < 3 ? 'Chưa đủ dữ liệu so sánh (cần ít nhất 3 ngày mỗi tuần).' : `trung bình ${c.now.toFixed(1)} ${c.unit}; ${c.now === c.before ? 'không đổi' : (c.now > c.before ? 'tăng ' : 'giảm ') + Math.abs(c.now-c.before).toFixed(1) + ' ' + c.unit} so với 7 ngày trước (${report.previous.length} ngày ghi nhận).`}</p>)}
-        <p className="mt-3 text-sm font-medium text-blue-900">Gợi ý theo dõi: {report.missing ? 'kiểm tra kết nối Robot Myka khi dữ liệu bị gián đoạn.' : 'theo dõi dữ liệu Robot Myka và liên hệ nhóm chăm sóc khi cần.'}</p>
+        <p className="mt-3 text-sm font-medium text-blue-900">Gợi ý theo dõi: {report.missing ? 'bổ sung các ngày còn thiếu và hỏi thăm tình trạng hiện tại.' : 'trao đổi với người cao tuổi về thay đổi sinh hoạt, ghi nhận thêm triệu chứng nếu có.'}</p>
 
         {/* AI Health Intelligence Feature Box */}
         <div className="mt-4 rounded-2xl border border-blue-400/30 bg-gradient-to-br p-4 sm:p-5 text-white shadow-md" style={{ color: '#ffffff' }}>
@@ -209,11 +257,11 @@
 
       {expanded && <div className="overflow-x-auto rounded-xl border bg-white">
         <table className="w-full text-sm">
-          <caption className="p-3 text-left font-semibold">Nhật ký 14 ngày gần nhất · Robot Myka · mô phỏng</caption>
+          <caption className="p-3 text-left font-semibold">Nhật ký 14 ngày gần nhất · {mode === 'demo' ? 'Mô phỏng' : 'Người thân ghi nhận'}</caption>
           <thead><tr>{['Ngày','Cân nặng (kg)','Ngủ (giờ)','Vận động (phút)','Tâm trạng /5','Ghi chú'].map(s => <th key={s} className="p-3 text-left whitespace-nowrap">{s}</th>)}</tr></thead>
           <tbody>{rows.filter(r => r.date >= (() => {const d = new Date(today()+'T12:00:00+07:00');d.setUTCDate(d.getUTCDate()-13);return d.toISOString().slice(0,10);})()).slice().reverse().map(r => <tr key={r.date} className="border-t"><td className="p-3 whitespace-nowrap">{r.date}</td>{fields.map(([key]) => <td key={key} className="p-3">{r[key]}</td>)}<td className="p-3">{r.symptoms || '—'}</td></tr>)}</tbody>
         </table>
-        {!rows.length && <p className="p-4 text-slate-500">Chưa nhận dữ liệu từ Robot Myka.</p>}
+        {!rows.length && <p className="p-4 text-slate-500">Chưa có nhật ký. Chọn Ghi nhật ký để bắt đầu.</p>}
       </div>}
     </div>;
   };
