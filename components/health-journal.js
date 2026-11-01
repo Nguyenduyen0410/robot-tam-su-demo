@@ -75,7 +75,7 @@
     return <div className="mb-6 space-y-4 rounded-2xl border border-blue-200 bg-blue-50/40 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-blue-700">MYKA · CHĂM SÓC MỖI NGÀY</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-700">ỨNG DỤNG HỖ TRỢ NGƯỜI THÂN · HỆ THỐNG AI CARE COMPANION</p>
           <h2 className="mt-1 text-xl font-bold">Sức khỏe hằng ngày</h2>
           <p className="mt-1 text-sm text-slate-600">Robot Myka tự động thu thập tại nhà Ngoại qua đàm thoại; người thân đi làm xa theo dõi từ xa trên app.</p>
         </div>

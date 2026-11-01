@@ -426,7 +426,7 @@
             <div className="relative">
               <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:gap-5 sm:text-left">
                 <img src="assets/avatar-elder.png" alt="Ảnh đại diện của Ngoại" className="h-28 w-28 shrink-0 rounded-full border-4 border-white/90 object-cover shadow-lg sm:h-24 sm:w-24" />
-                <div className="mt-4 min-w-0 sm:mt-0"><p className="text-xs font-bold tracking-[.16em] text-blue-50">HỒ SƠ CHĂM SÓC · {elder?.id || elderId}</p><h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">{elder?.name || 'Bà Nguyễn Thị Hoa'}</h1><p className="mt-1 text-sm text-blue-50">{careProfile?.age ?? elder?.age ?? 72} tuổi</p><p className="mx-auto mt-1 flex max-w-2xl items-start justify-center gap-1 text-sm text-blue-50 sm:mx-0 sm:justify-start"><span className="material-symbols-rounded text-base" aria-hidden="true">location_on</span><span>{careProfile?.address || elder?.address || 'Chưa cập nhật địa chỉ'}</span></p></div>
+                <div className="mt-4 min-w-0 sm:mt-0"><p className="text-[11px] font-bold uppercase tracking-wider text-blue-200">ỨNG DỤNG HỖ TRỢ NGƯỜI THÂN · HỆ THỐNG AI CARE COMPANION</p><p className="mt-0.5 text-xs font-bold tracking-[.16em] text-blue-50">HỒ SƠ CHĂM SÓC · {elder?.id || elderId}</p><h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">{elder?.name || 'Bà Nguyễn Thị Hoa'}</h1><p className="mt-1 text-sm text-blue-50">{careProfile?.age ?? elder?.age ?? 72} tuổi</p><p className="mx-auto mt-1 flex max-w-2xl items-start justify-center gap-1 text-sm text-blue-50 sm:mx-0 sm:justify-start"><span className="material-symbols-rounded text-base" aria-hidden="true">location_on</span><span>{careProfile?.address || elder?.address || 'Chưa cập nhật địa chỉ'}</span></p></div>
               </div>
               <p className="mx-auto mt-4 max-w-2xl text-center text-sm leading-relaxed text-blue-50 sm:mx-0 sm:text-left">Cùng gia đình chăm sóc Ngoại mỗi ngày. Số đo, lịch chăm sóc và thông tin cần thiết được gom tại đây.</p>
               <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
@@ -591,7 +591,10 @@
               <div className="flex flex-wrap items-center gap-3"><button type="submit" disabled={!apiAvailable || settingsSaving} className="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">{settingsSaving ? 'Đang lưu…' : 'Lưu cài đặt'}</button>{settingsMessage && <p role="status" className="text-sm text-blue-700">{settingsMessage}</p>}</div>
             </form>
           </section>}
-          <footer className="text-xs text-slate-400 mt-8">Myka Care Companion · Cùng gia đình chăm sóc người thân. Trao đổi chăm sóc qua Telegram.</footer>
+          <footer className="text-xs text-slate-400 mt-8 text-center pb-6 border-t border-slate-200/60 pt-4">
+            <p className="font-medium text-slate-500">Đề tài: Phân tích nghiệp vụ ứng dụng hỗ trợ người thân trong hệ thống AI Care Companion</p>
+            <p className="mt-1 text-[11px] text-slate-400">Báo cáo thực tập chuyên ngành Khoa học Dữ liệu & Phân tích Kinh doanh (DSBA) · SV: Nguyễn Phạm Kiều Duyên (48K29.1)</p>
+          </footer>
         </main>
           {showScheduleEditor && <ScheduleEditor initialSchedule={editingSchedule} onClose={() => { setShowScheduleEditor(false); setEditingSchedule(null); }} onSave={saveSchedule} />}
         {showPaymentCheckout && <PaymentCheckout amount={pendingPayment?.amount || pricing.monthly_fee} purpose={checkoutPurpose} cycleLabel={initialPaymentPending ? 'Thanh toán lần đầu' : (pendingPayment ? 'Hóa đơn chờ thanh toán' : `${pricing.next_renewal_date} · 1 tháng`)} onClose={() => setShowPaymentCheckout(false)} />}

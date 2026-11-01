@@ -49,7 +49,7 @@
       <main className="myka-login">
         <div className="myka-login-shell">
           <aside className="myka-login-story" aria-label="Myka đồng hành cùng gia đình">
-            <div className="myka-story-top"><span className="myka-story-dot" /> CHĂM SÓC TỪ NHỮNG ĐIỀU NHỎ</div>
+            <div className="myka-story-top"><span className="myka-story-dot" /> ỨNG DỤNG HỖ TRỢ NGƯỜI THÂN · HỆ THỐNG AI CARE COMPANION</div>
             <div className="myka-story-copy"><h2>Ở xa một chút.<br /><em>Quan tâm gần hơn.</em></h2><p>Cùng Myka giữ kết nối với sức khỏe và những điều thường ngày của người thân.</p></div>
             <div className="myka-robot-scene" aria-hidden="true">
               <div className="myka-scene-orbit" />
