@@ -21,3 +21,9 @@ DEF-03: So sánh z < −3 sử dụng dung sai 1e-9 để không gắn cờ đi�
 ## Giao diện người thân E04 ngày 03/11/2026
 
 Màn hình gia đình chỉ có Chỉ số & lịch sử và Điều cần quan tâm, dùng diễn giải dễ hiểu. Đã bỏ bảng đối chứng, P95, z/MAD, phiên bản/seed, liên kết dữ liệu thô và ô thử phân loại lời nói khỏi luồng người thân. Các phép tính và bộ dữ liệu vẫn phục vụ kiểm thử/nghiên cứu, được bàn giao trong bằng chứng và báo cáo. Không có trang nghiên cứu/admin mới hoặc chế độ ẩn công khai thay thế.
+
+
+## E05 03/11/2026 — phạm vi robot đồng hành
+E05 thay thế E03/E04 làm bộ demo hiện tại. Không dùng các tổng số 13.200/13.000 và F1 97,84% của E03 cho E05. Myka gửi huyết áp/mạch; sleep/activity phải là lời tự báo có confirmed=true và utterance; interaction_minutes tính từ sessions started_at/ended_at; reminder_response pending không sinh activity. Cân nặng/SpO₂/đường huyết chỉ nhập từ thiết bị ngoài qua caregiver_entry, có recorder, measurement_provider và ngày đo. Không còn temperature/respiratory_rate trong tập hiện tại hoặc API nhận dữ liệu. Số đo bên ngoài không nằm trong expected lịch Myka.
+Bộ dữ liệu 20 hồ sơ, 60 ngày, 9.085 dòng thô; 7.200 khung theo lịch (BP 2, phản hồi lời nhắc 1, sleep/activity 1 mỗi loại, thuốc 1 mỗi ngày). 9.065 dòng hợp lệ duy nhất gồm cả bản ngoài lịch và nhật ký; chỉ 6.685 khung thuộc lịch được phủ. Không dùng 9065/7200 để tính hoàn thành.
+Chức năng rút thông tin giọng nói thật và gửi tự động cho bác sĩ chưa triển khai. Demo dùng lời tự báo đã xác nhận tạo sẵn. Bản tổng hợp chỉ tải xuống để người thân kiểm tra/chủ động chia sẻ. Các tập E03 còn giữ trong D1 theo version, không trộn vào truy vấn E05.
