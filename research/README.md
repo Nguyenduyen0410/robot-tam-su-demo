@@ -15,3 +15,5 @@ Baseline lấy 14 ngày đầu mỗi hồ sơ. Trung vị và 1,4826 × MAD; sà
 Sắc thái lời nói: từ điển/luật phủ định, không xử lý âm thanh. mood.js được kiểm tra nhãn/điểm trùng Python trên 90 câu. Nhãn ban đầu và lần rà đều có AI hỗ trợ; không gọi là gán nhãn tay hoặc chuyên gia. Điểm 1–5 và confidence là quy ước chưa hiệu chỉnh, không xác định tâm trạng lâm sàng. Không có từ khóa thì không đủ dữ liệu. Không có LLM hoặc dự báo bệnh.
 
 Biểu đồ dùng SVG; đã bỏ script Recharts không được sử dụng gây ForwardRef. Kết quả kiểm thử cụ thể phải dẫn nhật ký đợt E03, không nâng trạng thái local thành public khi chưa chạy thật.
+
+DEF-03: So sánh z < −3 sử dụng dung sai 1e-9 để không gắn cờ điểm bằng −3 nhưng IEEE-754 biểu diễn −3,000000000000001. Dung sai chỉ xử lý sai số số học, không thay ngưỡng nghiệp vụ. Có ca kiểm tra đúng biên.
