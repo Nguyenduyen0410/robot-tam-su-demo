@@ -17,3 +17,7 @@ Sắc thái lời nói: từ điển/luật phủ định, không xử lý âm t
 Biểu đồ dùng SVG; đã bỏ script Recharts không được sử dụng gây ForwardRef. Kết quả kiểm thử cụ thể phải dẫn nhật ký đợt E03, không nâng trạng thái local thành public khi chưa chạy thật.
 
 DEF-03: So sánh z < −3 sử dụng dung sai 1e-9 để không gắn cờ điểm bằng −3 nhưng IEEE-754 biểu diễn −3,000000000000001. Dung sai chỉ xử lý sai số số học, không thay ngưỡng nghiệp vụ. Có ca kiểm tra đúng biên.
+
+## Giao diện người thân E04 ngày 03/11/2026
+
+Màn hình gia đình chỉ có Chỉ số & lịch sử và Điều cần quan tâm, dùng diễn giải dễ hiểu. Đã bỏ bảng đối chứng, P95, z/MAD, phiên bản/seed, liên kết dữ liệu thô và ô thử phân loại lời nói khỏi luồng người thân. Các phép tính và bộ dữ liệu vẫn phục vụ kiểm thử/nghiên cứu, được bàn giao trong bằng chứng và báo cáo. Không có trang nghiên cứu/admin mới hoặc chế độ ẩn công khai thay thế.
