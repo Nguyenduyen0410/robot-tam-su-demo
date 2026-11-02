@@ -37,8 +37,7 @@
   <!-- Babel Standalone -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Recharts -->
-  <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+  <!-- Charts use native SVG; no unused Recharts runtime. -->
 
   <style>
     * { box-sizing: border-box; }
@@ -92,7 +91,7 @@
   <!-- Myka Care Companion is the family-facing app. -->
   <script type="text/babel" src="pages/landing.js?v=new-thesis-20261102a"></script>
   <script type="text/babel" src="pages/login.js?v=new-thesis-20261102a"></script>
-  <script type="text/babel" src="pages/family.js?v=bp-robot-source-20261102"></script>
+  <script type="text/babel" src="pages/family.js?v=research-E03"></script>
   <script type="text/babel" src="components/device-setup.js"></script>
   <script type="text/babel" src="components/schedule-editor.js"></script>
   <script type="text/babel" src="components/conversation-history.js"></script>
@@ -101,6 +100,10 @@
   <script type="text/babel" src="components/wifi-network-picker.js"></script>
 
   <script type="text/babel" src="components/health-journal.js?v=journal-restored-20261102"></script>
+
+  <script src="assets/research/core.js?v=E03"></script>
+  <script src="assets/research/mood.js?v=E03"></script>
+  <script type="text/babel" src="components/research-panel.js?v=E03"></script>
 
   <!-- App (last) -->
   <script type="text/babel" src="app.js"></script>
