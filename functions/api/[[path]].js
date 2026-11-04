@@ -239,6 +239,43 @@ async function ensureConversationLogs(db, elderId) {
   }
 }
 
+
+// Shared demo source: a slot represents one simulated robot measurement, never a new click-time reading.
+// robotHasReading=false models an unavailable measurement; live device polling is not implemented.
+async function syncBpDemoSlot(db, elderId, slot, robotHasReading = true) {
+      const schedule = await ensureBpDemoSchedule(db, elderId);
+      if (!schedule?.enabled) return { success: true, skipped: true, reason: 'schedule_disabled' };
+      const now = new Date();
+      const localParts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      }).formatToParts(now).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+      const localDate = `${localParts.year}-${localParts.month}-${localParts.day}`;
+      const scheduledTime = slot === 'morning' ? schedule.morning_time : schedule.evening_time;
+      const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
+      const localMinuteOfDay = Number(localParts.hour) * 60 + Number(localParts.minute);
+      const scheduledMinuteOfDay = scheduledHour * 60 + scheduledMinute;
+      const elapsedMinutes = localMinuteOfDay - scheduledMinuteOfDay;
+      if (elapsedMinutes < 0) return { success: true, skipped: true, reason: 'outside_schedule_window', local_date: localDate, slot, scheduled_time: scheduledTime };
+      const id = `BP-SCHEDULE-${elderId}-${localDate.replaceAll('-', '')}-${slot.toUpperCase()}`;
+      const existing = await db.prepare('SELECT id FROM blood_pressure WHERE id = ? AND elder_id = ?').bind(id, elderId).first();
+      if (existing) return { success: true, skipped: true, reason: 'already_recorded', local_date: localDate, slot, scheduled_time: scheduledTime };
+      if (!robotHasReading) return { success: true, skipped: true, reason: 'robot_no_measurement', local_date: localDate, slot, scheduled_time: scheduledTime };
+      const dayIndex = Math.floor(Date.parse(`${localDate}T00:00:00Z`) / 86400000);
+      const eveningOffset = slot === 'evening' ? 3 : 0;
+      const systolic = 118 + (dayIndex % 8) + eveningOffset;
+      const diastolic = 75 + (dayIndex % 6) + (slot === 'evening' ? 2 : 0);
+      const heartRate = 70 + (dayIndex % 9) + (slot === 'evening' ? 3 : 0);
+      const status = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
+      const timestamp = new Date(`${localDate}T${scheduledTime}:00+07:00`).toISOString();
+      const note = `APP-SYNC-DEMO: Số đo mô phỏng tự động lúc ${scheduledTime}.`;
+      const inserted = await db.prepare('INSERT OR IGNORE INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(id, elderId, systolic, diastolic, heartRate, status, note, timestamp).run();
+      if (!inserted.meta?.changes) return { success: true, skipped: true, reason: 'already_recorded', local_date: localDate, slot };
+      if (status === 'critical') await db.prepare('INSERT INTO alerts (id, elder_id, type, title, detail, severity, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(newId('ALT'), elderId, 'bp_critical', 'Đã ghi nhận chỉ số vượt ngưỡng cấu hình', `Đo mô phỏng ${systolic}/${diastolic} mmHg, nhịp tim ${heartRate} bpm. Cần người chăm sóc xem lại.`, 'critical', 'pending', timestamp).run();
+      return { success: true, skipped: false, slot, reading: { id, elder_id: elderId, systolic, diastolic, heart_rate: heartRate, status, note, timestamp }, agent: await agentStatus(db, elderId) };
+}
+
 export async function onRequest({ request, env, params }) {
   const headers = corsHeaders(request);
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
@@ -347,34 +384,23 @@ export async function onRequest({ request, env, params }) {
       if (!['https://myka-care-companion.pages.dev', 'http://localhost:8765', 'http://127.0.0.1:8765'].includes(origin)) return json(request, { error: 'Nguồn gửi lịch không được phép.' }, 403);
       const slot = new URL(request.url).searchParams.get('slot');
       if (!['morning', 'evening'].includes(slot)) return json(request, { error: 'Khung giờ không hợp lệ.' }, 422);
-      const schedule = await ensureBpDemoSchedule(db, elderId);
-      if (!schedule?.enabled) return json(request, { success: true, skipped: true, reason: 'schedule_disabled' });
-      const now = new Date();
-      const localParts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-      }).formatToParts(now).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
-      const localDate = `${localParts.year}-${localParts.month}-${localParts.day}`;
-      const scheduledTime = slot === 'morning' ? schedule.morning_time : schedule.evening_time;
-      const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
-      const localMinuteOfDay = Number(localParts.hour) * 60 + Number(localParts.minute);
-      const scheduledMinuteOfDay = scheduledHour * 60 + scheduledMinute;
-      const elapsedMinutes = localMinuteOfDay - scheduledMinuteOfDay;
-      if (elapsedMinutes < 0) return json(request, { success: true, skipped: true, reason: 'outside_schedule_window', local_date: localDate, scheduled_time: scheduledTime });
-      const dayIndex = Math.floor(Date.parse(`${localDate}T00:00:00Z`) / 86400000);
-      const eveningOffset = slot === 'evening' ? 3 : 0;
-      const systolic = 118 + (dayIndex % 8) + eveningOffset;
-      const diastolic = 75 + (dayIndex % 6) + (slot === 'evening' ? 2 : 0);
-      const heartRate = 70 + (dayIndex % 9) + (slot === 'evening' ? 3 : 0);
-      const status = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
-      const id = `BP-SCHEDULE-${elderId}-${localDate.replaceAll('-', '')}-${slot.toUpperCase()}`;
-      const timestamp = new Date(`${localDate}T${scheduledTime}:00+07:00`).toISOString();
-      const note = `APP-SYNC-DEMO: Số đo mô phỏng tự động lúc ${scheduledTime}.`;
-      const inserted = await db.prepare('INSERT OR IGNORE INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(id, elderId, systolic, diastolic, heartRate, status, note, timestamp).run();
-      if (!inserted.meta?.changes) return json(request, { success: true, skipped: true, reason: 'already_recorded', local_date: localDate, slot });
-      if (status === 'critical') await db.prepare('INSERT INTO alerts (id, elder_id, type, title, detail, severity, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(newId('ALT'), elderId, 'bp_critical', 'Đã ghi nhận chỉ số vượt ngưỡng cấu hình', `Đo mô phỏng ${systolic}/${diastolic} mmHg, nhịp tim ${heartRate} bpm. Cần người chăm sóc xem lại.`, 'critical', 'pending', timestamp).run();
-      return json(request, { success: true, skipped: false, slot, reading: { id, elder_id: elderId, systolic, diastolic, heart_rate: heartRate, status, note, timestamp }, agent: await agentStatus(db, elderId) }, 201);
+      const result = await syncBpDemoSlot(db, elderId, slot, env.MYKA_DEMO_ROBOT_HAS_READING !== 'false');
+      return json(request, result, result.skipped ? 200 : 201);
+    }
+
+    if (request.method === 'POST' && area === 'family' && section === 'bp-sync' && elderId) {
+      if (elderId !== 'E001') return json(request, { error: 'Đồng bộ lịch mô phỏng chỉ áp dụng cho hồ sơ E001.' }, 404);
+      const origin = request.headers.get('Origin') || '';
+      if (!['https://myka-care-companion.pages.dev', 'http://localhost:8765', 'http://127.0.0.1:8765'].includes(origin)) return json(request, { error: 'Nguồn yêu cầu không được phép.' }, 403);
+      const text = await request.text();
+      if (text.trim()) {
+        let body; try { body = JSON.parse(text); } catch { return json(request, { error: 'Yêu cầu không hợp lệ.' }, 422); }
+        if (!body || Array.isArray(body) || typeof body !== 'object' || Object.keys(body).length) return json(request, { error: 'Nút đồng bộ không nhận số đo, thời điểm hoặc khung giờ do người thân nhập.' }, 422);
+      }
+      const slots = [];
+      for (const slot of ['morning', 'evening']) slots.push({ slot, ...await syncBpDemoSlot(db, elderId, slot, env.MYKA_DEMO_ROBOT_HAS_READING !== 'false') });
+      const received = slots.filter(r => !r.skipped).map(r => r.reading);
+      return json(request, { success: true, is_synthetic: true, mode: 'scheduled_demo_recovery', received_count: received.length, received, slots, agent: await agentStatus(db, elderId) });
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'conversation-history' && elderId) {

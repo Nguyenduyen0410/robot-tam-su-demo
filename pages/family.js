@@ -38,7 +38,7 @@
     const [agentStatus, setAgentStatus] = React.useState(null);
     const [measurementSyncBusy, setMeasurementSyncBusy] = React.useState(false);
     const [measurementSyncMessage, setMeasurementSyncMessage] = React.useState('');
-    const [demoSampleIndex, setDemoSampleIndex] = React.useState(0);
+    const [measurementSyncTone, setMeasurementSyncTone] = React.useState('info');
     const [telegramLinks, setTelegramLinks] = React.useState({ group_chat_url: '' });
     const [apiAvailable, setApiAvailable] = React.useState(false);
     const [healthDataSource, setHealthDataSource] = React.useState('app_demo');
@@ -289,44 +289,40 @@
       } catch { setCareProfileMessage('Chưa lưu được hồ sơ. Dữ liệu nháp vẫn được giữ nguyên để bạn thử lại.'); }
       finally { setProfileSaving(false); }
     };
-    const refreshDemoMeasurement = async () => {
+    const recoverScheduledMeasurements = async () => {
       if (measurementSyncBusy) return;
       setMeasurementSyncBusy(true);
-      setMeasurementSyncMessage('Myka đang nhận và xử lý số đo…');
-      const samples = [
-        { systolic: 126, diastolic: 92, heart_rate: 92, cuffAlert: true, deviceId: '11', note: 'APP-SYNC-DEMO: Số đo từ máy Omron BLE (ID: 11). Cảnh báo vòng bít quấn lỏng; nhịp tim 92 bpm.' },
-        { systolic: 128, diastolic: 80, heart_rate: 74, cuffAlert: false, deviceId: '11', note: 'APP-SYNC-DEMO: Đo lại lần 2 sau khi quấn lại vòng bít chuẩn.' },
-        { systolic: 132, diastolic: 86, heart_rate: 78, cuffAlert: false, deviceId: '11' },
-        { systolic: 158, diastolic: 96, heart_rate: 92, cuffAlert: false, deviceId: '11' },
-      ];
-      const sample = samples[demoSampleIndex % samples.length];
+      setMeasurementSyncTone('info');
+      setMeasurementSyncMessage('Đang kiểm tra các khung giờ và yêu cầu đồng bộ lại…');
       try {
-        const response = await fetch(apiUrl(`/device/bp-record/${elderId}`), {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...sample, note: 'APP-SYNC-DEMO: Số đo được người thân tải mới trong ứng dụng.' }),
-        });
+        const response = await fetch(apiUrl(`/family/bp-sync/${elderId}`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Chưa tải được số đo mới.');
+        if (!response.ok) throw new Error(result.error || 'Chưa đồng bộ được số đo.');
         const healthResponse = await fetch(apiUrl(`/family/health-summary/${elderId}?days=${days}`));
-        if (!healthResponse.ok) throw new Error('Số đo đã được nhận nhưng chưa tải lại được biểu đồ.');
+        if (!healthResponse.ok) throw new Error('Đã kiểm tra đồng bộ nhưng chưa tải lại được lịch sử. Bạn có thể thử lại.');
         const health = await healthResponse.json();
         setReadings((health.daily_readings || []).slice().reverse());
         setHealthDataSource(health.data_source || 'app_demo');
         setAgentStatus(result.agent || null);
-        setApiAvailable(true);
-        setStatusUpdatedAt(new Date());
-        setDemoSampleIndex(index => index + 1);
-        const measureLabel = `${sample.systolic}/${sample.diastolic} mmHg`;
-        setMeasurementSyncMessage(result.status === 'critical'
-          ? `Myka đã ghi nhận ${measureLabel}, cập nhật biểu đồ và lịch sử, đồng thời tạo cảnh báo để gia đình xem lại.`
-          : result.status === 'warning'
-            ? `Myka đã ghi nhận ${measureLabel}, cập nhật biểu đồ và lịch sử; gia đình có thể xem lại số đo cần lưu ý.`
-            : `Myka đã ghi nhận ${measureLabel} và cập nhật biểu đồ cùng lịch sử đo.`);
+        setApiAvailable(true); setStatusUpdatedAt(new Date());
+        const slots = result.slots || [];
+        if (result.received_count > 0) {
+          setMeasurementSyncTone('success');
+          const times = slots.filter(row => !row.skipped).map(row => row.slot === 'morning' ? '09:00' : '19:00').join(' và ');
+          setMeasurementSyncMessage(`Đã đồng bộ bù ${result.received_count} số đo của khung ${times}. Lịch sử giữ giờ đo theo lịch; bấm lại không tạo bản ghi trùng.`);
+        } else if (slots.every(row => row.reason === 'schedule_disabled')) {
+          setMeasurementSyncMessage('Lịch mô phỏng đang tắt. Không thêm số đo hoặc tự bật lịch; bạn có thể kiểm tra cấu hình trong Cài đặt.');
+        } else if (slots.some(row => row.reason === 'robot_no_measurement')) {
+          setMeasurementSyncMessage('Chưa nhận được số đo của khung đã đến giờ. Cần có kết quả đo từ Myka trước khi đồng bộ; app không tạo số thay thế.');
+        } else if (slots.every(row => row.reason === 'outside_schedule_window')) {
+          setMeasurementSyncMessage('Chưa đến khung đo 09:00 hoặc 19:00 hôm nay. Không có số đo theo lịch để đồng bộ bù.');
+        } else {
+          setMeasurementSyncMessage('Các số đo đã đến lịch hôm nay đã có trong lịch sử. Không có số đo mới để bổ sung.');
+        }
       } catch (error) {
-        setMeasurementSyncMessage(error.message || 'Không tải được dữ liệu mới. Vui lòng thử lại.');
-      } finally {
-        setMeasurementSyncBusy(false);
-      }
+        setMeasurementSyncTone('error');
+        setMeasurementSyncMessage(error.message || 'Chưa đồng bộ được dữ liệu. Vui lòng thử lại.');
+      } finally { setMeasurementSyncBusy(false); }
     };
     const voiceOptions = [
       { id: 'male_young_warm', label: 'Nam thành niên', detail: 'Ấm áp' },
@@ -553,10 +549,10 @@
                 <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Số đo gần nhất</p><p className={`mt-2 text-lg font-extrabold ${measurementAgeMinutes === null || measurementAgeMinutes > 30 ? 'text-amber-700' : 'text-emerald-700'}`}>{measurementFreshness}</p><p className="mt-1 text-xs text-slate-500">{measurementTime ? `${newestMeasurement.systolic}/${newestMeasurement.diastolic} mmHg · ${measurementFreshnessDetail}` : measurementFreshnessDetail}</p></article>
               </div>
               <article className="mt-4 rounded-3xl border border-[#e9dfcf] bg-[#fffaf2] p-5 shadow-sm sm:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#17428f] text-white"><span className="material-symbols-rounded" aria-hidden="true">monitor_heart</span></span><div><h3 className="font-extrabold text-slate-900">Cập nhật dữ liệu sức khỏe</h3><p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">Nhận số đo mới qua Myka. Hệ thống tự lưu vào lịch sử, cập nhật biểu đồ và đánh dấu cần lưu ý nếu số đo vượt ngưỡng cấu hình.</p></div></div><button type="button" onClick={refreshDemoMeasurement} disabled={!apiAvailable || measurementSyncBusy} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#17428f] px-5 py-3 font-bold text-white shadow-md transition hover:bg-[#103673] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-55"><span className={`material-symbols-rounded ${measurementSyncBusy ? 'animate-spin' : ''}`} aria-hidden="true">{measurementSyncBusy ? 'progress_activity' : 'sync'}</span>{measurementSyncBusy ? 'Đang tải dữ liệu…' : 'Tải dữ liệu mới'}</button></div>
-                {measurementSyncMessage && <p role="status" aria-live="polite" className={`mt-4 rounded-2xl border p-3 text-sm font-medium ${measurementSyncMessage.includes('Chưa tải') || measurementSyncMessage.includes('Không tải') ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>{measurementSyncMessage}</p>}
-                {!apiAvailable && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Cần kết nối máy chủ để tải và lưu số đo.</p>}
-                <p className="mt-3 text-xs leading-relaxed text-slate-500">Các chỉ số và phân loại hỗ trợ gia đình theo dõi; không thay thế chẩn đoán hoặc hướng dẫn điều trị từ nhân viên y tế. Việc phân loại và cập nhật được xử lý tự động ở phía máy chủ.</p>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#17428f] text-white"><span className="material-symbols-rounded" aria-hidden="true">monitor_heart</span></span><div><h3 className="font-extrabold text-slate-900">Đồng bộ lại số đo từ Myka</h3><p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">Dùng khi chưa thấy số đo của khung 09:00 hoặc 19:00. Chỉ bổ sung khung đã đến giờ còn thiếu; số đo đã có sẽ không được ghi thêm.</p></div></div><button type="button" onClick={recoverScheduledMeasurements} disabled={measurementSyncBusy} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#17428f] px-5 py-3 font-bold text-white shadow-md transition hover:bg-[#103673] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-55"><span className={`material-symbols-rounded ${measurementSyncBusy ? 'animate-spin' : ''}`} aria-hidden="true">{measurementSyncBusy ? 'progress_activity' : 'sync'}</span>{measurementSyncBusy ? 'Đang đồng bộ…' : 'Kiểm tra & đồng bộ'}</button></div>
+                {measurementSyncMessage && <p role="status" aria-live="polite" className={`mt-4 rounded-2xl border p-3 text-sm font-medium ${measurementSyncTone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800' : measurementSyncTone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-blue-200 bg-blue-50 text-blue-900'}`}>{measurementSyncMessage}</p>}
+                {!apiAvailable && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Chưa xác nhận được kết nối máy chủ. Bạn có thể bấm kiểm tra lại; nếu chưa kết nối được thì số đo không được thêm.</p>}
+                <p className="mt-3 text-xs leading-relaxed text-slate-500">Bản minh họa dùng cùng nguồn số đo mô phỏng với lịch tự động, chưa lấy trực tiếp từ robot thật. Nút không yêu cầu đo lại; nếu Myka chưa có kết quả đo thì không thể đồng bộ thay thế.</p>
               </article>
             </section>;
           })()}
