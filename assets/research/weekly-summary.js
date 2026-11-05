@@ -19,7 +19,7 @@
   let text=String(statement.text||'').replace(/(\d)\.(\d)/g,'$1,$2');
   if(statement.metric_id==='blood_pressure')text=text.replace(/^huyết áp\s*/i,'');
   if(statement.metric_id==='sleep')text=text.replace(/^giấc ngủ(?: tự báo)?\s*/i,'');
-  if(statement.metric_id==='medication')text=text.replace(/(?:[,;]\s*)?không chứng minh/i,'; không chứng minh');
+  if(statement.metric_id==='medication')text=text.replace(/\s*(?:[,;]\s*)?không chứng minh/i,'; không chứng minh');
   return{label:labels[statement.metric_id]||'',text};
  }
  root.MykaWeeklySummary={facts,summarize,present};if(typeof module!=='undefined')module.exports=root.MykaWeeklySummary;
