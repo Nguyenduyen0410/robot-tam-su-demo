@@ -1,0 +1,7 @@
+{
+  "name": "myka-summary-evaluation",
+  "main": "index.js",
+  "compatibility_date": "2025-10-11",
+  "workers_dev": true,
+  "ai": { "binding": "AI" }
+}
