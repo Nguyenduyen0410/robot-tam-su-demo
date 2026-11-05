@@ -1,8 +1,9 @@
-name: Tạo số đo huyết áp mô phỏng theo lịch
+name: Đồng bộ bù số đo mô phỏng (dự phòng)
 
 on:
   schedule:
-    # Kiểm tra lại để không bỏ lượt khi GitHub khởi động trễ.
+    # Primary delivery uses the Cloudflare Durable Object alarm (workers/bp-scheduler).
+    # This slower recovery job is only a fallback; actual late receipt stays logged.
     - cron: '7,27,47 * * * *'
   workflow_dispatch:
 

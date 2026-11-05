@@ -240,6 +240,19 @@ async function ensureConversationLogs(db, elderId) {
 }
 
 
+// Receipt time is captured by the server, separately from the source measurement time.
+// Historical rows remain NULL: their receipt time was never recorded.
+async function ensureBpReceiptTime(db) {
+  const { results } = await db.prepare('PRAGMA table_info(blood_pressure)').all();
+  if (!results.some(column => column.name === 'received_at')) {
+    try { await db.prepare('ALTER TABLE blood_pressure ADD COLUMN received_at TEXT').run(); }
+    catch (error) {
+      const after = await db.prepare('PRAGMA table_info(blood_pressure)').all();
+      if (!after.results.some(column => column.name === 'received_at')) throw error;
+    }
+  }
+}
+
 // Shared demo source: a slot represents one simulated robot measurement, never a new click-time reading.
 // robotHasReading=false models an unavailable measurement; live device polling is not implemented.
 async function syncBpDemoSlot(db, elderId, slot, robotHasReading = true) {
@@ -268,12 +281,13 @@ async function syncBpDemoSlot(db, elderId, slot, robotHasReading = true) {
       const status = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
       const timestamp = new Date(`${localDate}T${scheduledTime}:00+07:00`).toISOString();
       const note = `APP-SYNC-DEMO: Số đo mô phỏng tự động lúc ${scheduledTime}.`;
-      const inserted = await db.prepare('INSERT OR IGNORE INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(id, elderId, systolic, diastolic, heartRate, status, note, timestamp).run();
+      const receivedAt = now.toISOString();
+      const inserted = await db.prepare('INSERT OR IGNORE INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(id, elderId, systolic, diastolic, heartRate, status, note, timestamp, receivedAt).run();
       if (!inserted.meta?.changes) return { success: true, skipped: true, reason: 'already_recorded', local_date: localDate, slot };
       if (status === 'critical') await db.prepare('INSERT INTO alerts (id, elder_id, type, title, detail, severity, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
         .bind(newId('ALT'), elderId, 'bp_critical', 'Đã ghi nhận chỉ số vượt ngưỡng cấu hình', `Đo mô phỏng ${systolic}/${diastolic} mmHg, nhịp tim ${heartRate} bpm. Cần người chăm sóc xem lại.`, 'critical', 'pending', timestamp).run();
-      return { success: true, skipped: false, slot, reading: { id, elder_id: elderId, systolic, diastolic, heart_rate: heartRate, status, note, timestamp }, agent: await agentStatus(db, elderId) };
+      return { success: true, skipped: false, slot, reading: { id, elder_id: elderId, systolic, diastolic, heart_rate: heartRate, status, note, timestamp, received_at: receivedAt }, agent: await agentStatus(db, elderId) };
 }
 
 export async function onRequest({ request, env, params }) {
@@ -288,6 +302,7 @@ export async function onRequest({ request, env, params }) {
   const elderId = resource;
 
   try {
+    if (['health-summary', 'bp-history', 'bp-sync', 'bp-record'].includes(section) || (area === 'demo-scheduler' && section === 'tick')) await ensureBpReceiptTime(db);
     if (request.method === 'GET' && parts.join('/') === 'health') {
       return json(request, { status: 'ok', timestamp: nowIso(), database: 'connected' });
     }
@@ -297,7 +312,7 @@ export async function onRequest({ request, env, params }) {
       const days = Math.min(30, Math.max(7, Number(new URL(request.url).searchParams.get('days') || 7)));
       const { rows: sourceReadings, source } = await getReadOnlyBpm(env, days);
       const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-      const { results: syncedRows } = await db.prepare("SELECT id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp FROM blood_pressure WHERE elder_id = ? AND note LIKE 'APP-SYNC-DEMO:%' AND timestamp >= ? ORDER BY timestamp DESC")
+      const { results: syncedRows } = await db.prepare("SELECT id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp, received_at FROM blood_pressure WHERE elder_id = ? AND note LIKE 'APP-SYNC-DEMO:%' AND timestamp >= ? ORDER BY timestamp DESC")
         .bind(elderId, new Date(cutoff).toISOString()).all();
       const merged = new Map();
       [...sourceReadings, ...syncedRows].forEach(row => merged.set(String(row.id), row));
@@ -583,9 +598,12 @@ export async function onRequest({ request, env, params }) {
       const systolic = Number(body.systolic), diastolic = Number(body.diastolic), heartRate = Number(body.heart_rate);
       if (!Number.isInteger(systolic) || systolic < 60 || systolic > 240 || !Number.isInteger(diastolic) || diastolic < 40 || diastolic > 140 || systolic <= diastolic || !Number.isInteger(heartRate) || heartRate < 40 || heartRate > 200) return json(request, { error: 'Chỉ số không hợp lệ.' }, 422);
       const status = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
-      const id = newId('BP'), timestamp = nowIso();
-      const reading = { id, elder_id: elderId, systolic, diastolic, heart_rate: heartRate, status, note: String(body.note || 'Đo thử qua API thiết bị').slice(0, 300), timestamp };
-      await db.prepare('INSERT INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(reading.id, reading.elder_id, reading.systolic, reading.diastolic, reading.heart_rate, reading.status, reading.note, reading.timestamp).run();
+      const receivedAt = nowIso();
+      const measuredMs = body.measured_at == null ? Date.parse(receivedAt) : Date.parse(body.measured_at);
+      if (body.measured_at != null && (typeof body.measured_at !== 'string' || !Number.isFinite(measuredMs) || measuredMs > Date.parse(receivedAt))) return json(request, { error: 'Thời điểm đo không hợp lệ.' }, 422);
+      const id = newId('BP'), timestamp = new Date(measuredMs).toISOString();
+      const reading = { id, elder_id: elderId, systolic, diastolic, heart_rate: heartRate, status, note: String(body.note || 'Đo thử qua API thiết bị').slice(0, 300), timestamp, received_at: receivedAt };
+      await db.prepare('INSERT INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(reading.id, reading.elder_id, reading.systolic, reading.diastolic, reading.heart_rate, reading.status, reading.note, reading.timestamp, reading.received_at).run();
       if (status === 'critical') await db.prepare('INSERT INTO alerts (id, elder_id, type, title, detail, severity, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(newId('ALT'), elderId, 'bp_critical', 'Đã ghi nhận chỉ số vượt ngưỡng cấu hình', `Đo được ${systolic}/${diastolic} mmHg, nhịp tim ${heartRate} bpm. Cần người chăm sóc xem lại.`, 'critical', 'pending', timestamp).run();
       return json(request, { success: true, id, status, reading, agent: await agentStatus(db, elderId) }, 201);
     }

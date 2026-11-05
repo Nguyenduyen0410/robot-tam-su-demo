@@ -1,0 +1,10 @@
+{
+  "name": "myka-bp-scheduler",
+  "main": "index.js",
+  "compatibility_date": "2025-10-11",
+  "workers_dev": true,
+  "durable_objects": { "bindings": [{ "name": "CLOCK", "class_name": "BpClock" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BpClock"] }],
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "vars": { "API_BASE": "https://myka-care-companion.pages.dev" }
+}
