@@ -95,9 +95,10 @@ export default {
         return clock.fetch(new Request('https://scheduler.internal/probe', { method: 'POST', body: JSON.stringify(job) }));
       }
       const id = url.searchParams.get('id');
+      if (request.method === 'GET' && id === 'E001-v1') return env.CLOCK.get(env.CLOCK.idFromName(id)).fetch('https://scheduler.internal/status');
       if (!/^probe-[a-f0-9-]{36}$/.test(id || '')) return new Response('Invalid probe id', { status: 422 });
       return env.CLOCK.get(env.CLOCK.idFromName(id)).fetch('https://scheduler.internal/status');
     }
-    return Response.json({ service: 'myka-bp-scheduler', mode: 'synthetic', nominal_delay_seconds: [20, 35] });
+    return Response.json({ service: 'myka-bp-scheduler', mode: 'synthetic', target_latency_seconds: [20, 35] });
   },
 };

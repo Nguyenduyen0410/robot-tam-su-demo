@@ -27,9 +27,13 @@ Sau khi thêm binding, cần có một deployment mới để Function nhận bi
 
 ## Phạm vi Agent
 
-Mục **Trạng thái** giữ thông tin kết nối máy chủ, thiết bị và lần cập nhật gần nhất; nút **Tải dữ liệu mới** gửi một số đo mô phỏng qua luồng ghi nhận hiện có. Backend kiểm tra số đo, áp dụng ngưỡng cấu hình, lưu vào `blood_pressure` và tạo bản ghi `alerts` nếu vượt ngưỡng cao. Số đo mẫu được đánh dấu bằng tiền tố `APP-SYNC-DEMO:`; API `GET /api/family/health-summary/{elder_id}` gộp chúng với dữ liệu hướng dẫn để mục Sức khỏe cập nhật biểu đồ và lịch sử ngay sau khi tải lại. Không có trang Agent hoặc nhật ký Agent tách riêng.
+Mục **Trạng thái** có nút **Kiểm tra & đồng bộ**, gửi yêu cầu rỗng tới `POST /api/family/bp-sync/E001`. Backend chỉ lấy bù khung đã đến giờ còn thiếu khi lịch bật và nguồn mô phỏng có số đo; không tạo số đo tùy ý theo lần bấm. Khóa hồ sơ/ngày/khung chống trùng giữa đồng bộ thủ công và tự động. Số đo mẫu giữ tiền tố `APP-SYNC-DEMO:` và được API sức khỏe đọc lại từ D1.
 
-Trong **Cài đặt**, người thân có thể bật/tắt lịch tạo hai số đo giả mỗi ngày lúc **09:00** và **19:00** (múi giờ `Asia/Ho_Chi_Minh`). GitHub Actions chạy `.github/workflows/scheduled-demo-bp.yml` theo lịch UTC 02:00/12:00 và gọi `POST /api/demo-scheduler/tick/E001?slot=morning|evening`; Pages Function chỉ ghi dữ liệu nếu lịch đang bật, chỉ ghi một lần cho mỗi ngày/khung giờ và lưu trực tiếp vào D1. GitHub Actions chạy lịch trên nhánh mặc định; thời gian bắt đầu có thể trễ khi hệ thống hàng đợi bận. Đây chỉ là số đo mô phỏng để demo, không đại diện cho máy đo hoặc dữ liệu bệnh nhân thật.
+Trong **Cài đặt**, người thân bật/tắt lịch mô phỏng **09:00/19:00** theo giờ Việt Nam. Từ 05/11/2026, Worker `myka-bp-scheduler` dùng Durable Object Alarm để gửi từng khung, tự đặt lịch tiếp theo; Cron 5 phút chỉ khởi tạo/sửa alarm còn thiếu. Alarm dự kiến chạy sau mốc đo 20–30 giây, chừa thời gian gọi API cho mục tiêu nhận sau 20–35 giây. Đây là mục tiêu thử nghiệm, không phải bảo đảm mọi lần đều đạt. GitHub Actions 20 phút/lần giữ vai trò đồng bộ bù dự phòng. Khi có lỗi, thời gian nhận thực tế vẫn được lưu, không cắt xuống ngưỡng mục tiêu.
+
+`blood_pressure.timestamp` giữ giờ đo nguồn; `received_at` mới do máy chủ gán khi chấp nhận ghi. API áp dụng bổ sung cột nullable cho cơ sở dữ liệu cũ; không chạy lại migration 0006 nếu cột đã tồn tại, không điền giả giờ nhận của bản ghi cũ. Luồng device có thể gửi `measured_at` hợp lệ không ở tương lai; nếu không có, timestamp vẫn là mốc tiếp nhận tương thích cũ và không đủ để kết luận độ trễ từ thiết bị. UI lịch sử chỉ hiện giờ nhận theo giờ Việt Nam, chưa có thì ghi chưa ghi nhận; công thức/thống kê thuộc báo cáo.
+
+Triển khai Worker riêng bằng `wrangler deploy --config workers/bp-scheduler/wrangler.jsonc`. `PROBE_TOKEN` chỉ dùng tạm cho kiểm thử có kiểm soát; ba Alarm thử ghi hồ sơ giả riêng `E-TIMING-TEST`, không sửa E001. Xóa secret sau kiểm tra để vô hiệu hóa endpoint thử.
 
 Luồng thiết bị `POST /api/device/bp-record/{elder_id}` vẫn phân loại số đo gửi vào, lưu lịch sử huyết áp và tạo cảnh báo khi vượt ngưỡng cao. Đây là Agent demo theo quy tắc cấu hình, không phải mô hình học máy, chẩn đoán hay tư vấn điều trị. Kịch bản trình diễn không kết nối thiết bị thật và không gửi thông báo đẩy. App không có chat riêng bác sĩ–người thân; trao đổi tư vấn dùng nhóm Telegram chung đã được cấu hình.
 
@@ -58,6 +62,6 @@ CTA đăng ký/gia hạn mở luồng chuyển khoản ngân hàng minh họa. T
 - Trước khi triển khai thật cần bổ sung xác thực server-side, phân quyền theo hồ sơ, bảo vệ API thiết bị và quy trình bảo mật dữ liệu.
 
 
-## Cập nhật lịch gửi số đo mô phỏng (02/11/2026)
+## Lịch sử cấu hình trước 05/11/2026
 
-GitHub Actions kiểm tra hai khung giờ 09:00/19:00 (Việt Nam) khoảng 20 phút/lần. Backend bỏ qua khung giờ chưa đến, gửi bù khung giờ đã đến trong cùng ngày và dùng ID theo ngày/khung giờ để chống ghi trùng. Dịch vụ có thể chạy trễ; chưa bảo đảm đúng phút hoặc gửi bù các ngày trước khi dịch vụ ngừng cả ngày. Lịch vẫn phụ thuộc cờ bật trong cài đặt hồ sơ E001. Số đo lưu D1 khi app đóng; app đang mở tải lại mỗi 30 giây. Đây là robot mô phỏng, chưa có kết nối máy đo thật.
+Trước bản sửa, GitHub Actions kiểm tra khoảng 20 phút/lần và có thể chạy muộn; quan sát E11 ghi nhận đồng bộ bù khung 19:00 vào khoảng 20:30. Bằng chứng này được giữ nguyên. Bản sửa dùng Alarm làm lịch chính, lưu giờ nhận và kiểm tra lại bằng E12; chưa nghiệm thu vận hành tự nhiên qua nhiều ngày hoặc truyền từ robot thật. App đang mở tự tải lại mỗi 30 giây, nên thời điểm nhìn thấy trên màn hình có thể muộn hơn thời điểm máy chủ đã nhận.
