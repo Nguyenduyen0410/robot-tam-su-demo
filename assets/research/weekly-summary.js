@@ -14,5 +14,13 @@
    {metric_id:'medication',text:`Đã nhận xác nhận ${f.medication.confirmed}/${f.medication.expected} lần nhắc thuốc; không chứng minh đã uống thuốc thực tế.`}
   ]};
  }
- root.MykaWeeklySummary={facts,summarize};if(typeof module!=='undefined')module.exports=root.MykaWeeklySummary;
+ function present(statement){
+  const labels={blood_pressure:'Huyết áp',interaction:'Trò chuyện',sleep:'Giấc ngủ tự báo',medication:'Xác nhận lịch thuốc'};
+  let text=String(statement.text||'').replace(/(\d)\.(\d)/g,'$1,$2');
+  if(statement.metric_id==='blood_pressure')text=text.replace(/^huyết áp\s*/i,'');
+  if(statement.metric_id==='sleep')text=text.replace(/^giấc ngủ(?: tự báo)?\s*/i,'');
+  if(statement.metric_id==='medication')text=text.replace(/(?:[,;]\s*)?không chứng minh/i,'; không chứng minh');
+  return{label:labels[statement.metric_id]||'',text};
+ }
+ root.MykaWeeklySummary={facts,summarize,present};if(typeof module!=='undefined')module.exports=root.MykaWeeklySummary;
 })(globalThis);
