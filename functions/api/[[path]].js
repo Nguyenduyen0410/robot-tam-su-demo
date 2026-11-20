@@ -8,11 +8,11 @@ const corsHeaders = (request) => {
     'http://127.0.0.1:8765',
   ]);
   const headers = {
+    'Access-Control-Allow-Origin': origin || '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept',
     'Vary': 'Origin',
   };
-  if (allowed.has(origin)) headers['Access-Control-Allow-Origin'] = origin;
   return headers;
 };
 
@@ -302,9 +302,86 @@ export async function onRequest({ request, env, params }) {
   const elderId = resource;
 
   try {
-    if (['health-summary', 'bp-history', 'bp-sync', 'bp-record'].includes(section) || (area === 'demo-scheduler' && section === 'tick')) await ensureBpReceiptTime(db);
+    if (['health-summary', 'bp-history', 'bp-sync', 'bp-record'].includes(section) || area === 'bpm' || (area === 'demo-scheduler' && section === 'tick')) await ensureBpReceiptTime(db);
     if (request.method === 'GET' && parts.join('/') === 'health') {
-      return json(request, { status: 'ok', timestamp: nowIso(), database: 'connected' });
+      return json(request, { success: true, status: 'ok', timestamp: nowIso(), database: 'connected' });
+    }
+
+    if (area === 'bpm') {
+      const targetElder = 'E001';
+      if (request.method === 'GET' && (!section || section === 'latest')) {
+        const latest = await latestFor(db, targetElder);
+        const sys = Number(latest?.systolic ?? 118);
+        const dia = Number(latest?.diastolic ?? 78);
+        const pul = Number(latest?.heart_rate ?? 72);
+        const isHigh = sys >= 140 || dia >= 90;
+        return json(request, {
+          success: true,
+          data: {
+            sys, dia, pul, ihb: false,
+            status: isHigh ? 'hypertension_stage_2' : (sys >= 130 || dia >= 85 ? 'hypertension_stage_1' : 'normal'),
+            status_vi: isHigh ? 'Huyết áp cao (Vượt ngưỡng lưu ý)' : (sys >= 130 || dia >= 85 ? 'Tăng huyết áp độ 1' : 'Huyết áp bình thường (Tối ưu)'),
+            warning: isHigh,
+            advice: isHigh ? 'Chỉ số huyết áp vượt ngưỡng theo dõi. Gia đình nên hỏi thăm Ngoại và theo dõi sát.' : 'Huyết áp và nhịp tim của Ngoại rất tốt và ổn định.',
+            measured_at: latest?.timestamp || nowIso(),
+            received_at: latest?.received_at || nowIso(),
+            tenant_id: 'sh_tenant',
+            robot_id: 'ROBOT-DEFAULT',
+            robot_type: 'OLDSTER'
+          }
+        });
+      }
+      if (request.method === 'GET' && section === 'history') {
+        const limit = Math.min(100, Math.max(1, Number(new URL(request.url).searchParams.get('limit') || 10)));
+        const { results } = await db.prepare('SELECT * FROM blood_pressure WHERE elder_id = ? ORDER BY timestamp DESC LIMIT ?').bind(targetElder, limit).all();
+        return json(request, {
+          success: true,
+          total: results.length,
+          limit,
+          data: results.map(r => ({
+            id: r.id,
+            sys: r.systolic,
+            dia: r.diastolic,
+            pul: r.heart_rate,
+            ihb: false,
+            status: r.status,
+            status_vi: r.systolic >= 140 || r.diastolic >= 90 ? 'Cần lưu ý (Vượt ngưỡng)' : 'Huyết áp bình thường (Tối ưu)',
+            warning: r.systolic >= 140 || r.diastolic >= 90,
+            advice: r.note || 'Số đo từ Robot Myka',
+            measured_at: r.timestamp,
+            received_at: r.received_at
+          }))
+        });
+      }
+      if (request.method === 'POST' && !section) {
+        const body = await request.json();
+        const sys = Number(body.sys ?? body.systolic);
+        const dia = Number(body.dia ?? body.diastolic);
+        const pul = Number(body.pul ?? body.heart_rate ?? body.heartRate ?? 72);
+        if (!Number.isInteger(sys) || sys < 60 || sys > 240 || !Number.isInteger(dia) || dia < 40 || dia > 140 || sys <= dia || !Number.isInteger(pul) || pul < 40 || pul > 200) {
+          return json(request, { success: false, error: 'Chỉ số huyết áp hoặc nhịp tim không hợp lệ.' }, 422);
+        }
+        const status = sys >= 140 || dia >= 90 ? 'critical' : sys >= 130 || dia >= 85 ? 'warning' : 'normal';
+        const receivedAt = nowIso();
+        const measuredAt = body.measured_at && Number.isFinite(Date.parse(body.measured_at)) ? new Date(Date.parse(body.measured_at)).toISOString() : receivedAt;
+        const id = newId('BPM');
+        const noteText = `APP-SYNC-DEMO: ${body.note || 'Đồng bộ trực tiếp qua API Robot Myka (' + (body.robot_id || 'ROBOT-MYKA-001') + ')'}`;
+        await db.prepare('INSERT INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(id, targetElder, sys, dia, pul, status, noteText, measuredAt, receivedAt).run();
+        return json(request, {
+          success: true,
+          message: 'BPM measurement recorded successfully',
+          data: {
+            id, sys, dia, pul, ihb: Boolean(body.ihb),
+            status: status === 'critical' ? 'hypertension_stage_2' : (status === 'warning' ? 'hypertension_stage_1' : 'normal'),
+            status_vi: status === 'critical' ? 'Huyết áp vượt ngưỡng cảnh báo' : (status === 'warning' ? 'Tăng huyết áp độ 1' : 'Huyết áp bình thường (Tối ưu)'),
+            warning: status !== 'normal',
+            advice: status === 'normal' ? 'Huyết áp và nhịp tim ổn định.' : 'Huyết áp hơi cao, Ngoại nhớ nghỉ ngơi và hạn chế ăn mặn.',
+            measured_at: measuredAt,
+            received_at: receivedAt
+          }
+        }, 201);
+      }
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'health-summary' && elderId) {

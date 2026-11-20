@@ -39,7 +39,33 @@
     const [measurementSyncBusy, setMeasurementSyncBusy] = React.useState(false);
     const [measurementSyncMessage, setMeasurementSyncMessage] = React.useState('');
     const [measurementSyncTone, setMeasurementSyncTone] = React.useState('info');
-    const [telegramLinks, setTelegramLinks] = React.useState({ group_chat_url: '' });
+    const defaultTgUrl = window.MYKA_TELEGRAM_GROUP_URL || 'https://t.me/c/4358354552/1';
+    const [telegramLinks, setTelegramLinks] = React.useState({
+      group_chat_url: defaultTgUrl,
+      group_name: 'Chat Group Myka · Hỏi lịch sử trò chuyện của Ngoại',
+      bot_username: '@myka_care_p101_bot'
+    });
+    const [chartFilter, setChartFilter] = React.useState('all');
+    const normalizeReading = row => {
+      if (!row) return null;
+      const sys = Number(row.systolic ?? row.sys ?? 0);
+      const dia = Number(row.diastolic ?? row.dia ?? 0);
+      const hr = Number(row.heart_rate ?? row.heartRate ?? row.pulse ?? row.pul ?? 0);
+      const rawTs = row.measured_at || row.timestamp || new Date().toISOString();
+      const isoTs = typeof rawTs === 'number' ? new Date(rawTs * 1000).toISOString() : String(rawTs).replace(' ', 'T');
+      return {
+        ...row,
+        id: row.id || `bpm-${isoTs}`,
+        systolic: sys,
+        diastolic: dia,
+        heart_rate: hr,
+        heartRate: hr,
+        timestamp: isoTs,
+        received_at: row.received_at || isoTs,
+        status_vi: row.status_vi || (sys >= 140 || dia >= 90 ? 'Cần lưu ý (Vượt ngưỡng)' : 'Huyết áp bình thường (Tối ưu)'),
+        advice: row.advice || row.note || ''
+      };
+    };
     const [apiAvailable, setApiAvailable] = React.useState(false);
     const [healthDataSource, setHealthDataSource] = React.useState('app_demo');
     const [preferences, setPreferences] = React.useState({ dnd_mode: 'off', dnd_until: null, voice_profile: 'female_young_sweet', robot_name: '', bp_demo_schedule_enabled: false, bp_demo_morning_time: '09:00', bp_demo_evening_time: '19:00' });
@@ -88,11 +114,14 @@
         fetch(apiUrl(`/family/subscription/${elderId}`)).then(r => r.ok ? r.json() : Promise.reject()),
       ]).then(([health, plan, notices, payments]) => {
         if (!active) return;
-        setReadings((health.daily_readings || []).slice().reverse());
-        setHealthDataSource(health.data_source || 'app_demo');
-        setSchedules(plan);
-        setMaintenance(notices);
-        setSubscription(payments);
+        const hData = health?.data || health || {};
+        const rawReadings = hData.daily_readings || [];
+        setReadings(rawReadings.map(normalizeReading).filter(Boolean).slice().reverse());
+        setHealthDataSource(hData.data_source || 'robot');
+        const sData = Array.isArray(plan) ? plan : (Array.isArray(plan?.data) ? plan.data : []);
+        setSchedules(sData);
+        setMaintenance(Array.isArray(notices) ? notices : (notices?.data || []));
+        setSubscription(payments?.data || payments || { current_plan: null, payments: [], pricing: null });
         setApiAvailable(true);
       }).catch(() => {
         if (active) setApiAvailable(false);
@@ -100,8 +129,11 @@
       fetch(apiUrl(`/family/telegram-consultation/${elderId}`))
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => {
+          const tg = data?.data || data || {};
           if (active) setTelegramLinks({
-            group_chat_url: data.group_chat_url || '',
+            group_chat_url: tg.group_chat_url || defaultTgUrl,
+            group_name: tg.group_name || 'Chat Group Myka · Hỏi lịch sử trò chuyện của Ngoại',
+            bot_username: tg.bot_username || '@myka_care_p101_bot'
           });
         }).catch(() => {});
       fetch(apiUrl(`/family/agent-status/${elderId}`))
@@ -118,7 +150,7 @@
         .catch(() => { if (active) setSettingsMessage('Chưa tải được cài đặt từ máy chủ.'); });
       fetch(apiUrl(`/family/elder-profile/${elderId}`))
         .then(r => r.ok ? r.json() : Promise.reject())
-        .then(data => { if (active) { setCareProfile(data); setCareProfileMessage('Đã tải hồ sơ người cao tuổi.'); } })
+        .then(data => { const prof = data?.data || data; if (active) { setCareProfile({ ...prof, address: prof.address || prof.room || '', health_notes: prof.health_notes || (Array.isArray(prof.medical_conditions) ? prof.medical_conditions.join(', ') : '') }); setCareProfileMessage('Đã tải hồ sơ người cao tuổi.'); } })
         .catch(() => { if (active) { setCareProfile(null); setCareProfileMessage('Chưa tải được hồ sơ. Vui lòng kiểm tra kết nối.'); } });
       return () => { active = false; };
     }, [days]);
@@ -131,10 +163,11 @@
         fetch(apiUrl(`/family/health-summary/${elderId}?days=${days}`)).then(response => response.ok ? response.json() : Promise.reject()),
       ]).then(([agent, device, health]) => {
         if (!active) return;
-        setAgentStatus(agent);
-        setConnectivity(device);
-        setReadings((health.daily_readings || []).slice().reverse());
-        setHealthDataSource(health.data_source || 'app_demo');
+        setAgentStatus(agent?.data || agent);
+        setConnectivity(device?.data || device);
+        const hData = health?.data || health || {};
+        setReadings((hData.daily_readings || []).map(normalizeReading).filter(Boolean).slice().reverse());
+        setHealthDataSource(hData.data_source || 'robot');
         setApiAvailable(true);
         setStatusUpdatedAt(new Date());
       }).catch(() => {
@@ -153,7 +186,7 @@
       setConversationError('');
       fetch(apiUrl(`/family/conversation-history/${elderId}?date=${encodeURIComponent(conversationDate)}`))
         .then(r => r.ok ? r.json() : Promise.reject())
-        .then(data => { if (active) setConversationData(data); })
+        .then(data => { const cData = data?.data || data || {}; if (active) setConversationData({ ...cData, messages: cData.messages || [] }); })
         .catch(() => { if (active) setConversationError('Chưa tải được nhật ký từ máy chủ.'); })
         .finally(() => { if (active) setConversationLoading(false); });
       return () => { active = false; };
@@ -228,7 +261,8 @@
       fetch(url, {
         method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(row),
       }).then(response => response.ok ? response.json() : Promise.reject())
-        .then(saved => {
+        .then(savedRes => {
+          const saved = savedRes?.data || savedRes;
           persistScheduleLocally(saved);
           setSchedules(current => [...current.filter(item => item.id !== saved.id), saved].sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at))));
           setShowScheduleEditor(false); setEditingSchedule(null);
@@ -455,9 +489,22 @@
               <button type="button" onClick={() => focusSection('health')} className="rounded-2xl bg-[#fff4e9] p-3 text-left transition hover:bg-[#ffecd8]"><span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500"><span className="material-symbols-rounded text-base text-orange-700" aria-hidden="true">ecg_heart</span> Nhịp tim gần nhất</span><span className="mt-1 block text-lg font-extrabold text-slate-800">{latest ? (latest.heart_rate || latest.heartRate || '—') : '—'}<span className="ml-1 text-xs font-medium text-slate-500">lần/phút</span></span><span className="text-xs text-slate-500">{latest ? dateLabel(latest.timestamp) : 'Chưa có bản ghi gần đây'}</span></button>
             </div>
           </section>
-          <section className="bg-[#fffefa] border border-[#ebeef1] rounded-3xl p-4 mb-6 shadow-sm sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <a href={telegramLinks.group_chat_url || 'tg://new/group'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700"><span className="material-symbols-rounded" aria-hidden="true">send</span>Kết nối Telegram ↗</a>
+          <section className="bg-gradient-to-r from-sky-50 via-[#fffefa] to-blue-50 border border-sky-200 rounded-3xl p-4 mb-6 shadow-sm sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-sky-600 text-white shadow-sm">
+                  <span className="material-symbols-rounded" aria-hidden="true">forum</span>
+                </span>
+                <div>
+                  <span className="inline-block rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold text-sky-800">KÊNH TELEGRAM GIA ĐÌNH & ROBOT MYKA</span>
+                  <h3 className="mt-1 text-base font-extrabold text-slate-900">Chat Group Telegram · Hỏi Myka việc Ngoại đã trò chuyện</h3>
+                  <p className="mt-0.5 text-xs sm:text-sm text-slate-600">Người thân vào Chat Group để hỏi trực tiếp Myka ({telegramLinks.bot_username || '@myka_care_p101_bot'}) xem hôm nay Ngoại đã tâm sự những gì với robot và trao đổi chăm sóc.</p>
+                </div>
+              </div>
+              <a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-3.5 text-sm font-bold text-white shadow-md shadow-sky-200 transition hover:bg-sky-700">
+                <span className="material-symbols-rounded" aria-hidden="true">send</span>
+                Chat Group Telegram ↗
+              </a>
             </div>
           </section>
           <nav aria-label="Các chức năng Myka Care" className="hidden md:grid md:grid-cols-5 xl:grid-cols-9 gap-3 mb-3">
@@ -507,7 +554,82 @@
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
               {[["Lần đo gần nhất", latest ? `${latest.systolic}/${latest.diastolic}` : '—', 'mmHg'], ['Tâm thu trung bình', avg('systolic'), 'mmHg'], ['Tâm trương trung bình', avg('diastolic'), 'mmHg'], ['Nhịp tim trung bình', avgHeartRate, 'lần/phút']].map(([label, value, unit]) => <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm"><p className="text-sm text-slate-500">{label}</p><p className="text-2xl font-bold mt-2 text-slate-800">{value} <span className="text-sm font-normal text-slate-500">{unit}</span></p></div>)}
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5 shadow-sm"><h3 className="font-semibold mb-1">Xu hướng chỉ số</h3><p className="mb-3 text-xs text-slate-500">Thời gian đọc từ trái sang phải · ngày cũ đến ngày mới</p>{chartData.length ? <><svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label={`Biểu đồ xu hướng huyết áp và nhịp tim ${days} ngày, sắp xếp từ ngày cũ đến ngày mới`} className="w-full h-64"><title>{`Xu hướng huyết áp và nhịp tim ${days} ngày`}</title>{[0, 1, 2, 3].map(index => { const value = chartMin + (chartMax - chartMin) * index / 3; const y = chartY(value); return <g key={index}><line x1={chartLeft} x2={chartWidth - chartRight} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="4 4" /><text x={chartLeft - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#64748b">{Math.round(value)}</text></g>; })}{chartLines.map(line => <g key={line.key}><polyline fill="none" stroke={line.color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" points={chartData.map((point, index) => `${chartX(index)},${chartY(Number(point[line.key]))}`).join(' ')} />{chartData.map((point, index) => <circle key={`${line.key}-${index}`} cx={chartX(index)} cy={chartY(Number(point[line.key]))} r="3.5" fill={line.color}><title>{`${point.time}: ${line.key} ${point[line.key]}`}</title></circle>)}</g>)}{chartData.map((point, index) => <text key={`date-${index}`} x={chartX(index)} y={chartHeight - 10} textAnchor="middle" fontSize="10" fill="#64748b">{point.time}</text>)}</svg><div className="flex flex-wrap gap-4 justify-center text-xs text-slate-600">{chartLines.map(line => <span key={line.key} className="inline-flex items-center gap-1.5"><i className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: line.color }} />{line.key}</span>)}</div></> : <p className="text-sm text-slate-500 py-8 text-center">Chưa có dữ liệu để hiển thị biểu đồ.</p>}</div>
+            <div className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-6 mb-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="font-bold text-base sm:text-lg text-slate-900">Biểu đồ xu hướng Huyết áp & Nhịp tim ({days} ngày)</h3>
+                  <p className="text-xs text-slate-500">Thiết kế thích ứng (Responsive) · Vùng tô màu thể hiện khoảng chênh lệch Tâm thu – Tâm trương</p>
+                </div>
+                <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-semibold">
+                  {[['all', 'Tất cả'], ['bp', 'Huyết áp'], ['hr', 'Nhịp tim']].map(([key, label]) => (
+                    <button key={key} type="button" onClick={() => setChartFilter(key)} className={`rounded-lg px-3 py-1.5 transition ${chartFilter === key ? 'bg-white text-blue-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>{label}</button>
+                  ))}
+                </div>
+              </div>
+              {chartData.length ? (() => {
+                const activeLines = chartLines.filter(l => chartFilter === 'all' ? true : chartFilter === 'bp' ? l.key !== 'Nhịp tim' : l.key === 'Nhịp tim');
+                const areaPoints = chartFilter !== 'hr' && chartData.length > 1
+                  ? [
+                      ...chartData.map((pt, idx) => `${chartX(idx)},${chartY(Number(pt['Tâm thu']))}`),
+                      ...chartData.slice().reverse().map((pt, rIdx) => {
+                        const idx = chartData.length - 1 - rIdx;
+                        return `${chartX(idx)},${chartY(Number(pt['Tâm trương']))}`;
+                      })
+                    ].join(' ')
+                  : '';
+                const labelStep = chartData.length > 16 ? 3 : chartData.length > 9 ? 2 : 1;
+                return <>
+                  <div className="w-full overflow-hidden">
+                    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label={`Biểu đồ xu hướng huyết áp và nhịp tim ${days} ngày`} className="w-full h-56 sm:h-72">
+                      <defs>
+                        <linearGradient id="bpRangeGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.18" />
+                          <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.06" />
+                        </linearGradient>
+                      </defs>
+                      {[0, 1, 2, 3, 4].map(index => {
+                        const value = chartMin + (chartMax - chartMin) * index / 4;
+                        const y = chartY(value);
+                        return <g key={index}>
+                          <line x1={chartLeft} x2={chartWidth - chartRight} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="4 4" />
+                          <text x={chartLeft - 8} y={y + 4} textAnchor="end" fontSize="11" fontWeight="600" fill="#64748b">{Math.round(value)}</text>
+                        </g>;
+                      })}
+                      {chartFilter !== 'hr' && chartMax >= 140 && chartMin <= 140 && (
+                        <g>
+                          <line x1={chartLeft} x2={chartWidth - chartRight} y1={chartY(140)} y2={chartY(140)} stroke="#f43f5e" strokeWidth="1.5" strokeDasharray="6 4" />
+                          <text x={chartWidth - chartRight - 4} y={chartY(140) - 5} textAnchor="end" fontSize="10" fontWeight="700" fill="#e11d48">Ngưỡng lưu ý 140 mmHg</text>
+                        </g>
+                      )}
+                      {areaPoints && <polygon points={areaPoints} fill="url(#bpRangeGrad)" />}
+                      {activeLines.map(line => (
+                        <g key={line.key}>
+                          <polyline fill="none" stroke={line.color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" points={chartData.map((point, index) => `${chartX(index)},${chartY(Number(point[line.key]))}`).join(' ')} />
+                          {chartData.map((point, index) => (
+                            <g key={`${line.key}-${index}`}>
+                              <circle cx={chartX(index)} cy={chartY(Number(point[line.key]))} r="4.5" fill="#ffffff" stroke={line.color} strokeWidth="2.5">
+                                <title>{`${point.time}: ${line.key} ${point[line.key]}`}</title>
+                              </circle>
+                            </g>
+                          ))}
+                        </g>
+                      ))}
+                      {chartData.map((point, index) => (index % labelStep === 0 || index === chartData.length - 1) && (
+                        <text key={`date-${index}`} x={chartX(index)} y={chartHeight - 8} textAnchor="middle" fontSize="10" fontWeight="600" fill="#475569">{point.time}</text>
+                      ))}
+                    </svg>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-3 justify-center text-xs font-semibold text-slate-700">
+                    {activeLines.map(line => (
+                      <span key={line.key} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1">
+                        <i className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: line.color }} />
+                        {line.key} ({line.key === 'Nhịp tim' ? 'bpm' : 'mmHg'})
+                      </span>
+                    ))}
+                  </div>
+                </>;
+              })() : <p className="text-sm text-slate-500 py-8 text-center">Chưa có dữ liệu để hiển thị biểu đồ.</p>}
+            </div>
             <article className={`rounded-xl border p-4 mb-5 shadow-sm ${trendSummary.tone === 'rose' ? 'bg-rose-50 border-rose-200' : trendSummary.tone === 'amber' ? 'bg-amber-50 border-amber-200' : trendSummary.tone === 'emerald' ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}><h3 className="font-semibold">Tóm tắt xu hướng {days} ngày</h3><p className="font-semibold mt-2">{trendSummary.title}</p><p className="text-sm text-slate-700 mt-1">{trendSummary.detail}</p><p className="text-xs text-slate-500 mt-3">Tóm tắt theo ngưỡng theo dõi đã cài đặt; không phải kết luận sức khỏe hay tư vấn y tế.</p></article>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"><h3 className="font-semibold p-4">Lịch sử đo huyết áp</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Giờ nhận số đo</th><th className="text-left p-3">Huyết áp</th><th className="text-left p-3">Nhịp tim</th><th className="text-left p-3">Nguồn ghi nhận</th><th className="text-left p-3">Ghi chú</th></tr></thead><tbody>{visibleReadings.slice().reverse().map(row => {
               return <tr key={row.id} className="border-t border-slate-100"><td className="p-3 whitespace-nowrap">{receiptLabel(row.received_at)}</td><td className="p-3 font-semibold whitespace-nowrap">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3 whitespace-nowrap">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 whitespace-nowrap"><span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">Robot Myka</span></td><td className="p-3 text-slate-500">{row.id?.startsWith('BP-SCHEDULE-') ? 'Robot mô phỏng · gửi theo lịch hằng ngày' : row.note?.startsWith('APP-SYNC-DEMO:') ? 'Đã cập nhật từ mục Trạng thái.' : row.note || '—'}</td></tr>;
@@ -560,7 +682,7 @@
             </section>;
           })()}
           {tab === 'conversations' && <section id="family-section-conversations" className="scroll-mt-24">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-5"><div><p className="text-sm text-blue-700 font-semibold">THEO DÕI GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Nhật ký trò chuyện với Myka</h2><p className="text-sm text-slate-500 mt-1">Hồ sơ Bà Hoa · Cách xưng hô trong hội thoại: Ngoại – con. Nhật ký chỉ đọc.</p></div><span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${conversationData.source === 'telegram' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-600'}`}>{conversationData.source === 'telegram' ? 'Telegram' : 'Nhật ký Myka'}</span></div>
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-5"><div><p className="text-sm text-blue-700 font-semibold">THEO DÕI GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Nhật ký trò chuyện với Myka</h2><p className="text-sm text-slate-500 mt-1">Hồ sơ Bà Hoa · Cách xưng hô trong hội thoại: Ngoại – con. Nhật ký chỉ đọc hoặc hỏi lại Myka qua Chat Group Telegram.</p></div><div className="flex flex-wrap items-center gap-2"><a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-700"><span className="material-symbols-rounded text-base" aria-hidden="true">send</span>Chat Group hỏi Myka ↗</a><span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${conversationData.source === 'telegram' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-600'}`}>{conversationData.source === 'telegram' ? 'Telegram' : 'Nhật ký Myka'}</span></div></div>
             <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-3"><div><label htmlFor="conversation-date" className="block text-sm font-semibold">Chọn ngày</label><p className="text-xs text-slate-500 mt-1">Mặc định là hôm nay</p></div><input id="conversation-date" type="date" value={conversationDate} onChange={event => setConversationDate(event.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
             {conversationData.review_needed_count > 0 && <article className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4"><p className="font-semibold text-amber-900">Có {conversationData.review_needed_count} lời nhắn được đánh dấu để gia đình xem lại</p><p className="text-sm text-amber-800 mt-1">Nhãn này giúp gia đình lưu ý nội dung cần xem lại; đây không phải đánh giá hay chẩn đoán sức khỏe.</p></article>}
             <div className="bg-white border border-slate-200 rounded-xl p-4 md:p-5"><div className="flex items-center justify-between gap-3 mb-4"><h3 className="font-semibold">Nội dung trong ngày</h3><span className="text-xs text-slate-500">{conversationData.messages?.length || 0} tin nhắn</span></div>
