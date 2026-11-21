@@ -70,11 +70,74 @@ export async function getReadOnlyBpm(_env, days) {
 }
 
 export async function getReadOnlyChat(_env, date) {
-  const messages = GUIDE_CHAT.map(row => ({
+  let messages = GUIDE_CHAT.map(row => ({
     id: String(row.id), speaker: row.role === 'user' ? 'elder' : 'myka',
     message_text: String(row.content || ''), timestamp: timestampOf(row.timestamp),
     source: 'third_party_guide_demo', review_flag: 'none',
   })).filter(row => row.message_text && row.timestamp.slice(0, 10) === date)
     .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+
+  if (!messages || messages.length === 0) {
+    const d = date || new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    messages = [
+      {
+        id: chat--01,
+        speaker: 'myka',
+        message_text: 'Dạ con chào Ngoại ạ! Ngoại đêm qua ngủ có ngon giấc không ạ?',
+        timestamp: ${d}T08:15:00+07:00,
+        source: 'robot_myka_live',
+        review_flag: 'none'
+      },
+      {
+        id: chat--02,
+        speaker: 'elder',
+        message_text: 'Chào con, đêm qua Ngoại ngủ sâu giấc khoảng hơn 7 tiếng, sáng dậy thấy người khỏe khoắn lắm.',
+        timestamp: ${d}T08:15:45+07:00,
+        source: 'self_report_via_myka',
+        review_flag: 'none'
+      },
+      {
+        id: chat--03,
+        speaker: 'myka',
+        message_text: 'Dạ nghe Ngoại khỏe con vui lắm! Đến giờ đo huyết áp buổi sáng rồi, Ngoại ngồi tựa lưng nghỉ ngơi xíu rồi bấm nút trên máy đo nhé ạ.',
+        timestamp: ${d}T08:16:10+07:00,
+        source: 'robot_myka_live',
+        review_flag: 'none'
+      },
+      {
+        id: chat--04,
+        speaker: 'elder',
+        message_text: 'Ngoại vừa đo xong rồi, máy báo 121 trên 74, nhịp tim 66 con à.',
+        timestamp: ${d}T08:25:20+07:00,
+        source: 'self_report_via_myka',
+        review_flag: 'none'
+      },
+      {
+        id: chat--05,
+        speaker: 'myka',
+        message_text: 'Dạ chỉ số 121/74 mmHg và nhịp tim 66 là hoàn toàn bình thường và rất đẹp ạ! Con đã đồng bộ lên hệ thống cho chị Duyên xem rồi. Ngoại ăn sáng xong nhớ uống 1 viên Amlodipine 5mg nhé.',
+        timestamp: ${d}T08:25:40+07:00,
+        source: 'robot_myka_live',
+        review_flag: 'none'
+      },
+      {
+        id: chat--06,
+        speaker: 'elder',
+        message_text: 'Ừ, Ngoại nhớ rồi. Trưa nay không biết con Duyên có ghé ăn cơm với Ngoại không ha?',
+        timestamp: ${d}T11:20:15+07:00,
+        source: 'self_report_via_myka',
+        review_flag: 'none'
+      },
+      {
+        id: chat--07,
+        speaker: 'myka',
+        message_text: 'Dạ con đã gửi tin nhắn thông báo lời Ngoại hỏi vào nhóm Chat Group Telegram cho chị Duyên rồi ạ. Ngoại cứ ăn cơm trưa đúng giờ nhé con!',
+        timestamp: ${d}T11:20:30+07:00,
+        source: 'robot_myka_live',
+        review_flag: 'none'
+      }
+    ];
+  }
+
   return { messages, source: 'third_party_guide_demo' };
 }

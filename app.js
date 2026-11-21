@@ -27,48 +27,68 @@
 
   function App() {
     const [route, navigate] = useHashRoute();
+    
+    // Luôn yêu cầu đăng nhập khi mở phiên làm việc mới, không tự động lưu đăng nhập vĩnh viễn
+    // để bảo mật và thuận tiện cho việc trình diễn demo cho thầy
     const [currentUser, setCurrentUser] = React.useState(() => {
-      const storedUser = RTS.LS.get('rts_current_user') || null;
-      // The first-time setup account is intentionally not remembered between page visits.
-      if (storedUser?.demoSetupMode) {
-        RTS.LS.set('rts_current_user', null);
+      try {
+        const stored = sessionStorage.getItem('rts_current_user');
+        return stored ? JSON.parse(stored) : null;
+      } catch {
         return null;
       }
-      return storedUser;
     });
 
-    // ---- Auth guard (NO hooks inside conditionals) ----
+    // Clear old localStorage user if exists to avoid unwanted auto-login
+    React.useEffect(() => {
+      localStorage.removeItem('rts_current_user');
+    }, []);
+
+    // ---- Auth guard ----
     React.useEffect(() => {
       if (currentUser && currentUser.role !== 'family') {
-        RTS.LS.set('rts_current_user', null);
+        sessionStorage.removeItem('rts_current_user');
+        localStorage.removeItem('rts_current_user');
         setCurrentUser(null);
         navigate('login');
         return;
       }
       if (!currentUser && PROTECTED.includes(route)) {
-        // A public deep link to the family area should start at the welcome page.
-        // From there, the user chooses to continue to login before entering the app.
-        navigate('landing');
+        navigate('login');
+        return;
       }
       if (currentUser && route === 'login') {
         navigate('family');
+        return;
       }
-      if (!APP_ROUTES.includes(route)) navigate(currentUser ? 'family' : 'login');
+      if (!APP_ROUTES.includes(route)) {
+        navigate(currentUser ? 'family' : 'login');
+      }
     }, [route, currentUser]);
 
     function login(user) {
       if (!user || user.role !== 'family') return;
-      // Each sign-in to the first-time setup demo starts a fresh walkthrough on this browser.
-      if (user.demoSetupMode) RTS.LS.set(`myka_setup_complete_${user.id}`, null);
-      RTS.LS.set(`myka_ever_logged_in_${user.id}`, true);
+      // Reset cờ cài đặt khi chọn tài khoản demo cài đặt từ đầu
+      if (user.demoSetupMode) {
+        localStorage.removeItem('myka_setup_complete_' + user.id);
+        localStorage.removeItem('myka_device_paired_' + user.id);
+        localStorage.removeItem('myka_setup_complete_family');
+        sessionStorage.removeItem('myka_setup_complete_' + user.id);
+      }
       setCurrentUser(user);
-      RTS.LS.set('rts_current_user', user.demoSetupMode ? null : user);
+      sessionStorage.setItem('rts_current_user', JSON.stringify(user));
       navigate('family');
     }
 
     function logout() {
       setCurrentUser(null);
-      RTS.LS.set('rts_current_user', null);
+      sessionStorage.removeItem('rts_current_user');
+      localStorage.removeItem('rts_current_user');
+      // Reset toàn bộ cờ cài đặt để lần demo tiếp theo có thể thử lại quy trình kết nối từ đầu
+      localStorage.removeItem('myka_setup_complete_U-DEMO-SETUP');
+      localStorage.removeItem('myka_device_paired_U-DEMO-SETUP');
+      localStorage.removeItem('myka_setup_complete_family');
+      sessionStorage.removeItem('myka_setup_complete_U-DEMO-SETUP');
       navigate('login');
     }
 
@@ -86,9 +106,8 @@
       // Wrong role trying to access another role's page
       if (currentUser && PROTECTED.includes(route)) {
         const allowedRoute = ROLE_ROUTES[currentUser.role];
-        // Only block if trying to access a DIFFERENT role's specific page
         if (allowedRoute !== route) {
-          navigate(allowedRoute || 'landing');
+          navigate(allowedRoute || 'login');
           return React.createElement('div', {
             className: 'flex items-center justify-center min-h-screen bg-slate-100'
           }, React.createElement('div', { className: 'text-center text-slate-400' },
@@ -118,9 +137,9 @@
             React.createElement('h1', { className: 'text-4xl font-bold text-slate-700 mb-2' }, '404'),
             React.createElement('p', { className: 'text-slate-500 mb-6' }, 'Trang không tìm thấy'),
             React.createElement('button', {
-              onClick: () => navigate('landing'),
+              onClick: () => navigate('login'),
               className: 'px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700'
-            }, '← Về trang chủ')
+            }, '← Về đăng nhập')
           ));
       }
     }

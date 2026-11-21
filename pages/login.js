@@ -25,6 +25,22 @@
       setError('');
     }
 
+    function quickLogin(acc) {
+      fillDemo(acc);
+      setError('');
+      setLoading(true);
+      setTimeout(() => {
+        const users = RTS.getUsers();
+        const user = acc.setupMode
+          ? { id: 'U-DEMO-SETUP', role: 'family', email: acc.email, name: 'Chị Duyên', elderId: 'E001', demoSetupMode: true }
+          : users.find(u => u.role === 'family' && u.email === acc.email);
+        if (user) {
+          onLogin(user);
+        }
+        setLoading(false);
+      }, 400);
+    }
+
     function handleLogin(e) {
       e.preventDefault();
       setError('');
@@ -93,7 +109,7 @@
                 <button type="submit" disabled={loading} className="myka-auth-submit"><span>{loading ? 'Đang đăng nhập…' : 'Đăng nhập'}</span><span className={`material-symbols-rounded ${loading ? 'myka-login-loading' : ''}`} aria-hidden="true">{loading ? 'progress_activity' : 'arrow_forward'}</span></button>
               </form>
               <div className="myka-login-divider"><span>Hoặc khám phá Myka</span></div>
-              <div className="myka-login-demos" aria-label="Truy cập nhanh">{DEMO_ACCOUNTS.map((acc,index) => <button key={acc.email} type="button" onClick={() => fillDemo(acc)} aria-pressed={email === acc.email} className={`myka-demo-option ${email === acc.email ? 'is-selected' : ''}`}><span className="material-symbols-rounded myka-demo-icon" aria-hidden="true">{index === 0 ? 'home_health' : 'smart_toy'}</span><span><strong>{acc.roleLabel}</strong><small>{index === 0 ? 'Xem không gian chăm sóc' : 'Thử kết nối thiết bị'}</small></span><span className="material-symbols-rounded myka-demo-check" aria-hidden="true">{email === acc.email ? 'check_circle' : 'chevron_right'}</span></button>)}</div>
+              <div className="myka-login-demos" aria-label="Truy cập nhanh">{DEMO_ACCOUNTS.map((acc,index) => <button key={acc.email} type="button" onClick={() => quickLogin(acc)} aria-pressed={email === acc.email} className={`myka-demo-option ${email === acc.email ? 'is-selected' : ''}`}><span className="material-symbols-rounded myka-demo-icon" aria-hidden="true">{index === 0 ? 'home_health' : 'smart_toy'}</span><span><strong>{acc.roleLabel}</strong><small>{index === 0 ? 'Xem không gian chăm sóc' : 'Thử kết nối thiết bị'}</small></span><span className="material-symbols-rounded myka-demo-check" aria-hidden="true">{email === acc.email ? 'check_circle' : 'chevron_right'}</span></button>)}</div>
               <p className="myka-login-demo-hint">Chọn một trải nghiệm để điền sẵn thông tin đăng nhập.</p>
             </React.Fragment>}
             </div>
