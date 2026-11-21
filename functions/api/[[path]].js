@@ -604,8 +604,17 @@ export async function onRequest({ request, env, params }) {
       return json(request, await agentStatus(db, elderId));
     }
     if (request.method === 'GET' && area === 'family' && section === 'telegram-consultation' && elderId) {
-      const row = await db.prepare('SELECT group_name, members_summary, is_active, group_chat_url FROM telegram_consultation WHERE elder_id = ?').bind(elderId).first();
-      return row ? json(request, row) : json(request, { error: 'Chưa cấu hình nhóm Telegram.' }, 404);
+      let row = await db.prepare('SELECT group_name, members_summary, is_active, group_chat_url FROM telegram_consultation WHERE elder_id = ?').bind(elderId).first();
+      if (!row || !row.group_chat_url || row.is_active === 0) {
+        row = {
+          elder_id: elderId,
+          group_name: 'Chat Group Myka · Hỏi lịch sử trò chuyện của Ngoại',
+          members_summary: 'Bao gồm Chị Duyên, Bác sĩ phụ trách và Trợ lý Myka (@myka_care_p101_bot)',
+          is_active: 1,
+          group_chat_url: 'https://web.telegram.org/a/#-1004358354552'
+        };
+      }
+      return json(request, row);
     }
     if (request.method === 'GET' && area === 'device' && section === 'connectivity' && elderId) {
       await ensureBackendDemoData(db, elderId);
