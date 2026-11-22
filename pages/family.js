@@ -663,41 +663,18 @@
             </section>;
           })()}
           {tab === 'conversations' && <section id="family-section-conversations" className="scroll-mt-24">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-5"><div><p className="text-sm text-blue-700 font-semibold">THEO DÕI GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Nhật ký trò chuyện với Myka</h2><p className="text-sm text-slate-500 mt-1">Hồ sơ Bà Hoa · Cách xưng hô trong hội thoại: Ngoại – con. Nhật ký chỉ đọc hoặc hỏi lại Myka qua Chat Group Telegram.</p></div><div className="flex flex-wrap items-center gap-2"><a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-700"><span className="material-symbols-rounded text-base" aria-hidden="true">send</span>Chat Group hỏi Myka ↗</a><span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${conversationData.source === 'telegram' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-600'}`}>{conversationData.source === 'telegram' ? 'Telegram' : 'Nhật ký Myka'}</span></div></div>
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-5"><div><p className="text-sm text-blue-700 font-semibold">THEO DÕI GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Nhật ký trò chuyện với Myka</h2><p className="text-sm text-slate-500 mt-1">Hồ sơ Bà Hoa · Cách xưng hô trong hội thoại: Ngoại – con. Nhật ký chỉ đọc hoặc hỏi lại Myka qua Chat Group Telegram.</p></div><div className="flex flex-wrap items-center gap-2"><a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-700"><span className="material-symbols-rounded text-base" aria-hidden="true">send</span>Chat Group hỏi Myka ↗</a><span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${conversationData.source === 'telegram' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-600'}`}>{conversationData.source === 'telegram' ? 'Telegram' : conversationData.source === 'guide_demo' ? 'Nhật ký mẫu' : 'Nhật ký Myka'}</span></div></div>
             <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-3"><div><label htmlFor="conversation-date" className="block text-sm font-semibold">Chọn ngày</label><p className="text-xs text-slate-500 mt-1">Mặc định là hôm nay</p></div><input id="conversation-date" type="date" value={conversationDate} onChange={event => setConversationDate(event.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
             {conversationData.review_needed_count > 0 && <article className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4"><p className="font-semibold text-amber-900">Có {conversationData.review_needed_count} lời nhắn được đánh dấu để gia đình xem lại</p><p className="text-sm text-amber-800 mt-1">Nhãn này giúp gia đình lưu ý nội dung cần xem lại; đây không phải đánh giá hay chẩn đoán sức khỏe.</p></article>}
-            <article className="bg-sky-50 border border-sky-200 rounded-xl p-4 mb-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-sky-900 flex items-center gap-1.5">
-                    <span className="material-symbols-rounded text-sky-600 text-lg">campaign</span>
-                    Bản tin hội thoại mới nhất trong ngày của Ngoại với Robot Myka
-                  </p>
-                  <p className="text-sm text-sky-800 mt-1">
-                    Ngoại đã có tương tác sinh hoạt: xác nhận ngủ ngon 7 tiếng, đo huyết áp sáng (121/74 mmHg), nhắc uống thuốc Amlodipine 5mg và tâm sự bữa trưa ngon miệng.
-                  </p>
-                </div>
-                <a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-sky-700 whitespace-nowrap">
-                  <span className="material-symbols-rounded text-sm">send</span> Hỏi Myka qua Telegram ↗
-                </a>
-              </div>
-            </article>
             <div className="bg-white border border-slate-200 rounded-xl p-4 md:p-5">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <h3 className="font-semibold">Nội dung trong ngày</h3>
-                <span className="text-xs text-slate-500">{(conversationData.messages && conversationData.messages.length > 0 ? conversationData.messages.length : 7)} tin nhắn</span>
+                <span className="text-xs text-slate-500">{conversationData.messages.length} tin nhắn</span>
               </div>
               {conversationLoading ? <p className="py-10 text-center text-sm text-slate-500">Đang tải nhật ký…</p>
                 : conversationError ? <p role="status" className="py-10 text-center text-sm text-rose-700">{conversationError}</p>
-                  : <ConversationHistory messages={(conversationData.messages && conversationData.messages.length > 0) ? conversationData.messages : [
-                      { id: 'fb-01', speaker: 'myka', message_text: 'Dạ con chào Ngoại ạ! Ngoại đêm qua ngủ có ngon giấc không ạ?', timestamp: `${conversationDate}T08:15:00+07:00` },
-                      { id: 'fb-02', speaker: 'elder', message_text: 'Chào con, đêm qua Ngoại ngủ sâu giấc khoảng hơn 7 tiếng, sáng dậy thấy người khỏe khoắn lắm.', timestamp: `${conversationDate}T08:15:45+07:00` },
-                      { id: 'fb-03', speaker: 'myka', message_text: 'Dạ nghe Ngoại khỏe con vui lắm! Đến giờ đo huyết áp buổi sáng rồi, Ngoại ngồi tựa lưng nghỉ ngơi xíu rồi bấm nút trên máy đo nhé ạ.', timestamp: `${conversationDate}T08:16:10+07:00` },
-                      { id: 'fb-04', speaker: 'elder', message_text: 'Ngoại vừa đo xong rồi, máy báo 121 trên 74, nhịp tim 66 con à.', timestamp: `${conversationDate}T08:25:20+07:00` },
-                      { id: 'fb-05', speaker: 'myka', message_text: 'Dạ chỉ số 121/74 mmHg và nhịp tim 66 là hoàn toàn bình thường và rất đẹp ạ! Con đã đồng bộ lên hệ thống cho chị Duyên xem rồi. Ngoại ăn sáng xong nhớ uống 1 viên Amlodipine 5mg nhé.', timestamp: `${conversationDate}T08:25:40+07:00` },
-                      { id: 'fb-06', speaker: 'elder', message_text: 'Ừ, Ngoại nhớ rồi. Trưa nay không biết con Duyên có ghé ăn cơm với Ngoại không ha?', timestamp: `${conversationDate}T11:20:15+07:00` },
-                      { id: 'fb-07', speaker: 'myka', message_text: 'Dạ con đã gửi tin nhắn thông báo lời Ngoại hỏi vào nhóm Chat Group Telegram cho chị Duyên rồi ạ. Ngoại cứ ăn cơm trưa đúng giờ nhé con!', timestamp: `${conversationDate}T11:20:30+07:00` }
-                    ]} loading={false} robotName={preferences.robot_name} />}
+                  : conversationData.messages.length ? <ConversationHistory messages={conversationData.messages} />
+                  : <p className="py-10 text-center text-sm text-slate-500">Chưa có hội thoại cho ngày này. Bạn có thể chọn ngày khác hoặc hỏi Myka qua Telegram.</p>}
             </div>
             <p className="text-xs text-slate-500 mt-3">Chọn ngày để xem lại các trao đổi đã ghi nhận.</p>
           </section>}
