@@ -50,6 +50,27 @@
     </svg>;
   }
 
+  function SleepHighlight({ summary, days }) {
+    const missing = days - summary.coverage;
+    const spreadMinutes = Math.round((summary.spread ?? 0) * 60);
+    const longest = summary.points.reduce((max, point) =>
+      !max || point.value > max.value ? point : max, null);
+    const enoughToCompare = summary.coverage >= 2;
+    const evenDuration = enoughToCompare && spreadMinutes <= 60;
+    const observation = !enoughToCompare
+      ? 'Chưa đủ ghi nhận để xem thời lượng ngủ có đều giữa các ngày.'
+      : evenDuration
+        ? `Trong ${missing ? 'các ngày đã ghi' : `${days} ngày qua`}, thời lượng ngủ của Ngoại khá đều. Ngày ngủ nhiều nhất và ít nhất chênh ${spreadMinutes} phút.`
+        : `Ngày ${dateLabel(longest.day)} Ngoại ngủ ${format(longest.value)} giờ, nhiều nhất trong các ngày đã ghi. Ngày ngủ nhiều nhất và ít nhất chênh ${spreadMinutes} phút.`;
+    return <aside aria-label="Điểm đáng chú ý về giấc ngủ" className="mt-3 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-slate-800">
+      <p className="font-bold text-teal-900">Điểm đáng chú ý về giấc ngủ</p>
+      <p className="mt-1">{observation}</p>
+      {missing > 0 && <p className="mt-1">Còn {missing} ngày chưa ghi thời lượng ngủ. Nếu biết, bạn có thể bổ sung để nhìn rõ xu hướng hơn.</p>}
+      {evenDuration && missing === 0 && <p className="mt-1">Bạn có thể động viên Ngoại duy trì nếp ngủ hiện tại nếu Ngoại thấy thoải mái.</p>}
+      {enoughToCompare && !evenDuration && <p className="mt-1">Bạn có thể hỏi Ngoại hôm đó có gì khác thường và khi thức dậy cảm thấy thế nào.</p>}
+    </aside>;
+  }
+
   window.CareJournal = function CareJournal({ elderId, days }) {
     const storageKey = `myka_care_journal_v1:${elderId}`;
     function read() {
@@ -219,6 +240,7 @@
             </div>)}
           </dl>}
           <Trend summary={summary} label={metrics[metric].label} days={days} unit={displayUnit} bar={metric === 'activity'} />
+          {metric === 'sleep' && <SleepHighlight summary={summary} days={days} />}
           {metric === 'activity' ? <div className="space-y-1 text-sm text-slate-700">
             <p>Số 0 là ngày đã ghi không vận động. Ngày không có cột hoặc số 0 là ngày chưa ghi.</p>
             {!!inactiveDays.length && <p>Bạn có thể hỏi thăm Ngoại về {inactiveDays.length === 1 ? `ngày ${dateLabel(inactiveDays[0].day)}` : 'những ngày đã ghi không vận động'} để hiểu bối cảnh.</p>}
@@ -257,6 +279,7 @@
           <article className="rounded-xl bg-white p-3">
             <h4 className="font-semibold">Giấc ngủ theo ngày thức dậy</h4>
             <Trend summary={sleepSummary} label="giấc ngủ" days={days} unit="giờ" />
+            {metric !== 'sleep' && <SleepHighlight summary={sleepSummary} days={days} />}
           </article>
           <article className="rounded-xl bg-white p-3">
             <h4 className="font-semibold">Vận động theo ngày</h4>
