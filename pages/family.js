@@ -61,7 +61,7 @@
         heart_rate: hr,
         heartRate: hr,
         timestamp: isoTs,
-        received_at: row.received_at || isoTs,
+        received_at: row.received_at || null,
         status_vi: row.status_vi || (sys >= 140 || dia >= 90 ? 'Cần lưu ý (Vượt ngưỡng)' : 'Huyết áp bình thường (Tối ưu)'),
         advice: row.advice || row.note || ''
       };
@@ -573,7 +573,11 @@
             </div>
             <CareJournal key={elderId} elderId={elderId} days={days} />
             <div className="mb-4"><h2 className="text-xl font-bold">Huyết áp và nhịp tim</h2>
-              <p className="text-sm text-slate-500">{apiAvailable ? 'Số đo trả về từ API Myka.' : 'Dữ liệu lưu trên trình duyệt khi chưa kết nối API.'} Thông tin tham khảo.</p>
+              <p className="text-sm text-slate-500">{!apiAvailable
+                ? 'Dữ liệu mẫu lưu trên trình duyệt.'
+                : healthDataSource === 'third_party_api'
+                  ? 'Lịch sử đọc từ backend Myka. Nguồn từng bản ghi được ghi bên dưới.'
+                  : 'Dữ liệu minh họa do API của app demo trả về. Các bản ghi 09:00 và 19:00 có nhãn lịch mô phỏng.'}</p>
             </div>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
@@ -606,7 +610,7 @@
               <button type="button" onClick={() => focusSection('conversations')} className="mt-2 text-sm font-semibold text-blue-800">Mở nhật ký trò chuyện để xem bối cảnh</button>
             </article>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"><h3 className="font-semibold p-4">Lịch sử đo huyết áp</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Giờ nhận số đo</th><th className="text-left p-3">Huyết áp</th><th className="text-left p-3">Nhịp tim</th><th className="text-left p-3">Nguồn ghi nhận</th><th className="text-left p-3">Ghi chú</th></tr></thead><tbody>{visibleReadings.slice().reverse().map(row => {
-              return <tr key={row.id} className="border-t border-slate-100"><td className="p-3 whitespace-nowrap">{receiptLabel(row.received_at)}</td><td className="p-3 font-semibold whitespace-nowrap">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3 whitespace-nowrap">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 whitespace-nowrap"><span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">Robot Myka</span></td><td className="p-3 text-slate-500">{row.id?.startsWith('BP-SCHEDULE-') ? 'Robot mô phỏng · gửi theo lịch hằng ngày' : row.note?.startsWith('APP-SYNC-DEMO:') ? 'Đã cập nhật từ mục Trạng thái.' : row.note || '—'}</td></tr>;
+              return <tr key={row.id} className="border-t border-slate-100"><td className="p-3 whitespace-nowrap">{receiptLabel(row.received_at)}</td><td className="p-3 font-semibold whitespace-nowrap">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3 whitespace-nowrap">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 whitespace-nowrap"><span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">{row.id?.startsWith('BP-SCHEDULE-') ? 'Lịch mô phỏng' : row.note?.startsWith('APP-SYNC-DEMO:') ? 'Đồng bộ demo' : row.source === 'third_party_guide_demo' ? 'Mẫu tài liệu API' : row.source === 'third_party_api' ? 'Backend Myka' : 'Chưa xác minh'}</span></td><td className="p-3 text-slate-500">{row.id?.startsWith('BP-SCHEDULE-') ? 'Bộ lập lịch demo gửi lên API app' : row.note?.startsWith('APP-SYNC-DEMO:') ? 'Đã cập nhật từ mục Trạng thái.' : row.note || '—'}</td></tr>;
             })}</tbody></table>{!visibleReadings.length && <p className="p-6 text-center text-slate-500">Chưa có bản ghi trong khoảng thời gian này.</p>}</div></div>
           </section>}
 
