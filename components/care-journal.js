@@ -118,6 +118,18 @@
     const inactiveDays = summary.points.filter(p => p.value === 0);
     const missingDays = days - summary.coverage;
     const isExternal = !['sleep', 'activity'].includes(metric);
+    const sleepSummary = journal.summarize(records, 'sleep', end, days);
+    const activitySummary = journal.summarize(records, 'activity', end, days);
+    const sleepByDay = new Map(sleepSummary.points.map(point => [point.day, point.value]));
+    const noActivityDays = activitySummary.points.filter(point => point.value === 0);
+    const pairedDays = activitySummary.points.filter(point => sleepByDay.has(point.day)).length;
+    const lastInactive = noActivityDays.at(-1);
+    const followUp = Object.entries(metrics).filter(([key]) => !['sleep', 'activity'].includes(key))
+      .map(([key, item]) => ({
+        label: item.label,
+        last: records.filter(row => row.metric === key && row.day <= end && row.value != null)
+          .reduce((latest, row) => row.day > latest ? row.day : latest, '')
+      }));
     return <section className="my-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6" aria-label="Nhật ký sức khỏe">
       <h2 className="text-xl font-bold">Nhật ký sức khỏe do người thân ghi</h2>
       <p className="mt-1 text-sm text-slate-600">Hồ sơ {elderId} · Bản trình diễn lưu trên trình duyệt này. Chỉ nhập dữ liệu giả lập.</p>
@@ -237,6 +249,32 @@
           </ul>}
         </div>
       </div>
+      <section className="mt-6 space-y-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-6" aria-label="Tổng kết chăm sóc">
+        <h3 className="text-lg font-bold text-blue-950">Tổng kết chăm sóc · {days} ngày</h3>
+        <p className="text-sm text-slate-700">{dateLabel(sleepSummary.begin)}–{dateLabel(end)} · Nhật ký người thân ghi</p>
+        <p>{sleepSummary.coverage}/{days} ngày có thời lượng ngủ · {activitySummary.points.filter(p => p.value > 0).length} ngày có vận động · {pairedDays} ngày có cả hai ghi nhận.</p>
+        {(sleepSummary.points.length > 0 || activitySummary.points.length > 0) && <div className="grid gap-3 xl:grid-cols-2">
+          <article className="rounded-xl bg-white p-3">
+            <h4 className="font-semibold">Giấc ngủ theo ngày thức dậy</h4>
+            <Trend summary={sleepSummary} label="giấc ngủ" days={days} unit="giờ" />
+          </article>
+          <article className="rounded-xl bg-white p-3">
+            <h4 className="font-semibold">Vận động theo ngày</h4>
+            <Trend summary={activitySummary} label="vận động" days={days} unit="lượt" bar />
+          </article>
+        </div>}
+        <p className="text-sm">Số 0 trên biểu đồ vận động là ngày đã ghi không vận động. Ngày chưa nhập được để trống.</p>
+        <div className="rounded-xl bg-white p-4">
+          <h4 className="font-semibold">Việc người thân có thể làm</h4>
+          <ul className="mt-2 list-disc space-y-2 pl-5 text-sm">
+            <li>{lastInactive
+              ? `Ngày ${dateLabel(lastInactive.day)} đã ghi 0 lượt vận động${sleepByDay.has(lastInactive.day) ? `, ngủ ${format(sleepByDay.get(lastInactive.day))} giờ` : ', chưa ghi thời lượng ngủ'}. Hỏi thêm Ngoại hôm đó sinh hoạt và cảm thấy thế nào.`
+              : 'Khi hỏi thăm, có thể hỏi Ngoại dạo này ngủ thế nào và tâm trạng ra sao, rồi ghi lại điều Ngoại chia sẻ.'}</li>
+            {followUp.map(({ label, last }) => <li key={label}>{label} · {last ? `Gần nhất ngày ${dateLabel(last)}` : 'Chưa có kết quả trong nhật ký'}. Có kết quả mới thì cập nhật kèm nguồn.</li>)}
+          </ul>
+        </div>
+        <p className="text-sm text-slate-700">Tổng kết mô tả các ghi nhận hiện có. Nếu có số đo hoặc triệu chứng khiến bạn lo lắng, hãy trao đổi với bác sĩ và cung cấp thời điểm, giá trị cùng nguồn đo.</p>
+      </section>
     </section>;
   };
 })();

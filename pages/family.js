@@ -10,7 +10,6 @@
     const [highlightTarget, setHighlightTarget] = React.useState('');
     const [highlightRequest, setHighlightRequest] = React.useState(0);
     const [days, setDays] = React.useState(7);
-    const [showResearchArchive, setShowResearchArchive] = React.useState(false);
     const [readings, setReadings] = React.useState(() => RTS.getBP(elderId) || []);
     const [schedules, setSchedules] = React.useState(() => RTS.getSchedules(elderId) || []);
     const [maintenance, setMaintenance] = React.useState([
@@ -573,12 +572,6 @@
               </label>
             </div>
             <CareJournal key={elderId} elderId={elderId} days={days} />
-            <details className="mb-6 rounded-xl border border-slate-200 bg-white p-4" open={showResearchArchive}
-              onToggle={e => setShowResearchArchive(e.currentTarget.open)}>
-              <summary className="cursor-pointer font-semibold text-slate-700">Hồ sơ mô phỏng dùng trong kiểm chứng Chương 4</summary>
-              <p className="mt-2 text-sm text-slate-600">Khu riêng để xem lại bộ dữ liệu, biểu đồ và kết quả kiểm chứng của bản nghiên cứu trước.</p>
-              {showResearchArchive && <ResearchPanel />}
-            </details>
             <div className="mb-4"><h2 className="text-xl font-bold">Huyết áp và nhịp tim</h2>
               <p className="text-sm text-slate-500">{apiAvailable ? 'Số đo trả về từ API Myka.' : 'Dữ liệu lưu trên trình duyệt khi chưa kết nối API.'} Thông tin tham khảo.</p>
             </div>
