@@ -12,7 +12,7 @@
     unit: 'mmol/L', context: 'unknown', source: ''
   });
 
-  function Trend({ summary, label, unit, end, days, bar }) {
+  function Trend({ summary, label, unit, days, bar }) {
     if (!summary.points.length) return <p className="rounded-xl bg-slate-50 p-4 text-slate-600">Chưa có dữ liệu để vẽ biểu đồ trong khoảng này.</p>;
     const max = Math.max(1, ...summary.points.map(p => p.value));
     const x = p => {
@@ -22,13 +22,15 @@
     };
     const y = p => 206 - p.value / max * 155;
     return <svg viewBox="0 0 720 260" className="w-full" role="img" aria-label={`Biểu đồ ${label} trong ${days} ngày`}>
-      {[0, 0.5, 1].map(part => <g key={part}>
+      {(bar && max % 2 ? [0, 1] : [0, 0.5, 1]).map(part => <g key={part}>
         <line x1="88" x2="684" y1={206 - part * 155} y2={206 - part * 155} stroke="#cbd5e1" />
         <text x="78" y={211 - part * 155} textAnchor="end" fontSize="17" fill="#475569">{format(max * part)}</text>
       </g>)}
       <text x="88" y="26" fontSize="19" fill="#475569">{unit}</text>
-      <text x="88" y="240" fontSize="18" fill="#475569">{dateLabel(summary.begin)}</text>
-      <text x="684" y="240" fontSize="18" fill="#475569" textAnchor="end">{dateLabel(end)}</text>
+      {Array.from({ length: days }, (_, i) => i).filter(i => days === 7 || i % 5 === 0 || i === days - 1).map(i => {
+        const day = journal.dayAt(summary.begin, i);
+        return <text key={day} x={x({ day })} y="240" fontSize="17" fill="#475569" textAnchor="middle">{dateLabel(day)}</text>;
+      })}
       {!bar && summary.points.slice(1).map((point, i) => {
         const previous = summary.points[i];
         if (Date.parse(point.day) - Date.parse(previous.day) > 86400000) return null;
@@ -41,7 +43,9 @@
         return bar && point.value > 0
           ? <rect key={i} x={x(point) - width / 2} y={y(point)} width={width} height={206 - y(point)}
             rx="3" fill="#1760ad">{title}</rect>
-          : <circle key={i} cx={x(point)} cy={y(point)} r="6" fill="#1760ad">{title}</circle>;
+          : bar
+            ? <text key={i} x={x(point)} y="200" textAnchor="middle" fontSize="17" fill="#475569">{title}0</text>
+            : <circle key={i} cx={x(point)} cy={y(point)} r="6" fill="#1760ad">{title}</circle>;
       })}
     </svg>;
   }
@@ -110,6 +114,9 @@
     };
     const coverageLabel = metric === 'sleep' ? 'đêm có thời lượng' : 'ngày có dữ liệu';
     const totalActivities = summary.points.reduce((sum, p) => sum + p.value, 0);
+    const activeDays = summary.points.filter(p => p.value > 0).length;
+    const inactiveDays = summary.points.filter(p => p.value === 0);
+    const missingDays = days - summary.coverage;
     const isExternal = !['sleep', 'activity'].includes(metric);
     return <section className="my-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6" aria-label="Nhật ký sức khỏe">
       <h2 className="text-xl font-bold">Nhật ký sức khỏe do người thân ghi</h2>
@@ -182,8 +189,11 @@
             <label>Đơn vị biểu đồ<select className={fieldStyle} value={unit} onChange={e => setUnit(e.target.value)}><option>mmol/L</option><option>mg/dL</option></select></label>
             <label>Bối cảnh biểu đồ<select className={fieldStyle} value={context} onChange={e => setContext(e.target.value)}><option value="all">Tất cả</option>{Object.entries(contextLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
           </div>}
-          <p className="text-sm text-slate-600">{summary.coverage}/{days} {coverageLabel}{metric === 'activity' ? ` · ${totalActivities} lượt đã ghi` : ''}.</p>
-          {summary.points.length > 0 && <dl className="grid grid-cols-3 gap-2 rounded-xl bg-blue-50 p-3 text-sm">
+          {metric === 'activity' ? <div className="space-y-1 rounded-xl bg-blue-50 p-3 text-sm">
+            <p className="font-bold text-blue-950">{activeDays} ngày có vận động · {totalActivities} lượt được ghi nhận</p>
+            <p>{inactiveDays.length} ngày được ghi là không vận động{inactiveDays.length ? ` (${inactiveDays.map(p => dateLabel(p.day)).join(', ')})` : ''}. {missingDays} ngày chưa có ghi nhận.</p>
+          </div> : <p className="text-sm text-slate-600">{summary.coverage}/{days} {coverageLabel}.</p>}
+          {metric !== 'activity' && summary.points.length > 0 && <dl className="grid grid-cols-3 gap-2 rounded-xl bg-blue-50 p-3 text-sm">
             {[
               ['Gần nhất', summary.latest],
               [metric === 'activity' ? 'TB/ngày có ghi' : 'Trung bình', summary.mean],
@@ -193,8 +203,14 @@
               <dd className="font-bold text-blue-950">{value == null || (mixedGlucose && label !== 'Gần nhất') ? '—' : `${format(value)} ${displayUnit}`}</dd>
             </div>)}
           </dl>}
-          <Trend summary={summary} label={metrics[metric].label} end={end} days={days} unit={displayUnit} bar={metric === 'activity'} />
-          <p className="text-sm text-slate-700">
+          <Trend summary={summary} label={metrics[metric].label} days={days} unit={displayUnit} bar={metric === 'activity'} />
+          {metric === 'activity' ? <div className="space-y-1 text-sm text-slate-700">
+            <p>Số 0 là ngày đã ghi không vận động. Ngày không có cột hoặc số 0 là ngày chưa ghi.</p>
+            {!!inactiveDays.length && <p>Bạn có thể hỏi thăm Ngoại về {inactiveDays.length === 1 ? `ngày ${dateLabel(inactiveDays[0].day)}` : 'những ngày đã ghi không vận động'} để hiểu bối cảnh.</p>}
+            <p>{missingDays === 0 && previous.coverage === days
+              ? `Kỳ trước có ${previous.points.filter(p => p.value > 0).length} ngày có vận động, so với ${activeDays} ngày kỳ này.`
+              : 'Cần ghi đủ ngày ở cả hai kỳ để so sánh số ngày có vận động.'}</p>
+          </div> : <p className="text-sm text-slate-700">
             {mixedGlucose
               ? 'Chọn cùng bối cảnh đo để tính mức dao động và so sánh các kỳ đường huyết.'
               : summary.coverage >= 2 && previous.coverage >= 2
@@ -203,7 +219,7 @@
                 ? `Ghi nhận gần nhất ngày ${dateLabel(lastPoint.day)} là ${format(lastPoint.value)} ${displayUnit}, so với ${format(earlierPoint.value)} ${displayUnit} ngày ${dateLabel(earlierPoint.day)}. Chưa đủ dữ liệu để so sánh hai kỳ.`
                 : 'Cần thêm các ngày có ghi nhận để so sánh.'}
             {' '}Ngày chưa ghi được để trống. Khoảng dao động là chênh lệch giữa giá trị lớn nhất và nhỏ nhất đã ghi.
-          </p>
+          </p>}
           {!!summary.selected.length && <ul className="divide-y rounded-xl border border-slate-200">
             {summary.selected.slice().sort((a, b) => b.day.localeCompare(a.day) || (b.measuredTime || '').localeCompare(a.measuredTime || '')).map(r => <li key={r.id} className="flex items-start justify-between gap-3 p-3 text-sm">
               <div><p className="font-semibold">{dateLabel(r.day)} {r.measuredTime || ''} · {r.metric === 'activity' ?
