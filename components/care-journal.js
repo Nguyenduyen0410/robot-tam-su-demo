@@ -75,7 +75,7 @@
       new Set([...summary.selected, ...previous.selected].map(row => row.context)).size > 1;
     const lastPoint = summary.points.at(-1);
     const earlierPoint = summary.points.findLast(point => point.day !== lastPoint?.day);
-    const missing = Object.keys(metrics).filter(key => !records.some(row =>
+    const missing = ['sleep', 'activity'].filter(key => !records.some(row =>
       row.metric === key && row.day >= summary.begin && row.day <= end && row.value !== null
     )).map(key => metrics[key].label);
     const field = key => ({ value: draft[key], onChange: e => setDraft({ ...draft, [key]: e.target.value }) });
@@ -127,8 +127,8 @@
         <p className="font-semibold">Những gì cần xem lại trong {days} ngày</p>
         <p className="mt-1 text-slate-700">{missing.length
           ? `Chưa có số liệu cho: ${missing.join(', ')}.`
-          : 'Mỗi chỉ số đã có ít nhất một ghi nhận trong kỳ này.'}</p>
-        <p className="mt-1 text-slate-700">Chọn từng chỉ số để xem mức dao động, thay đổi so với kỳ trước và nguồn ghi nhận.</p>
+          : 'Đã có ghi nhận giấc ngủ và vận động trong kỳ này.'}</p>
+        <p className="mt-1 text-slate-700">Đường huyết, SpO₂ và cân nặng được ghi khi có kết quả. Nhật ký không đặt lịch hay tính số lần bỏ lỡ cho các chỉ số này.</p>
       </aside>
       <div className="my-4 flex flex-wrap gap-2" aria-label="Chọn chỉ số">
         {Object.entries(metrics).map(([key, item]) => <button key={key} type="button" aria-pressed={key === metric}
@@ -165,6 +165,7 @@
             </label>}
           </>}
           {isExternal && <>
+            <p className="text-sm text-slate-700">Nhập theo kết quả đã nhận, kèm thời điểm đo và nguồn cung cấp.</p>
             <label className="block">Nguồn kết quả
               <input required maxLength="120" className={fieldStyle} placeholder={metric === 'weight' ? 'Ví dụ: cân tại nhà' : 'Ví dụ: kết quả bác sĩ cung cấp'} {...field('source')} />
             </label>
@@ -192,12 +193,14 @@
           {metric === 'activity' ? <div className="space-y-1 rounded-xl bg-blue-50 p-3 text-sm">
             <p className="font-bold text-blue-950">{activeDays} ngày có vận động · {totalActivities} lượt được ghi nhận</p>
             <p>{inactiveDays.length} ngày được ghi là không vận động{inactiveDays.length ? ` (${inactiveDays.map(p => dateLabel(p.day)).join(', ')})` : ''}. {missingDays} ngày chưa có ghi nhận.</p>
-          </div> : <p className="text-sm text-slate-600">{summary.coverage}/{days} {coverageLabel}.</p>}
+          </div> : <p className="text-sm text-slate-600">{isExternal
+            ? summary.selected.length ? `${summary.selected.length} kết quả đã nhập theo bộ lọc hiện tại.` : 'Chưa có kết quả đã nhập theo bộ lọc hiện tại.'
+            : `${summary.coverage}/${days} ${coverageLabel}.`}</p>}
           {metric !== 'activity' && summary.points.length > 0 && <dl className="grid grid-cols-3 gap-2 rounded-xl bg-blue-50 p-3 text-sm">
             {[
               ['Gần nhất', summary.latest],
               [metric === 'activity' ? 'TB/ngày có ghi' : 'Trung bình', summary.mean],
-              ['Khoảng dao động', summary.spread]
+              ['Khoảng dao động', summary.points.length > 1 ? summary.spread : null]
             ].map(([label, value]) => <div key={label}>
               <dt className="text-slate-600">{label}</dt>
               <dd className="font-bold text-blue-950">{value == null || (mixedGlucose && label !== 'Gần nhất') ? '—' : `${format(value)} ${displayUnit}`}</dd>
@@ -217,8 +220,8 @@
               ? `Trung bình kỳ này ${format(summary.mean)} ${displayUnit} (${summary.coverage} ngày có dữ liệu), kỳ trước ${format(previous.mean)} ${displayUnit} (${previous.coverage} ngày). Xem lại thời điểm và nguồn nếu thấy thay đổi.`
               : earlierPoint
                 ? `Ghi nhận gần nhất ngày ${dateLabel(lastPoint.day)} là ${format(lastPoint.value)} ${displayUnit}, so với ${format(earlierPoint.value)} ${displayUnit} ngày ${dateLabel(earlierPoint.day)}. Chưa đủ dữ liệu để so sánh hai kỳ.`
-                : 'Cần thêm các ngày có ghi nhận để so sánh.'}
-            {' '}Ngày chưa ghi được để trống. Khoảng dao động là chênh lệch giữa giá trị lớn nhất và nhỏ nhất đã ghi.
+                : 'Chưa đủ điểm đo để mô tả thay đổi.'}
+            {' '}{isExternal ? 'Khoảng trống thể hiện ngày không có kết quả trong bộ lọc.' : 'Ngày chưa ghi được để trống.'}
           </p>}
           {!!summary.selected.length && <ul className="divide-y rounded-xl border border-slate-200">
             {summary.selected.slice().sort((a, b) => b.day.localeCompare(a.day) || (b.measuredTime || '').localeCompare(a.measuredTime || '')).map(r => <li key={r.id} className="flex items-start justify-between gap-3 p-3 text-sm">
