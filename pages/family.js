@@ -10,6 +10,7 @@
     const [highlightTarget, setHighlightTarget] = React.useState('');
     const [highlightRequest, setHighlightRequest] = React.useState(0);
     const [days, setDays] = React.useState(7);
+    const [showResearchArchive, setShowResearchArchive] = React.useState(false);
     const [readings, setReadings] = React.useState(() => RTS.getBP(elderId) || []);
     const [schedules, setSchedules] = React.useState(() => RTS.getSchedules(elderId) || []);
     const [maintenance, setMaintenance] = React.useState([
@@ -194,13 +195,20 @@
 
     const elder = RTS.getElders().find(e => e.id === elderId);
     const fallbackReadings = RTS.getBP(elderId) || [];
-    const visibleReadings = apiAvailable ? readings : fallbackReadings.slice(-days);
+    const endDay = window.MykaCareJournal.today();
+    const firstDay = window.MykaCareJournal.dayAt(endDay, 1 - days);
+    const visibleReadings = (apiAvailable ? readings : fallbackReadings).filter(row => {
+      if (!Number.isFinite(Date.parse(row.timestamp))) return false;
+      const day = window.MykaCareJournal.today(new Date(row.timestamp));
+      return day >= firstDay && day <= endDay;
+    }).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
     const latest = visibleReadings[visibleReadings.length - 1];
-    const avg = (key) => visibleReadings.length
-      ? Math.round(visibleReadings.reduce((sum, row) => sum + Number(row[key] || 0), 0) / visibleReadings.length)
-      : '—';
-    const avgHeartRate = visibleReadings.some(row => row.heart_rate !== undefined)
-      ? avg('heart_rate') : avg('heartRate');
+    const avg = key => {
+      const values = visibleReadings.map(row => Number(key === 'heart_rate' ? row.heart_rate ?? row.heartRate : row[key]))
+        .filter(value => Number.isFinite(value) && value > 0);
+      return values.length ? Math.round(values.reduce((sum, n) => sum + n, 0) / values.length) : '—';
+    };
+    const avgHeartRate = avg('heart_rate');
     const dateLabel = value => {
       const date = new Date(value);
       return Number.isNaN(date.getTime()) ? value : date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
@@ -213,9 +221,9 @@
     })).filter(s => ['medication', 'checkup'].includes(s.type));
     const scheduleState = row => {
       const scheduleTime = Date.parse(row.scheduled_at || row.time || '');
-      if (Number.isFinite(scheduleTime) && scheduleTime > Date.now()) return { label: 'Theo lịch', classes: 'bg-blue-100 text-blue-800' };
-      if (row.confirmed === true || Number(row.confirmed) === 1) return { label: 'Đã xác nhận', classes: 'bg-emerald-100 text-emerald-800' };
-      return { label: 'Quá hạn', classes: 'bg-rose-100 text-rose-800' };
+      if (!Number.isFinite(scheduleTime)) return { label: 'Chưa rõ giờ', classes: 'bg-slate-100 text-slate-700' };
+      if (scheduleTime > Date.now()) return { label: 'Sắp đến', classes: 'bg-blue-100 text-blue-800' };
+      return { label: 'Đã qua giờ lịch', classes: 'bg-slate-100 text-slate-700' };
     };
     const upcomingSchedule = scheduleRows
       .filter(row => row.scheduled_at && new Date(row.scheduled_at).getTime() >= Date.now())
@@ -378,52 +386,60 @@
       { id: 'settings', label: 'Cài đặt', icon: 'tune' },
       { id: 'profile', label: 'Hồ sơ', icon: 'account_circle' },
     ];
-    const chartData = visibleReadings.slice().sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)).map(row => ({
-      time: new Date(row.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-      'Tâm thu': row.systolic,
-      'Tâm trương': row.diastolic,
-      'Nhịp tim': row.heart_rate || row.heartRate,
-    }));
-    const chartWidth = 720, chartHeight = 260, chartLeft = 42, chartRight = 16, chartTop = 16, chartBottom = 36;
-    const chartValues = chartData.flatMap(point => [point['Tâm thu'], point['Tâm trương'], point['Nhịp tim']]).filter(Number.isFinite);
-    const chartMin = chartValues.length ? Math.floor((Math.min(...chartValues) - 5) / 10) * 10 : 0;
-    const chartMax = chartValues.length ? Math.ceil((Math.max(...chartValues) + 5) / 10) * 10 : 100;
-    const chartX = index => chartLeft + (chartData.length <= 1 ? 0 : index * (chartWidth - chartLeft - chartRight) / (chartData.length - 1));
-    const chartY = value => chartTop + (chartMax - value) * (chartHeight - chartTop - chartBottom) / Math.max(1, chartMax - chartMin);
-    const chartLines = [
-      { key: 'Tâm thu', color: '#7c3aed' },
-      { key: 'Tâm trương', color: '#0ea5e9' },
-      { key: 'Nhịp tim', color: '#f59e0b' },
+    const dailyVitals = window.MykaCareJournal.summarizeVitals(visibleReadings);
+    const pressureSeries = [
+      { key: 'systolic', label: 'Tâm thu', color: '#2348a0' },
+      { key: 'diastolic', label: 'Tâm trương', color: '#36a0bd' }
     ];
-    const dailyTrend = new Map();
-    visibleReadings.forEach(row => {
-      const day = new Date(row.timestamp).toISOString().slice(0, 10);
-      const systolic = Number(row.systolic), diastolic = Number(row.diastolic);
-      const level = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
-      const priority = { normal: 0, warning: 1, critical: 2 };
-      const current = dailyTrend.get(day);
-      if (!current || priority[level] > priority[current]) dailyTrend.set(day, level);
-    });
-    const orderedDays = [...dailyTrend.entries()].sort(([a], [b]) => a.localeCompare(b));
-    let warningStreak = 0, maxWarningStreak = 0;
-    let previousDay = null;
-    orderedDays.forEach(([day, level]) => {
-      const consecutive = previousDay && (Date.parse(`${day}T00:00:00Z`) - Date.parse(`${previousDay}T00:00:00Z`)) === 86400000;
-      warningStreak = level === 'normal' ? 0 : (consecutive ? warningStreak : 0) + 1;
-      maxWarningStreak = Math.max(maxWarningStreak, warningStreak);
-      previousDay = day;
-    });
-    const criticalDays = orderedDays.filter(([, level]) => level === 'critical').length;
-    const warningDays = orderedDays.filter(([, level]) => level !== 'normal').length;
-    const trendSummary = !orderedDays.length
-      ? { tone: 'slate', title: 'Chưa có đủ số đo', detail: 'Khi có dữ liệu, ứng dụng sẽ tổng hợp các lần đo đã ghi nhận trong khoảng thời gian này.' }
-      : criticalDays
-        ? { tone: 'rose', title: 'Có bản ghi vượt ngưỡng cảnh báo cấu hình', detail: `Ghi nhận ${criticalDays} ngày có ít nhất một lần đo ở mức cảnh báo cao. Gia đình hãy xem lại bản ghi và trao đổi với nhân viên y tế.` }
-        : maxWarningStreak >= 3
-          ? { tone: 'amber', title: `Có chỉ số vượt ngưỡng theo dõi ${maxWarningStreak} ngày liên tiếp`, detail: 'Gia đình nên xem lại các lần đo trong chuỗi này và trao đổi với nhân viên y tế qua kênh chăm sóc.' }
-          : warningDays
-            ? { tone: 'amber', title: `Ghi nhận ${warningDays} ngày có chỉ số vượt ngưỡng theo dõi`, detail: 'Hiện chưa ghi nhận chuỗi vượt ngưỡng từ 3 ngày liên tiếp. Gia đình có thể xem lại từng lần đo trong lịch sử.' }
-            : { tone: 'emerald', title: 'Chưa ghi nhận lần đo vượt ngưỡng cấu hình', detail: 'Các số đo đã lưu trong khoảng thời gian này đều nằm trong ngưỡng theo dõi đã cài đặt.' };
+    const pulseSeries = [{ key: 'pulse', label: 'Nhịp tim', color: '#ad4e16' }];
+    const observedDays = dailyVitals.length;
+    const range = key => {
+      const values = dailyVitals.map(row => row[key]).filter(Number.isFinite);
+      if (!values.length) return '—';
+      const min = Math.round(Math.min(...values)), max = Math.round(Math.max(...values));
+      return min === max ? String(min) : `${min}–${max}`;
+    };
+
+    function vitalBars(title, unit, series) {
+      const rows = dailyVitals.filter(row => series.some(field => Number.isFinite(row[field.key])));
+      if (!rows.length) return <p className="py-5 text-sm text-slate-600">Chưa có số đo {title.toLocaleLowerCase('vi')} trong khoảng này.</p>;
+      const chartWidth = Math.max(660, rows.length * 50 + 72);
+      const spacing = (chartWidth - 70) / rows.length;
+      const barWidth = Math.min(32, (spacing - 8) / series.length);
+      const max = Math.ceil(Math.max(...rows.flatMap(row => series.map(field => row[field.key] || 0))) / 40) * 40;
+      const y = value => 208 - value / max * 164;
+      return <div className="mb-5">
+        <h4 className="font-semibold text-slate-900">{title} ({unit})</h4>
+        <div className="mt-2 overflow-x-auto">
+          <svg viewBox={`0 0 ${chartWidth} 246`} style={{ minWidth: chartWidth }} className="w-full"
+            role="img" aria-label={`Biểu đồ cột ${title} trung bình theo ngày`}>
+            {[0, 1, 2, 3, 4].map(tick => {
+              const value = max * tick / 4;
+              return <g key={tick}><line x1="44" x2={chartWidth - 12} y1={y(value)} y2={y(value)} stroke="#e2e8f0" />
+                <text x="36" y={y(value) + 4} textAnchor="end" fontSize="12" fill="#475569">{value}</text></g>;
+            })}
+            {rows.map((row, index) => {
+              const center = 48 + (index + 0.5) * spacing;
+              return <g key={row.day}>
+                {series.map((field, j) => Number.isFinite(row[field.key]) &&
+                  <rect key={field.key} x={center - barWidth * series.length / 2 + j * barWidth + 1}
+                    y={y(row[field.key])} width={barWidth - 2} height={208 - y(row[field.key])} rx="3" fill={field.color}>
+                    <title>{row.day}: {field.label} {Math.round(row[field.key])} {unit}, trung bình ngày</title>
+                  </rect>)}
+                <text x={center} y="230" textAnchor="middle" fontSize="12" fill="#475569">
+                  {row.day.slice(5).split('-').reverse().join('/')}
+                </text>
+              </g>;
+            })}
+          </svg>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-700">
+          {series.map(field => <span key={field.key} className="inline-flex items-center gap-2">
+            <i className="h-3 w-3 rounded-sm" style={{ backgroundColor: field.color }} />{field.label}
+          </span>)}
+        </div>
+      </div>;
+    }
 
     const devicePaired = Boolean(connectivity?.paired_devices?.length);
     const focusSection = section => { setTab(section); setMoreOpen(false); setHighlightTarget(section); setHighlightRequest(current => current + 1); };
@@ -548,8 +564,24 @@
           </section>}
 
           {tab === 'health' && <section id="family-section-health" className="scroll-mt-24">
-            <ResearchPanel />
-            <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 className="text-xl font-bold">Huyết áp và nhịp tim</h2><p className="text-sm text-slate-500">Lịch sử số đo theo thời gian · thông tin tham khảo, không thay thế tư vấn y tế.</p></div><select value={days} onChange={e => setDays(Number(e.target.value))} className="bg-white border border-slate-300 rounded-lg px-3 py-2"><option value={7}>7 ngày gần đây</option><option value={30}>30 ngày gần đây</option></select></div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-bold">Theo dõi sức khỏe</h2>
+              <label className="flex items-center gap-2 text-sm">Khoảng thời gian
+                <select value={days} onChange={e => setDays(Number(e.target.value))} className="rounded-lg border border-slate-300 bg-white px-3 py-2">
+                  <option value={7}>7 ngày gần đây</option><option value={30}>30 ngày gần đây</option>
+                </select>
+              </label>
+            </div>
+            <CareJournal key={elderId} elderId={elderId} days={days} />
+            <details className="mb-6 rounded-xl border border-slate-200 bg-white p-4" open={showResearchArchive}
+              onToggle={e => setShowResearchArchive(e.currentTarget.open)}>
+              <summary className="cursor-pointer font-semibold text-slate-700">Hồ sơ mô phỏng dùng trong kiểm chứng Chương 4</summary>
+              <p className="mt-2 text-sm text-slate-600">Khu riêng để xem lại bộ dữ liệu, biểu đồ và kết quả kiểm chứng của bản nghiên cứu trước.</p>
+              {showResearchArchive && <ResearchPanel />}
+            </details>
+            <div className="mb-4"><h2 className="text-xl font-bold">Huyết áp và nhịp tim</h2>
+              <p className="text-sm text-slate-500">{apiAvailable ? 'Số đo trả về từ API Myka.' : 'Dữ liệu lưu trên trình duyệt khi chưa kết nối API.'} Thông tin tham khảo.</p>
+            </div>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
               {[["Lần đo gần nhất", latest ? `${latest.systolic}/${latest.diastolic}` : '—', 'mmHg'], ['Tâm thu trung bình', avg('systolic'), 'mmHg'], ['Tâm trương trung bình', avg('diastolic'), 'mmHg'], ['Nhịp tim trung bình', avgHeartRate, 'lần/phút']].map(([label, value, unit]) => <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm"><p className="text-sm text-slate-500">{label}</p><p className="text-2xl font-bold mt-2 text-slate-800">{value} <span className="text-sm font-normal text-slate-500">{unit}</span></p></div>)}
@@ -557,86 +589,35 @@
             <div className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-6 mb-5 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div>
-                  <h3 className="font-bold text-base sm:text-lg text-slate-900">Biểu đồ xu hướng Huyết áp & Nhịp tim ({days} ngày)</h3>
-                  <p className="text-xs text-slate-500">Thiết kế thích ứng (Responsive) · Vùng tô màu thể hiện khoảng chênh lệch Tâm thu – Tâm trương</p>
+                  <h3 className="text-lg font-bold text-slate-900">Biểu đồ cột theo ngày ({days} ngày)</h3>
+                  <p className="text-sm text-slate-600">Mỗi cột là trung bình các lần đo hợp lệ trong một ngày có dữ liệu. Huyết áp và nhịp tim dùng hai thang đo riêng.</p>
                 </div>
                 <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-semibold">
                   {[['all', 'Tất cả'], ['bp', 'Huyết áp'], ['hr', 'Nhịp tim']].map(([key, label]) => (
-                    <button key={key} type="button" onClick={() => setChartFilter(key)} className={`rounded-lg px-3 py-1.5 transition ${chartFilter === key ? 'bg-white text-blue-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>{label}</button>
+                    <button key={key} type="button" aria-pressed={chartFilter === key} onClick={() => setChartFilter(key)}
+                      className={`rounded-lg px-3 py-1.5 ${chartFilter === key ? 'bg-white text-blue-800 shadow-sm' : 'text-slate-600'}`}>{label}</button>
                   ))}
                 </div>
               </div>
-              {chartData.length ? (() => {
-                const activeLines = chartLines.filter(l => chartFilter === 'all' ? true : chartFilter === 'bp' ? l.key !== 'Nhịp tim' : l.key === 'Nhịp tim');
-                const areaPoints = chartFilter !== 'hr' && chartData.length > 1
-                  ? [
-                      ...chartData.map((pt, idx) => `${chartX(idx)},${chartY(Number(pt['Tâm thu']))}`),
-                      ...chartData.slice().reverse().map((pt, rIdx) => {
-                        const idx = chartData.length - 1 - rIdx;
-                        return `${chartX(idx)},${chartY(Number(pt['Tâm trương']))}`;
-                      })
-                    ].join(' ')
-                  : '';
-                const labelStep = chartData.length > 16 ? 3 : chartData.length > 9 ? 2 : 1;
-                return <>
-                  <div className="w-full overflow-hidden">
-                    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label={`Biểu đồ xu hướng huyết áp và nhịp tim ${days} ngày`} className="w-full h-56 sm:h-72">
-                      <defs>
-                        <linearGradient id="bpRangeGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.18" />
-                          <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.06" />
-                        </linearGradient>
-                      </defs>
-                      {[0, 1, 2, 3, 4].map(index => {
-                        const value = chartMin + (chartMax - chartMin) * index / 4;
-                        const y = chartY(value);
-                        return <g key={index}>
-                          <line x1={chartLeft} x2={chartWidth - chartRight} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="4 4" />
-                          <text x={chartLeft - 8} y={y + 4} textAnchor="end" fontSize="11" fontWeight="600" fill="#64748b">{Math.round(value)}</text>
-                        </g>;
-                      })}
-                      {chartFilter !== 'hr' && chartMax >= 140 && chartMin <= 140 && (
-                        <g>
-                          <line x1={chartLeft} x2={chartWidth - chartRight} y1={chartY(140)} y2={chartY(140)} stroke="#f43f5e" strokeWidth="1.5" strokeDasharray="6 4" />
-                          <text x={chartWidth - chartRight - 4} y={chartY(140) - 5} textAnchor="end" fontSize="10" fontWeight="700" fill="#e11d48">Ngưỡng lưu ý 140 mmHg</text>
-                        </g>
-                      )}
-                      {areaPoints && <polygon points={areaPoints} fill="url(#bpRangeGrad)" />}
-                      {activeLines.map(line => (
-                        <g key={line.key}>
-                          <polyline fill="none" stroke={line.color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" points={chartData.map((point, index) => `${chartX(index)},${chartY(Number(point[line.key]))}`).join(' ')} />
-                          {chartData.map((point, index) => (
-                            <g key={`${line.key}-${index}`}>
-                              <circle cx={chartX(index)} cy={chartY(Number(point[line.key]))} r="4.5" fill="#ffffff" stroke={line.color} strokeWidth="2.5">
-                                <title>{`${point.time}: ${line.key} ${point[line.key]}`}</title>
-                              </circle>
-                            </g>
-                          ))}
-                        </g>
-                      ))}
-                      {chartData.map((point, index) => (index % labelStep === 0 || index === chartData.length - 1) && (
-                        <text key={`date-${index}`} x={chartX(index)} y={chartHeight - 8} textAnchor="middle" fontSize="10" fontWeight="600" fill="#475569">{point.time}</text>
-                      ))}
-                    </svg>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-3 justify-center text-xs font-semibold text-slate-700">
-                    {activeLines.map(line => (
-                      <span key={line.key} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1">
-                        <i className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: line.color }} />
-                        {line.key} ({line.key === 'Nhịp tim' ? 'bpm' : 'mmHg'})
-                      </span>
-                    ))}
-                  </div>
-                </>;
-              })() : <p className="text-sm text-slate-500 py-8 text-center">Chưa có dữ liệu để hiển thị biểu đồ.</p>}
+              {chartFilter !== 'hr' && vitalBars('Huyết áp', 'mmHg', pressureSeries)}
+              {chartFilter !== 'bp' && vitalBars('Nhịp tim', 'lần/phút', pulseSeries)}
             </div>
-            <article className={`rounded-xl border p-4 mb-5 shadow-sm ${trendSummary.tone === 'rose' ? 'bg-rose-50 border-rose-200' : trendSummary.tone === 'amber' ? 'bg-amber-50 border-amber-200' : trendSummary.tone === 'emerald' ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}><h3 className="font-semibold">Tóm tắt xu hướng {days} ngày</h3><p className="font-semibold mt-2">{trendSummary.title}</p><p className="text-sm text-slate-700 mt-1">{trendSummary.detail}</p><p className="text-xs text-slate-500 mt-3">Tóm tắt theo ngưỡng theo dõi đã cài đặt; không phải kết luận sức khỏe hay tư vấn y tế.</p></article>
+            <article className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
+              <h3 className="font-bold">Mức dao động trong các ngày có số đo</h3>
+              <p className="mt-1 text-sm text-slate-700">Có {observedDays} ngày ghi nhận trong kỳ đang xem. Khoảng dưới đây tính trên các giá trị trung bình ngày.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                {[['Tâm thu', 'systolic', 'mmHg'], ['Tâm trương', 'diastolic', 'mmHg'], ['Nhịp tim', 'pulse', 'lần/phút']].map(([label, key, unit]) =>
+                  <div key={key}><p className="text-sm text-slate-700">{label}</p><p className="text-xl font-bold">{range(key)} <span className="text-sm font-normal">{unit}</span></p></div>)}
+              </div>
+              <p className="mt-3 text-sm text-slate-700">Xem lại lần đo và hỏi thăm Ngoại nếu thấy số đo hoặc sinh hoạt thay đổi so với thường ngày.</p>
+              <button type="button" onClick={() => focusSection('conversations')} className="mt-2 text-sm font-semibold text-blue-800">Mở nhật ký trò chuyện để xem bối cảnh</button>
+            </article>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"><h3 className="font-semibold p-4">Lịch sử đo huyết áp</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Giờ nhận số đo</th><th className="text-left p-3">Huyết áp</th><th className="text-left p-3">Nhịp tim</th><th className="text-left p-3">Nguồn ghi nhận</th><th className="text-left p-3">Ghi chú</th></tr></thead><tbody>{visibleReadings.slice().reverse().map(row => {
               return <tr key={row.id} className="border-t border-slate-100"><td className="p-3 whitespace-nowrap">{receiptLabel(row.received_at)}</td><td className="p-3 font-semibold whitespace-nowrap">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3 whitespace-nowrap">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 whitespace-nowrap"><span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">Robot Myka</span></td><td className="p-3 text-slate-500">{row.id?.startsWith('BP-SCHEDULE-') ? 'Robot mô phỏng · gửi theo lịch hằng ngày' : row.note?.startsWith('APP-SYNC-DEMO:') ? 'Đã cập nhật từ mục Trạng thái.' : row.note || '—'}</td></tr>;
             })}</tbody></table>{!visibleReadings.length && <p className="p-6 text-center text-slate-500">Chưa có bản ghi trong khoảng thời gian này.</p>}</div></div>
           </section>}
 
-          {tab === 'schedule' && <section id="family-section-schedule" className="scroll-mt-24"><div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold mb-1">Lịch uống thuốc và tái khám</h2><p className="text-sm text-slate-500">Lịch chăm sóc sắp tới của Ngoại.</p></div><button onClick={() => { setEditingSchedule(null); setShowScheduleEditor(true); }} className="rounded-xl bg-blue-600 text-white px-4 py-2.5 font-bold shadow-md shadow-blue-200">＋ Thêm lịch</button></div><div className="space-y-3">{scheduleRows.map(row => <article key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap gap-4 items-start"><span className="text-2xl">{row.type === 'checkup' ? '🏥' : '💊'}</span><div className="flex-1 min-w-[12rem]"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{row.title}</h3><span className="text-sm text-slate-500">{dateLabel(row.scheduled_at)}</span></div><p className="text-sm text-slate-600 mt-1">{row.detail || '—'}</p></div><span className={`text-xs px-2 py-1 rounded-full ${scheduleState(row).classes}`}>{scheduleState(row).label}</span><div className="ml-auto flex gap-2"><button type="button" onClick={() => { setEditingSchedule(row); setShowScheduleEditor(true); }} className="rounded-lg border px-3 py-2 text-sm font-semibold text-blue-700">Chỉnh sửa</button><button type="button" onClick={() => deleteSchedule(row)} className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700">Xóa</button></div></article>)}{!scheduleRows.length && <p className="bg-white rounded-xl p-6 text-slate-500">Chưa có lịch chăm sóc.</p>}</div></section>}
+          {tab === 'schedule' && <section id="family-section-schedule" className="scroll-mt-24"><div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold mb-1">Lịch uống thuốc và tái khám</h2><p className="text-sm text-slate-500">Lịch nhắc dự kiến của Ngoại. Trạng thái dựa trên giờ đã đặt.</p></div><button onClick={() => { setEditingSchedule(null); setShowScheduleEditor(true); }} className="rounded-xl bg-blue-600 text-white px-4 py-2.5 font-bold shadow-md shadow-blue-200">＋ Thêm lịch</button></div><div className="space-y-3">{scheduleRows.map(row => <article key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap gap-4 items-start"><span className="text-2xl">{row.type === 'checkup' ? '🏥' : '💊'}</span><div className="flex-1 min-w-[12rem]"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{row.title}</h3><span className="text-sm text-slate-500">{dateLabel(row.scheduled_at)}</span></div><p className="text-sm text-slate-600 mt-1">{row.detail || '—'}</p></div><span className={`text-xs px-2 py-1 rounded-full ${scheduleState(row).classes}`}>{scheduleState(row).label}</span><div className="ml-auto flex gap-2"><button type="button" onClick={() => { setEditingSchedule(row); setShowScheduleEditor(true); }} className="rounded-lg border px-3 py-2 text-sm font-semibold text-blue-700">Chỉnh sửa</button><button type="button" onClick={() => deleteSchedule(row)} className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700">Xóa</button></div></article>)}{!scheduleRows.length && <p className="bg-white rounded-xl p-6 text-slate-500">Chưa có lịch chăm sóc.</p>}</div></section>}
 
           {tab === 'device' && <section id="family-section-device" className="scroll-mt-24"><h2 className="text-xl font-bold mb-1">Thông báo bảo trì thiết bị</h2><p className="text-sm text-slate-500 mb-4">Các nhắc nhở vận hành thiết bị được gửi từ hệ thống.</p><div className="space-y-3">{maintenance.map(item => <article key={item.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4"><span className="text-2xl">🛠️</span><div className="flex-1"><h3 className="font-semibold">{item.title}</h3><p className="text-sm text-slate-600 mt-1">{item.detail}</p><p className="text-xs text-slate-500 mt-2">Hạn: {item.due_at || 'Chưa xác định'}</p></div><span className="text-xs px-2 py-1 h-fit rounded-full bg-amber-100 text-amber-800">{item.status === 'pending' ? 'Cần chú ý' : 'Đã xử lý'}</span></article>)}{!maintenance.length && <p className="bg-white rounded-xl p-6 text-slate-500">Hiện chưa có thông báo bảo trì.</p>}</div></section>}
           {tab === 'connectivity' && <section id="family-section-connectivity" className="scroll-mt-24">
