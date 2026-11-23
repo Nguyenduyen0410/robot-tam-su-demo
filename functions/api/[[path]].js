@@ -1,4 +1,5 @@
-import { getReadOnlyBpm, getReadOnlyChat } from '../lib/third-party-myka.js';
+import { getReadOnlyChat } from '../lib/third-party-myka.js';
+import { mykaTestReadings } from '../lib/myka-test-readings.js';
 
 const corsHeaders = (request) => {
   const origin = request.headers.get('Origin') || '';
@@ -387,19 +388,17 @@ export async function onRequest({ request, env, params }) {
     if (request.method === 'GET' && area === 'family' && section === 'health-summary' && elderId) {
       if (elderId !== 'E001') return json(request, { error: 'Bản mẫu API guide hiện chỉ được gán cho hồ sơ E001 (Bà Hoa).' }, 404);
       const days = Math.min(30, Math.max(7, Number(new URL(request.url).searchParams.get('days') || 7)));
-      const { rows: sourceReadings, source } = await getReadOnlyBpm(env, days);
-      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-      const { results: syncedRows } = await db.prepare("SELECT id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp, received_at FROM blood_pressure WHERE elder_id = ? AND note LIKE 'APP-SYNC-DEMO:%' AND timestamp >= ? ORDER BY timestamp DESC")
-        .bind(elderId, new Date(cutoff).toISOString()).all();
-      const merged = new Map();
-      [...sourceReadings, ...syncedRows].forEach(row => merged.set(String(row.id), row));
-      const results = [...merged.values()].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      const source = 'third_party_api';
+      const newestDay = mykaTestReadings[0].timestamp.slice(0, 10);
+      const cutoff = new Date(Date.parse(newestDay) - (days - 1) * 86400000).toISOString().slice(0, 10);
+      const results = mykaTestReadings.filter(row => row.timestamp.slice(0, 10) >= cutoff);
       if (!results.length) return json(request, { elder_id: elderId, summary: null, daily_readings: [], data_source: source, demo: source !== 'third_party_api' });
       const latest = results[0];
       const avg = (key) => Math.round(results.reduce((sum, row) => sum + Number(row[key] || 0), 0) / results.length * 10) / 10;
       const status = Number(latest.systolic) >= 140 || Number(latest.diastolic) >= 90 ? 'critical' : Number(latest.systolic) >= 130 || Number(latest.diastolic) >= 85 ? 'warning' : 'normal';
       return json(request, {
-        elder_id: elderId, period_days: days, elder_name: 'Bà Nguyễn Thị Hoa', data_source: source, demo: source !== 'third_party_api',
+        elder_id: elderId, period_days: days, elder_name: 'Bà Nguyễn Thị Hoa', data_source: source,
+        snapshot_end: newestDay, imported_on: '2026-11-23', demo: true,
         latest_reading: latest,
         statistics: { total_measurements: results.length, avg_systolic: avg('systolic'), avg_diastolic: avg('diastolic'), avg_heart_rate: avg('heart_rate'), overall_status: status, overall_label: status === 'normal' ? 'Trong ngưỡng theo dõi' : status === 'warning' ? 'Cần người chăm sóc lưu ý' : 'Đã phát hiện chỉ số vượt ngưỡng' },
         daily_readings: results,
