@@ -1,4 +1,5 @@
-import { getReadOnlyBpm, getReadOnlyChat } from '../lib/third-party-myka.js';
+import { getReadOnlyChat } from '../lib/third-party-myka.js';
+import { mykaTestReadings } from '../lib/myka-test-readings.js';
 
 const corsHeaders = (request) => {
   const origin = request.headers.get('Origin') || '';
@@ -24,7 +25,6 @@ const json = (request, data, status = 200) => new Response(JSON.stringify(data),
 const nowIso = () => new Date().toISOString();
 const newId = (prefix) => `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
 let familyPreferencesSchemaReady = false;
-let bpDemoScheduleSchemaReady = false;
 let elderProfilesSchemaReady = false;
 let conversationLogsSchemaReady = false;
 async function ensureBackendDemoData(db, elderId) {
@@ -164,23 +164,6 @@ async function ensureFamilyPreferences(db, elderId) {
     VALUES (?, 'off', NULL, 'female_young_sweet', '', ?)`).bind(elderId, nowIso()).run();
 }
 
-async function ensureBpDemoSchedule(db, elderId) {
-  if (!bpDemoScheduleSchemaReady) {
-    await db.prepare(`CREATE TABLE IF NOT EXISTS bp_demo_schedules (
-      elder_id TEXT PRIMARY KEY,
-      enabled INTEGER NOT NULL DEFAULT 0,
-      morning_time TEXT NOT NULL DEFAULT '09:00',
-      evening_time TEXT NOT NULL DEFAULT '19:00',
-      timezone TEXT NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
-      updated_at TEXT NOT NULL
-    )`).run();
-    bpDemoScheduleSchemaReady = true;
-  }
-  await db.prepare("INSERT OR IGNORE INTO bp_demo_schedules (elder_id, enabled, morning_time, evening_time, timezone, updated_at) VALUES (?, 0, '09:00', '19:00', 'Asia/Ho_Chi_Minh', ?)")
-    .bind(elderId, nowIso()).run();
-  return db.prepare('SELECT enabled, morning_time, evening_time, timezone, updated_at FROM bp_demo_schedules WHERE elder_id = ?').bind(elderId).first();
-}
-
 async function ensureElderProfiles(db, elderId) {
   if (!elderProfilesSchemaReady) {
     await db.prepare(`CREATE TABLE IF NOT EXISTS elder_profiles (
@@ -253,43 +236,6 @@ async function ensureBpReceiptTime(db) {
   }
 }
 
-// Shared demo source: a slot represents one simulated robot measurement, never a new click-time reading.
-// robotHasReading=false models an unavailable measurement; live device polling is not implemented.
-async function syncBpDemoSlot(db, elderId, slot, robotHasReading = true) {
-      const schedule = await ensureBpDemoSchedule(db, elderId);
-      if (!schedule?.enabled) return { success: true, skipped: true, reason: 'schedule_disabled' };
-      const now = new Date();
-      const localParts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-      }).formatToParts(now).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
-      const localDate = `${localParts.year}-${localParts.month}-${localParts.day}`;
-      const scheduledTime = slot === 'morning' ? schedule.morning_time : schedule.evening_time;
-      const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
-      const localMinuteOfDay = Number(localParts.hour) * 60 + Number(localParts.minute);
-      const scheduledMinuteOfDay = scheduledHour * 60 + scheduledMinute;
-      const elapsedMinutes = localMinuteOfDay - scheduledMinuteOfDay;
-      if (elapsedMinutes < 0) return { success: true, skipped: true, reason: 'outside_schedule_window', local_date: localDate, slot, scheduled_time: scheduledTime };
-      const id = `BP-SCHEDULE-${elderId}-${localDate.replaceAll('-', '')}-${slot.toUpperCase()}`;
-      const existing = await db.prepare('SELECT id FROM blood_pressure WHERE id = ? AND elder_id = ?').bind(id, elderId).first();
-      if (existing) return { success: true, skipped: true, reason: 'already_recorded', local_date: localDate, slot, scheduled_time: scheduledTime };
-      if (!robotHasReading) return { success: true, skipped: true, reason: 'robot_no_measurement', local_date: localDate, slot, scheduled_time: scheduledTime };
-      const dayIndex = Math.floor(Date.parse(`${localDate}T00:00:00Z`) / 86400000);
-      const eveningOffset = slot === 'evening' ? 3 : 0;
-      const systolic = 118 + (dayIndex % 8) + eveningOffset;
-      const diastolic = 75 + (dayIndex % 6) + (slot === 'evening' ? 2 : 0);
-      const heartRate = 70 + (dayIndex % 9) + (slot === 'evening' ? 3 : 0);
-      const status = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
-      const timestamp = new Date(`${localDate}T${scheduledTime}:00+07:00`).toISOString();
-      const note = `APP-SYNC-DEMO: Số đo mô phỏng tự động lúc ${scheduledTime}.`;
-      const receivedAt = now.toISOString();
-      const inserted = await db.prepare('INSERT OR IGNORE INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(id, elderId, systolic, diastolic, heartRate, status, note, timestamp, receivedAt).run();
-      if (!inserted.meta?.changes) return { success: true, skipped: true, reason: 'already_recorded', local_date: localDate, slot };
-      if (status === 'critical') await db.prepare('INSERT INTO alerts (id, elder_id, type, title, detail, severity, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(newId('ALT'), elderId, 'bp_critical', 'Đã ghi nhận chỉ số vượt ngưỡng cấu hình', `Đo mô phỏng ${systolic}/${diastolic} mmHg, nhịp tim ${heartRate} bpm. Cần người chăm sóc xem lại.`, 'critical', 'pending', timestamp).run();
-      return { success: true, skipped: false, slot, reading: { id, elder_id: elderId, systolic, diastolic, heart_rate: heartRate, status, note, timestamp, received_at: receivedAt }, agent: await agentStatus(db, elderId) };
-}
-
 export async function onRequest({ request, env, params }) {
   const headers = corsHeaders(request);
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
@@ -302,7 +248,7 @@ export async function onRequest({ request, env, params }) {
   const elderId = resource;
 
   try {
-    if (['health-summary', 'bp-history', 'bp-sync', 'bp-record'].includes(section) || area === 'bpm' || (area === 'demo-scheduler' && section === 'tick')) await ensureBpReceiptTime(db);
+    if (['health-summary', 'bp-history', 'bp-record'].includes(section) || area === 'bpm') await ensureBpReceiptTime(db);
     if (request.method === 'GET' && parts.join('/') === 'health') {
       return json(request, { success: true, status: 'ok', timestamp: nowIso(), database: 'connected' });
     }
@@ -365,7 +311,7 @@ export async function onRequest({ request, env, params }) {
         const receivedAt = nowIso();
         const measuredAt = body.measured_at && Number.isFinite(Date.parse(body.measured_at)) ? new Date(Date.parse(body.measured_at)).toISOString() : receivedAt;
         const id = newId('BPM');
-        const noteText = `APP-SYNC-DEMO: ${body.note || 'Đồng bộ trực tiếp qua API Robot Myka (' + (body.robot_id || 'ROBOT-MYKA-001') + ')'}`;
+        const noteText = String(body.note || `Ghi nhận qua API thiết bị Myka (${body.robot_id || 'ROBOT-MYKA-001'})`).slice(0, 300);
         await db.prepare('INSERT INTO blood_pressure (id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
           .bind(id, targetElder, sys, dia, pul, status, noteText, measuredAt, receivedAt).run();
         return json(request, {
@@ -387,19 +333,17 @@ export async function onRequest({ request, env, params }) {
     if (request.method === 'GET' && area === 'family' && section === 'health-summary' && elderId) {
       if (elderId !== 'E001') return json(request, { error: 'Bản mẫu API guide hiện chỉ được gán cho hồ sơ E001 (Bà Hoa).' }, 404);
       const days = Math.min(30, Math.max(7, Number(new URL(request.url).searchParams.get('days') || 7)));
-      const { rows: sourceReadings, source } = await getReadOnlyBpm(env, days);
-      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-      const { results: syncedRows } = await db.prepare("SELECT id, elder_id, systolic, diastolic, heart_rate, status, note, timestamp, received_at FROM blood_pressure WHERE elder_id = ? AND note LIKE 'APP-SYNC-DEMO:%' AND timestamp >= ? ORDER BY timestamp DESC")
-        .bind(elderId, new Date(cutoff).toISOString()).all();
-      const merged = new Map();
-      [...sourceReadings, ...syncedRows].forEach(row => merged.set(String(row.id), row));
-      const results = [...merged.values()].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      const source = 'third_party_api';
+      const newestDay = mykaTestReadings[0].timestamp.slice(0, 10);
+      const cutoff = new Date(Date.parse(newestDay) - (days - 1) * 86400000).toISOString().slice(0, 10);
+      const results = mykaTestReadings.filter(row => row.timestamp.slice(0, 10) >= cutoff);
       if (!results.length) return json(request, { elder_id: elderId, summary: null, daily_readings: [], data_source: source, demo: source !== 'third_party_api' });
       const latest = results[0];
       const avg = (key) => Math.round(results.reduce((sum, row) => sum + Number(row[key] || 0), 0) / results.length * 10) / 10;
       const status = Number(latest.systolic) >= 140 || Number(latest.diastolic) >= 90 ? 'critical' : Number(latest.systolic) >= 130 || Number(latest.diastolic) >= 85 ? 'warning' : 'normal';
       return json(request, {
-        elder_id: elderId, period_days: days, elder_name: 'Bà Nguyễn Thị Hoa', data_source: source, demo: source !== 'third_party_api',
+        elder_id: elderId, period_days: days, elder_name: 'Bà Nguyễn Thị Hoa', data_source: source,
+        snapshot_end: newestDay, imported_on: '2026-11-23', demo: true,
         latest_reading: latest,
         statistics: { total_measurements: results.length, avg_systolic: avg('systolic'), avg_diastolic: avg('diastolic'), avg_heart_rate: avg('heart_rate'), overall_status: status, overall_label: status === 'normal' ? 'Trong ngưỡng theo dõi' : status === 'warning' ? 'Cần người chăm sóc lưu ý' : 'Đã phát hiện chỉ số vượt ngưỡng' },
         daily_readings: results,
@@ -431,7 +375,6 @@ export async function onRequest({ request, env, params }) {
 
     if (request.method === 'GET' && area === 'family' && section === 'settings' && elderId) {
       await ensureFamilyPreferences(db, elderId);
-      const bpDemoSchedule = await ensureBpDemoSchedule(db, elderId);
       const settings = await db.prepare('SELECT dnd_mode, dnd_until, voice_profile, robot_name, updated_at FROM family_preferences WHERE elder_id = ?').bind(elderId).first();
       if (!settings) return json(request, { error: 'Chưa có cài đặt cho hồ sơ này.' }, 404);
       if (settings.dnd_until && Date.parse(settings.dnd_until) <= Date.now()) {
@@ -440,12 +383,11 @@ export async function onRequest({ request, env, params }) {
         settings.dnd_until = null;
         settings.updated_at = nowIso();
       }
-      return json(request, { ...settings, bp_demo_schedule_enabled: Boolean(bpDemoSchedule?.enabled), bp_demo_morning_time: bpDemoSchedule?.morning_time || '09:00', bp_demo_evening_time: bpDemoSchedule?.evening_time || '19:00', dnd_enabled: settings.dnd_mode !== 'off' });
+      return json(request, { ...settings, dnd_enabled: settings.dnd_mode !== 'off' });
     }
 
     if (request.method === 'PUT' && area === 'family' && section === 'settings' && elderId) {
       await ensureFamilyPreferences(db, elderId);
-      await ensureBpDemoSchedule(db, elderId);
       const body = await request.json();
       const allowedModes = new Set(['off', '2h', '5h', 'custom', 'until_off']);
       const allowedVoices = new Set(['male_young_warm', 'male_middle_steady', 'female_young_sweet', 'female_middle_calm']);
@@ -459,40 +401,17 @@ export async function onRequest({ request, env, params }) {
         : mode === '5h' ? new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString()
           : mode === 'custom' && Number.isFinite(requestedDndUntil) && requestedDndUntil > Date.now() && requestedDndUntil <= Date.now() + 24 * 60 * 60 * 1000 ? new Date(requestedDndUntil).toISOString() : null;
       if (mode === 'custom' && !dndUntil) return json(request, { error: 'Thời lượng Không làm phiền không hợp lệ.' }, 422);
-      const bpDemoEnabled = body.bp_demo_schedule_enabled === true || body.bp_demo_schedule_enabled === 1;
       const updatedAt = nowIso();
       await db.prepare(`INSERT INTO family_preferences (elder_id, dnd_mode, dnd_until, voice_profile, robot_name, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(elder_id) DO UPDATE SET dnd_mode = excluded.dnd_mode, dnd_until = excluded.dnd_until,
         voice_profile = excluded.voice_profile, robot_name = excluded.robot_name, updated_at = excluded.updated_at`)
         .bind(elderId, mode, dndUntil, voice, robotName, updatedAt).run();
-      await db.prepare('UPDATE bp_demo_schedules SET enabled = ?, updated_at = ? WHERE elder_id = ?').bind(bpDemoEnabled ? 1 : 0, updatedAt, elderId).run();
-      return json(request, { success: true, dnd_mode: mode, dnd_until: dndUntil, dnd_enabled: mode !== 'off', voice_profile: voice, robot_name: robotName, bp_demo_schedule_enabled: bpDemoEnabled, bp_demo_morning_time: '09:00', bp_demo_evening_time: '19:00', updated_at: updatedAt });
+      return json(request, { success: true, dnd_mode: mode, dnd_until: dndUntil, dnd_enabled: mode !== 'off', voice_profile: voice, robot_name: robotName, updated_at: updatedAt });
     }
 
-    if (request.method === 'POST' && area === 'demo-scheduler' && section === 'tick' && elderId) {
-      if (elderId !== 'E001') return json(request, { error: 'Lịch đo mô phỏng hiện chỉ áp dụng cho hồ sơ E001.' }, 404);
-      const origin = request.headers.get('Origin') || '';
-      if (!['https://myka-care-companion.pages.dev', 'http://localhost:8765', 'http://127.0.0.1:8765'].includes(origin)) return json(request, { error: 'Nguồn gửi lịch không được phép.' }, 403);
-      const slot = new URL(request.url).searchParams.get('slot');
-      if (!['morning', 'evening'].includes(slot)) return json(request, { error: 'Khung giờ không hợp lệ.' }, 422);
-      const result = await syncBpDemoSlot(db, elderId, slot, env.MYKA_DEMO_ROBOT_HAS_READING !== 'false');
-      return json(request, result, result.skipped ? 200 : 201);
-    }
-
-    if (request.method === 'POST' && area === 'family' && section === 'bp-sync' && elderId) {
-      if (elderId !== 'E001') return json(request, { error: 'Đồng bộ lịch mô phỏng chỉ áp dụng cho hồ sơ E001.' }, 404);
-      const origin = request.headers.get('Origin') || '';
-      if (!['https://myka-care-companion.pages.dev', 'http://localhost:8765', 'http://127.0.0.1:8765'].includes(origin)) return json(request, { error: 'Nguồn yêu cầu không được phép.' }, 403);
-      const text = await request.text();
-      if (text.trim()) {
-        let body; try { body = JSON.parse(text); } catch { return json(request, { error: 'Yêu cầu không hợp lệ.' }, 422); }
-        if (!body || Array.isArray(body) || typeof body !== 'object' || Object.keys(body).length) return json(request, { error: 'Nút đồng bộ không nhận số đo, thời điểm hoặc khung giờ do người thân nhập.' }, 422);
-      }
-      const slots = [];
-      for (const slot of ['morning', 'evening']) slots.push({ slot, ...await syncBpDemoSlot(db, elderId, slot, env.MYKA_DEMO_ROBOT_HAS_READING !== 'false') });
-      const received = slots.filter(r => !r.skipped).map(r => r.reading);
-      return json(request, { success: true, is_synthetic: true, mode: 'scheduled_demo_recovery', received_count: received.length, received, slots, agent: await agentStatus(db, elderId) });
+    if (request.method === 'POST' && ((area === 'demo-scheduler' && section === 'tick') || (area === 'family' && section === 'bp-sync')) && elderId) {
+      return json(request, { success: false, code: 'SYNTHETIC_MEASUREMENT_SCHEDULER_DISABLED', message: 'Lịch 09:00/19:00 chỉ dùng để nhắc người thân xem app; hệ thống không tạo hoặc đồng bộ số đo theo lịch.' }, 410);
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'conversation-history' && elderId) {

@@ -25,11 +25,13 @@ wrangler d1 execute myka-care-db --remote --file=migrations/0004_elder_profile_d
 
 Sau khi thêm binding, cần có một deployment mới để Function nhận binding.
 
-## Phạm vi Agent
+## Phạm vi nguồn số đo và lời nhắc
 
-Mục **Trạng thái** có nút **Kiểm tra & đồng bộ**, gửi yêu cầu rỗng tới `POST /api/family/bp-sync/E001`. Backend chỉ lấy bù khung đã đến giờ còn thiếu khi lịch bật và nguồn mô phỏng có số đo; không tạo số đo tùy ý theo lần bấm. Khóa hồ sơ/ngày/khung chống trùng giữa đồng bộ thủ công và tự động. Số đo mẫu giữ tiền tố `APP-SYNC-DEMO:` và được API sức khỏe đọc lại từ D1.
+App hiển thị snapshot cố định gồm 28 bản ghi được trích xuất từ API lịch sử Myka ngày 23/11/2026. Timestamp trong biểu đồ và bảng là giờ đo do nguồn trả về; app không gán giờ đo mới và không làm mới snapshot thành số đo trực tiếp.
 
-Trong **Cài đặt**, người thân bật/tắt lịch mô phỏng **09:00/19:00** theo giờ Việt Nam. Từ 05/11/2026, Worker `myka-bp-scheduler` dùng Durable Object Alarm để gửi từng khung, tự đặt lịch tiếp theo; Cron 5 phút chỉ khởi tạo/sửa alarm còn thiếu. Alarm dự kiến chạy sau mốc đo 20–30 giây, chừa thời gian gọi API cho mục tiêu nhận sau 20–35 giây. Đây là mục tiêu thử nghiệm, không phải bảo đảm mọi lần đều đạt. GitHub Actions 20 phút/lần giữ vai trò đồng bộ bù dự phòng. Khi có lỗi, thời gian nhận thực tế vẫn được lưu, không cắt xuống ngưỡng mục tiêu.
+**09:00 và 19:00 là lời nhắc người thân mở app để xem số đo trong ngày.** Chúng không điều khiển robot, không gọi API thiết bị theo giờ, không tạo bản ghi đo và không làm thay đổi timestamp. Lời nhắc được xử lý ở trình duyệt khi trang app đang mở; thông báo hệ thống cần quyền do người thân cấp và không hoạt động nền khi app đã đóng.
+
+Worker lịch gửi số đo mô phỏng đã được ngừng; cấu hình hiện tại không còn cron. Endpoint cũ `/api/demo-scheduler/tick` và `/api/family/bp-sync` trả mã 410 để không sinh số đo giả. Các ca kiểm chứng lịch gửi trước đây chỉ là bằng chứng lịch sử của một cơ chế mô phỏng, không mô tả hành vi app hiện hành.
 
 `blood_pressure.timestamp` giữ giờ đo nguồn; `received_at` mới do máy chủ gán khi chấp nhận ghi. API áp dụng bổ sung cột nullable cho cơ sở dữ liệu cũ; không chạy lại migration 0006 nếu cột đã tồn tại, không điền giả giờ nhận của bản ghi cũ. Luồng device có thể gửi `measured_at` hợp lệ không ở tương lai; nếu không có, timestamp vẫn là mốc tiếp nhận tương thích cũ và không đủ để kết luận độ trễ từ thiết bị. UI lịch sử chỉ hiện giờ nhận theo giờ Việt Nam, chưa có thì ghi chưa ghi nhận; công thức/thống kê thuộc báo cáo.
 
@@ -43,7 +45,7 @@ Các thao tác Wi-Fi/Bluetooth và ghi phép đo hiện chỉ mô phỏng dữ l
 
 `GET/PUT /api/family/elder-profile/{elder_id}` đọc và lưu thông tin bổ sung của hồ sơ người cao tuổi đã liên kết: tuổi, địa chỉ và ghi chú sức khỏe. Người thân mở Hồ sơ, chọn Thêm thông tin hoặc Chỉnh sửa rồi Lưu thay đổi. API kiểm tra giới hạn dữ liệu, lưu vào D1 và trả hồ sơ đã cập nhật. Bản public hiện là demo dùng dữ liệu minh họa theo giới hạn bên dưới.
 
-`GET/PUT /api/family/settings/{elder_id}` lưu lựa chọn Không làm phiền (thời lượng tùy chỉnh tối đa 24 giờ hoặc đến khi bật lại), kiểu giọng, tên robot và trạng thái lịch số đo mô phỏng. Lịch được lưu trong bảng D1 `bp_demo_schedules` do API tự tạo khi đọc cài đặt, không cần chạy migration thủ công. Đây là cấu hình hồ sơ demo: app chưa có push notification để tắt rung/âm thanh thực tế; giọng và tên chỉ được áp dụng khi tích hợp phần cứng.
+`GET/PUT /api/family/settings/{elder_id}` lưu lựa chọn Không làm phiền, kiểu giọng và tên robot. Lời nhắc người thân xem số đo được lưu trong localStorage của trình duyệt hiện tại, tách khỏi hồ sơ thiết bị và dữ liệu đo. Kiểu giọng và tên robot chưa được đồng bộ tới phần cứng.
 
 `GET/POST /api/family/schedules/{elder_id}` đọc và tạo lịch thuốc/tái khám trong D1. Hàm `scheduleNotification()` hiện chỉ là điểm nối minh họa, chưa gửi push notification.
 
@@ -62,6 +64,6 @@ CTA đăng ký/gia hạn mở luồng chuyển khoản ngân hàng minh họa. T
 - Trước khi triển khai thật cần bổ sung xác thực server-side, phân quyền theo hồ sơ, bảo vệ API thiết bị và quy trình bảo mật dữ liệu.
 
 
-## Lịch sử cấu hình trước 05/11/2026
+## Tư liệu kiểm chứng lịch mô phỏng đã ngừng
 
-Trước bản sửa, GitHub Actions kiểm tra khoảng 20 phút/lần và có thể chạy muộn; quan sát E11 ghi nhận đồng bộ bù khung 19:00 vào khoảng 20:30. Bằng chứng này được giữ nguyên. Bản sửa dùng Alarm làm lịch chính, lưu giờ nhận và kiểm tra lại bằng E12; chưa nghiệm thu vận hành tự nhiên qua nhiều ngày hoặc truyền từ robot thật. App đang mở tự tải lại mỗi 30 giây, nên thời điểm nhìn thấy trên màn hình có thể muộn hơn thời điểm máy chủ đã nhận.
+Các bằng chứng E11/E12 ghi lại một thử nghiệm lập lịch gửi số đo mô phỏng trước đây. Cơ chế đó đã được tắt và không còn đại diện cho hành vi hiện hành của app. Ứng dụng hiện dùng 09:00/19:00 để nhắc người thân xem số đo; timestamp đo trên biểu đồ vẫn lấy từ snapshot API Myka.

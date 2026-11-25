@@ -10,7 +10,7 @@
     const [highlightTarget, setHighlightTarget] = React.useState('');
     const [highlightRequest, setHighlightRequest] = React.useState(0);
     const [days, setDays] = React.useState(7);
-    const [readings, setReadings] = React.useState(() => RTS.getBP(elderId) || []);
+    const [readings, setReadings] = React.useState([]);
     const [schedules, setSchedules] = React.useState(() => RTS.getSchedules(elderId) || []);
     const [maintenance, setMaintenance] = React.useState([
       { id: 'MNT-DEMO-01', title: 'Kiểm tra máy đo huyết áp', detail: 'Đến hạn kiểm tra định kỳ thiết bị đo huyết áp.', status: 'pending', due_at: '2026-10-30' },
@@ -36,9 +36,17 @@
     const demoMonthlyPayment = { id: 'PAY-RENEWAL-E001', service_name: 'Myka Care Companion · kỳ hiện tại', amount: 100000, currency: 'VND', status: 'paid', period_start: localMonthStart, period_end: currentMonthEnd, due_at: localMonthStart, paid_at: `${localMonthStart}T09:00:00+07:00` };
     const [subscription, setSubscription] = React.useState({ current_plan: null, payments: [], pricing: null });
     const [agentStatus, setAgentStatus] = React.useState(null);
-    const [measurementSyncBusy, setMeasurementSyncBusy] = React.useState(false);
-    const [measurementSyncMessage, setMeasurementSyncMessage] = React.useState('');
-    const [measurementSyncTone, setMeasurementSyncTone] = React.useState('info');
+    const reviewReminderKey = `myka-care-review-reminder:${elderId}`;
+    const readReviewReminder = () => {
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(reviewReminderKey) || 'null');
+        return { enabled: saved?.enabled !== false, morning: '09:00', evening: '19:00' };
+      } catch { return { enabled: true, morning: '09:00', evening: '19:00' }; }
+    };
+    const [reviewReminder, setReviewReminder] = React.useState(readReviewReminder);
+    const [reviewReminderMessage, setReviewReminderMessage] = React.useState('');
+    const [reviewReminderAlert, setReviewReminderAlert] = React.useState(null);
+    const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = React.useState(() => window.localStorage.getItem(`${reviewReminderKey}:browser`) === 'on');
     const defaultTgUrl = window.MYKA_TELEGRAM_GROUP_URL || 'https://web.telegram.org/a/#-1004358354552';
     const [telegramLinks, setTelegramLinks] = React.useState({
       group_chat_url: defaultTgUrl,
@@ -61,14 +69,15 @@
         heart_rate: hr,
         heartRate: hr,
         timestamp: isoTs,
-        received_at: row.received_at || isoTs,
+        received_at: row.received_at || null,
         status_vi: row.status_vi || (sys >= 140 || dia >= 90 ? 'Cần lưu ý (Vượt ngưỡng)' : 'Huyết áp bình thường (Tối ưu)'),
         advice: row.advice || row.note || ''
       };
     };
     const [apiAvailable, setApiAvailable] = React.useState(false);
+    const [snapshotEnd, setSnapshotEnd] = React.useState(null);
     const [healthDataSource, setHealthDataSource] = React.useState('app_demo');
-    const [preferences, setPreferences] = React.useState({ dnd_mode: 'off', dnd_until: null, voice_profile: 'female_young_sweet', robot_name: '', bp_demo_schedule_enabled: false, bp_demo_morning_time: '09:00', bp_demo_evening_time: '19:00' });
+    const [preferences, setPreferences] = React.useState({ dnd_mode: 'off', dnd_until: null, voice_profile: 'female_young_sweet', robot_name: '' });
     const [careProfile, setCareProfile] = React.useState(null);
     const [careProfileMessage, setCareProfileMessage] = React.useState('Đang tải hồ sơ người cao tuổi…');
     const [profileEditing, setProfileEditing] = React.useState(false);
@@ -86,6 +95,34 @@
       const timer = window.setInterval(() => setDndClock(Date.now()), 30000);
       return () => window.clearInterval(timer);
     }, []);
+
+    React.useEffect(() => {
+      if (!reviewReminder.enabled) return undefined;
+      const checkReminder = () => {
+        const now = new Date();
+        const localTime = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+        }).formatToParts(now).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+        const date = `${localTime.year}-${localTime.month}-${localTime.day}`;
+        const minuteNow = Number(localTime.hour) * 60 + Number(localTime.minute);
+        for (const [slot, time, label] of [['morning', reviewReminder.morning, 'buổi sáng'], ['evening', reviewReminder.evening, 'buổi tối']]) {
+          const [hour, minute] = time.split(':').map(Number);
+          const elapsed = minuteNow - (hour * 60 + minute);
+          const reminderId = `${reviewReminderKey}:${date}:${slot}`;
+          if (elapsed < 0 || elapsed > 5 || window.localStorage.getItem(`${reviewReminderKey}:last`) === reminderId) continue;
+          const notice = { id: reminderId, title: `Đến giờ kiểm tra số đo ${label}`, body: 'Mở mục Sức khỏe để xem huyết áp, nhịp tim và thời điểm đo gần nhất của Ngoại.' };
+          window.localStorage.setItem(`${reviewReminderKey}:last`, reminderId);
+          setReviewReminderAlert(notice);
+          if (browserNotificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification(notice.title, { body: notice.body, tag: reminderId });
+          }
+          break;
+        }
+      };
+      checkReminder();
+      const timer = window.setInterval(checkReminder, 30000);
+      return () => window.clearInterval(timer);
+    }, [reviewReminder, browserNotificationsEnabled]);
 
     React.useEffect(() => {
       if (!highlightTarget) return undefined;
@@ -117,7 +154,8 @@
         const hData = health?.data || health || {};
         const rawReadings = hData.daily_readings || [];
         setReadings(rawReadings.map(normalizeReading).filter(Boolean).slice().reverse());
-        setHealthDataSource(hData.data_source || 'robot');
+        setHealthDataSource(hData.data_source || 'app_demo');
+        setSnapshotEnd(hData.snapshot_end || null);
         const sData = Array.isArray(plan) ? plan : (Array.isArray(plan?.data) ? plan.data : []);
         setSchedules(sData);
         setMaintenance(Array.isArray(notices) ? notices : (notices?.data || []));
@@ -146,7 +184,7 @@
         .catch(() => { if (active) setConnectivity({ paired_devices: [] }); });
       fetch(apiUrl(`/family/settings/${elderId}`))
         .then(r => r.ok ? r.json() : Promise.reject())
-        .then(data => { if (active) setPreferences(data); })
+        .then(data => { if (active) setPreferences({ dnd_mode: data.dnd_mode || 'off', dnd_until: data.dnd_until || null, voice_profile: data.voice_profile || 'female_young_sweet', robot_name: data.robot_name || '' }); })
         .catch(() => { if (active) setSettingsMessage('Chưa tải được cài đặt từ máy chủ.'); });
       fetch(apiUrl(`/family/elder-profile/${elderId}`))
         .then(r => r.ok ? r.json() : Promise.reject())
@@ -167,7 +205,8 @@
         setConnectivity(device?.data || device);
         const hData = health?.data || health || {};
         setReadings((hData.daily_readings || []).map(normalizeReading).filter(Boolean).slice().reverse());
-        setHealthDataSource(hData.data_source || 'robot');
+        setHealthDataSource(hData.data_source || 'app_demo');
+        setSnapshotEnd(hData.snapshot_end || null);
         setApiAvailable(true);
         setStatusUpdatedAt(new Date());
       }).catch(() => {
@@ -193,29 +232,35 @@
     }, [conversationDate]);
 
     const elder = RTS.getElders().find(e => e.id === elderId);
-    const fallbackReadings = RTS.getBP(elderId) || [];
-    const visibleReadings = apiAvailable ? readings : fallbackReadings.slice(-days);
+    const endDay = apiAvailable && snapshotEnd ? snapshotEnd : window.MykaCareJournal.today();
+    const firstDay = window.MykaCareJournal.dayAt(endDay, 1 - days);
+    const visibleReadings = (apiAvailable ? readings : []).filter(row => {
+      if (!Number.isFinite(Date.parse(row.timestamp))) return false;
+      const day = window.MykaCareJournal.today(new Date(row.timestamp));
+      return day >= firstDay && day <= endDay;
+    }).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
     const latest = visibleReadings[visibleReadings.length - 1];
-    const avg = (key) => visibleReadings.length
-      ? Math.round(visibleReadings.reduce((sum, row) => sum + Number(row[key] || 0), 0) / visibleReadings.length)
-      : '—';
-    const avgHeartRate = visibleReadings.some(row => row.heart_rate !== undefined)
-      ? avg('heart_rate') : avg('heartRate');
+    const avg = key => {
+      const values = visibleReadings.map(row => Number(key === 'heart_rate' ? row.heart_rate ?? row.heartRate : row[key]))
+        .filter(value => Number.isFinite(value) && value > 0);
+      return values.length ? Math.round(values.reduce((sum, n) => sum + n, 0) / values.length) : '—';
+    };
+    const avgHeartRate = avg('heart_rate');
     const dateLabel = value => {
       const date = new Date(value);
       return Number.isNaN(date.getTime()) ? value : date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
     };
     const receiptLabel = value => value && Number.isFinite(Date.parse(value))
       ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'medium' })
-      : 'Chưa ghi nhận giờ nhận';
+      : 'Chưa có thông tin';
     const scheduleRows = apiAvailable ? schedules : schedules.map(s => ({
       ...s, scheduled_at: s.scheduled_at || s.time, type: s.type === 'appointment' ? 'checkup' : s.type,
     })).filter(s => ['medication', 'checkup'].includes(s.type));
     const scheduleState = row => {
       const scheduleTime = Date.parse(row.scheduled_at || row.time || '');
-      if (Number.isFinite(scheduleTime) && scheduleTime > Date.now()) return { label: 'Theo lịch', classes: 'bg-blue-100 text-blue-800' };
-      if (row.confirmed === true || Number(row.confirmed) === 1) return { label: 'Đã xác nhận', classes: 'bg-emerald-100 text-emerald-800' };
-      return { label: 'Quá hạn', classes: 'bg-rose-100 text-rose-800' };
+      if (!Number.isFinite(scheduleTime)) return { label: 'Chưa rõ giờ', classes: 'bg-slate-100 text-slate-700' };
+      if (scheduleTime > Date.now()) return { label: 'Sắp đến', classes: 'bg-blue-100 text-blue-800' };
+      return { label: 'Đã qua giờ lịch', classes: 'bg-slate-100 text-slate-700' };
     };
     const upcomingSchedule = scheduleRows
       .filter(row => row.scheduled_at && new Date(row.scheduled_at).getTime() >= Date.now())
@@ -302,7 +347,7 @@
       fetch(apiUrl(`/family/settings/${elderId}`), {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(preferences),
       }).then(r => r.ok ? r.json() : Promise.reject())
-        .then(data => { setPreferences(data); setSettingsMessage('Đã lưu cài đặt vào hồ sơ gia đình.'); })
+        .then(data => { setPreferences({ dnd_mode: data.dnd_mode || 'off', dnd_until: data.dnd_until || null, voice_profile: data.voice_profile || 'female_young_sweet', robot_name: data.robot_name || '' }); setSettingsMessage('Đã lưu cài đặt vào hồ sơ gia đình.'); })
         .catch(() => setSettingsMessage('Chưa lưu được cài đặt. Vui lòng thử lại khi kết nối máy chủ ổn định.'))
         .finally(() => setSettingsSaving(false));
     };
@@ -326,40 +371,19 @@
       } catch { setCareProfileMessage('Chưa lưu được hồ sơ. Dữ liệu nháp vẫn được giữ nguyên để bạn thử lại.'); }
       finally { setProfileSaving(false); }
     };
-    const recoverScheduledMeasurements = async () => {
-      if (measurementSyncBusy) return;
-      setMeasurementSyncBusy(true);
-      setMeasurementSyncTone('info');
-      setMeasurementSyncMessage('Đang kiểm tra các khung giờ và yêu cầu đồng bộ lại…');
-      try {
-        const response = await fetch(apiUrl(`/family/bp-sync/${elderId}`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Chưa đồng bộ được số đo.');
-        const healthResponse = await fetch(apiUrl(`/family/health-summary/${elderId}?days=${days}`));
-        if (!healthResponse.ok) throw new Error('Đã kiểm tra đồng bộ nhưng chưa tải lại được lịch sử. Bạn có thể thử lại.');
-        const health = await healthResponse.json();
-        setReadings((health.daily_readings || []).slice().reverse());
-        setHealthDataSource(health.data_source || 'app_demo');
-        setAgentStatus(result.agent || null);
-        setApiAvailable(true); setStatusUpdatedAt(new Date());
-        const slots = result.slots || [];
-        if (result.received_count > 0) {
-          setMeasurementSyncTone('success');
-          const times = slots.filter(row => !row.skipped).map(row => row.slot === 'morning' ? '09:00' : '19:00').join(' và ');
-          setMeasurementSyncMessage(`Đã đồng bộ bù ${result.received_count} số đo của khung ${times}. Lịch sử giữ giờ đo theo lịch; bấm lại không tạo bản ghi trùng.`);
-        } else if (slots.every(row => row.reason === 'schedule_disabled')) {
-          setMeasurementSyncMessage('Lịch mô phỏng đang tắt. Không thêm số đo hoặc tự bật lịch; bạn có thể kiểm tra cấu hình trong Cài đặt.');
-        } else if (slots.some(row => row.reason === 'robot_no_measurement')) {
-          setMeasurementSyncMessage('Chưa nhận được số đo của khung đã đến giờ. Cần có kết quả đo từ Myka trước khi đồng bộ; app không tạo số thay thế.');
-        } else if (slots.every(row => row.reason === 'outside_schedule_window')) {
-          setMeasurementSyncMessage('Chưa đến khung đo 09:00 hoặc 19:00 hôm nay. Không có số đo theo lịch để đồng bộ bù.');
-        } else {
-          setMeasurementSyncMessage('Các số đo đã đến lịch hôm nay đã có trong lịch sử. Không có số đo mới để bổ sung.');
-        }
-      } catch (error) {
-        setMeasurementSyncTone('error');
-        setMeasurementSyncMessage(error.message || 'Chưa đồng bộ được dữ liệu. Vui lòng thử lại.');
-      } finally { setMeasurementSyncBusy(false); }
+    const updateReviewReminder = enabled => {
+      const next = { ...reviewReminder, enabled };
+      setReviewReminder(next);
+      window.localStorage.setItem(reviewReminderKey, JSON.stringify(next));
+      setReviewReminderMessage(enabled ? 'Đã bật lời nhắc người thân kiểm tra app lúc 09:00 và 19:00.' : 'Đã tắt lời nhắc kiểm tra app.');
+    };
+    const enableBrowserNotifications = async () => {
+      if (!('Notification' in window)) { setReviewReminderMessage('Trình duyệt này không hỗ trợ thông báo hệ thống; lời nhắc trong app vẫn hoạt động khi trang đang mở.'); return; }
+      const permission = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
+      const enabled = permission === 'granted';
+      setBrowserNotificationsEnabled(enabled);
+      window.localStorage.setItem(`${reviewReminderKey}:browser`, enabled ? 'on' : 'off');
+      setReviewReminderMessage(enabled ? 'Đã cho phép thông báo trên trình duyệt này. Thông báo chỉ chạy khi app đang mở.' : 'Trình duyệt chưa cho phép thông báo; lời nhắc trong app vẫn xuất hiện khi trang đang mở.');
     };
     const voiceOptions = [
       { id: 'male_young_warm', label: 'Nam thành niên', detail: 'Ấm áp' },
@@ -378,52 +402,60 @@
       { id: 'settings', label: 'Cài đặt', icon: 'tune' },
       { id: 'profile', label: 'Hồ sơ', icon: 'account_circle' },
     ];
-    const chartData = visibleReadings.slice().sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp)).map(row => ({
-      time: new Date(row.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-      'Tâm thu': row.systolic,
-      'Tâm trương': row.diastolic,
-      'Nhịp tim': row.heart_rate || row.heartRate,
-    }));
-    const chartWidth = 720, chartHeight = 260, chartLeft = 42, chartRight = 16, chartTop = 16, chartBottom = 36;
-    const chartValues = chartData.flatMap(point => [point['Tâm thu'], point['Tâm trương'], point['Nhịp tim']]).filter(Number.isFinite);
-    const chartMin = chartValues.length ? Math.floor((Math.min(...chartValues) - 5) / 10) * 10 : 0;
-    const chartMax = chartValues.length ? Math.ceil((Math.max(...chartValues) + 5) / 10) * 10 : 100;
-    const chartX = index => chartLeft + (chartData.length <= 1 ? 0 : index * (chartWidth - chartLeft - chartRight) / (chartData.length - 1));
-    const chartY = value => chartTop + (chartMax - value) * (chartHeight - chartTop - chartBottom) / Math.max(1, chartMax - chartMin);
-    const chartLines = [
-      { key: 'Tâm thu', color: '#7c3aed' },
-      { key: 'Tâm trương', color: '#0ea5e9' },
-      { key: 'Nhịp tim', color: '#f59e0b' },
+    const dailyVitals = window.MykaCareJournal.summarizeVitals(visibleReadings);
+    const pressureSeries = [
+      { key: 'systolic', label: 'Tâm thu', color: '#2348a0' },
+      { key: 'diastolic', label: 'Tâm trương', color: '#36a0bd' }
     ];
-    const dailyTrend = new Map();
-    visibleReadings.forEach(row => {
-      const day = new Date(row.timestamp).toISOString().slice(0, 10);
-      const systolic = Number(row.systolic), diastolic = Number(row.diastolic);
-      const level = systolic >= 140 || diastolic >= 90 ? 'critical' : systolic >= 130 || diastolic >= 85 ? 'warning' : 'normal';
-      const priority = { normal: 0, warning: 1, critical: 2 };
-      const current = dailyTrend.get(day);
-      if (!current || priority[level] > priority[current]) dailyTrend.set(day, level);
-    });
-    const orderedDays = [...dailyTrend.entries()].sort(([a], [b]) => a.localeCompare(b));
-    let warningStreak = 0, maxWarningStreak = 0;
-    let previousDay = null;
-    orderedDays.forEach(([day, level]) => {
-      const consecutive = previousDay && (Date.parse(`${day}T00:00:00Z`) - Date.parse(`${previousDay}T00:00:00Z`)) === 86400000;
-      warningStreak = level === 'normal' ? 0 : (consecutive ? warningStreak : 0) + 1;
-      maxWarningStreak = Math.max(maxWarningStreak, warningStreak);
-      previousDay = day;
-    });
-    const criticalDays = orderedDays.filter(([, level]) => level === 'critical').length;
-    const warningDays = orderedDays.filter(([, level]) => level !== 'normal').length;
-    const trendSummary = !orderedDays.length
-      ? { tone: 'slate', title: 'Chưa có đủ số đo', detail: 'Khi có dữ liệu, ứng dụng sẽ tổng hợp các lần đo đã ghi nhận trong khoảng thời gian này.' }
-      : criticalDays
-        ? { tone: 'rose', title: 'Có bản ghi vượt ngưỡng cảnh báo cấu hình', detail: `Ghi nhận ${criticalDays} ngày có ít nhất một lần đo ở mức cảnh báo cao. Gia đình hãy xem lại bản ghi và trao đổi với nhân viên y tế.` }
-        : maxWarningStreak >= 3
-          ? { tone: 'amber', title: `Có chỉ số vượt ngưỡng theo dõi ${maxWarningStreak} ngày liên tiếp`, detail: 'Gia đình nên xem lại các lần đo trong chuỗi này và trao đổi với nhân viên y tế qua kênh chăm sóc.' }
-          : warningDays
-            ? { tone: 'amber', title: `Ghi nhận ${warningDays} ngày có chỉ số vượt ngưỡng theo dõi`, detail: 'Hiện chưa ghi nhận chuỗi vượt ngưỡng từ 3 ngày liên tiếp. Gia đình có thể xem lại từng lần đo trong lịch sử.' }
-            : { tone: 'emerald', title: 'Chưa ghi nhận lần đo vượt ngưỡng cấu hình', detail: 'Các số đo đã lưu trong khoảng thời gian này đều nằm trong ngưỡng theo dõi đã cài đặt.' };
+    const pulseSeries = [{ key: 'pulse', label: 'Nhịp tim', color: '#ad4e16' }];
+    const observedDays = dailyVitals.length;
+    const range = key => {
+      const values = dailyVitals.map(row => row[key]).filter(Number.isFinite);
+      if (!values.length) return '—';
+      const min = Math.round(Math.min(...values)), max = Math.round(Math.max(...values));
+      return min === max ? String(min) : `${min}–${max}`;
+    };
+
+    function vitalBars(title, unit, series) {
+      const rows = dailyVitals.filter(row => series.some(field => Number.isFinite(row[field.key])));
+      if (!rows.length) return <p className="py-5 text-sm text-slate-600">Chưa có số đo {title.toLocaleLowerCase('vi')} trong khoảng này.</p>;
+      const chartWidth = Math.max(660, rows.length * 50 + 72);
+      const spacing = (chartWidth - 70) / rows.length;
+      const barWidth = Math.min(32, (spacing - 8) / series.length);
+      const max = Math.ceil(Math.max(...rows.flatMap(row => series.map(field => row[field.key] || 0))) / 40) * 40;
+      const y = value => 208 - value / max * 164;
+      return <div className="mb-5">
+        <h4 className="font-semibold text-slate-900">{title} ({unit})</h4>
+        <div className="mt-2 overflow-x-auto">
+          <svg viewBox={`0 0 ${chartWidth} 246`} style={{ minWidth: chartWidth }} className="w-full"
+            role="img" aria-label={`Biểu đồ cột ${title} trung bình theo ngày`}>
+            {[0, 1, 2, 3, 4].map(tick => {
+              const value = max * tick / 4;
+              return <g key={tick}><line x1="44" x2={chartWidth - 12} y1={y(value)} y2={y(value)} stroke="#e2e8f0" />
+                <text x="36" y={y(value) + 4} textAnchor="end" fontSize="12" fill="#475569">{value}</text></g>;
+            })}
+            {rows.map((row, index) => {
+              const center = 48 + (index + 0.5) * spacing;
+              return <g key={row.day}>
+                {series.map((field, j) => Number.isFinite(row[field.key]) &&
+                  <rect key={field.key} x={center - barWidth * series.length / 2 + j * barWidth + 1}
+                    y={y(row[field.key])} width={barWidth - 2} height={208 - y(row[field.key])} rx="3" fill={field.color}>
+                    <title>{row.day}: {field.label} {Math.round(row[field.key])} {unit}, trung bình ngày</title>
+                  </rect>)}
+                <text x={center} y="230" textAnchor="middle" fontSize="12" fill="#475569">
+                  {row.day.slice(5).split('-').reverse().join('/')}
+                </text>
+              </g>;
+            })}
+          </svg>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-700">
+          {series.map(field => <span key={field.key} className="inline-flex items-center gap-2">
+            <i className="h-3 w-3 rounded-sm" style={{ backgroundColor: field.color }} />{field.label}
+          </span>)}
+        </div>
+      </div>;
+    }
 
     const devicePaired = Boolean(connectivity?.paired_devices?.length);
     const focusSection = section => { setTab(section); setMoreOpen(false); setHighlightTarget(section); setHighlightRequest(current => current + 1); };
@@ -454,6 +486,7 @@
           </div>
         </header>
         <main className="max-w-6xl mx-auto px-4 pb-28 pt-4 sm:px-6 sm:pb-28 sm:pt-6 md:p-8 md:pb-8">
+          {reviewReminderAlert && <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-950"><div><p className="font-bold">{reviewReminderAlert.title}</p><p className="mt-1 text-sm">{reviewReminderAlert.body}</p></div><div className="flex gap-2"><button type="button" onClick={() => focusSection('health')} className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white">Mở sức khỏe</button><button type="button" onClick={() => setReviewReminderAlert(null)} className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm">Đóng</button></div></div>}
           <section className="relative mb-5 overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#1f5ba7] via-[#357eb8] to-[#70a3cf] p-5 sm:p-8 text-white shadow-xl shadow-blue-900/10">
             <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full border-[28px] border-white/10" aria-hidden="true" />
             <div className="relative">
@@ -484,6 +517,7 @@
               <span className="min-w-0 flex-1"><span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">{upcomingSchedule ? (upcomingSchedule.type === 'checkup' ? 'Lịch hẹn tiếp theo' : 'Lịch chăm sóc tiếp theo') : 'Lịch chăm sóc'}</span><span className="mt-0.5 block truncate font-bold text-slate-800">{upcomingSchedule?.title || 'Chưa có lịch sắp tới'}</span><span className="mt-0.5 block truncate text-sm text-slate-500">{upcomingSchedule ? `${dateLabel(upcomingSchedule.scheduled_at)} · ${upcomingSchedule.detail || 'Chạm để xem lịch'}` : 'Gia đình có thể thêm lịch thuốc hoặc lịch hẹn.'}</span></span>
               <span className="material-symbols-rounded shrink-0 text-blue-500" aria-hidden="true">chevron_right</span>
             </button>
+            <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3 sm:p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-bold text-blue-950">Giờ nhắc người thân xem số đo</p><p className="mt-0.5 text-xs text-slate-600">Nhắc mở app xem giờ đo nguồn, không hẹn giờ đo cho Ngoại.</p></div><button type="button" onClick={() => focusSection('settings')} className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800">Cài đặt</button></div><div className="mt-3 flex flex-wrap gap-2"><span className="rounded-lg bg-white px-3 py-1.5 text-sm font-bold text-blue-900">Sáng · 09:00</span><span className="rounded-lg bg-white px-3 py-1.5 text-sm font-bold text-blue-900">Tối · 19:00</span><span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${reviewReminder.enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>{reviewReminder.enabled ? 'Đang bật' : 'Đang tắt'}</span></div></div>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <button type="button" onClick={() => focusSection('health')} className="rounded-2xl bg-blue-50/80 p-3 text-left transition hover:bg-blue-100/80"><span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500"><span className="material-symbols-rounded text-base text-blue-700" aria-hidden="true">favorite</span> Huyết áp gần nhất</span><span className="mt-1 block text-lg font-extrabold text-slate-800">{latest ? `${latest.systolic}/${latest.diastolic}` : 'Chưa có số đo'}</span><span className="text-xs text-slate-500">{latest ? `mmHg · ${dateLabel(latest.timestamp)}` : 'Chạm để mở sức khỏe'}</span></button>
               <button type="button" onClick={() => focusSection('health')} className="rounded-2xl bg-[#fff4e9] p-3 text-left transition hover:bg-[#ffecd8]"><span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500"><span className="material-symbols-rounded text-base text-orange-700" aria-hidden="true">ecg_heart</span> Nhịp tim gần nhất</span><span className="mt-1 block text-lg font-extrabold text-slate-800">{latest ? (latest.heart_rate || latest.heartRate || '—') : '—'}<span className="ml-1 text-xs font-medium text-slate-500">lần/phút</span></span><span className="text-xs text-slate-500">{latest ? dateLabel(latest.timestamp) : 'Chưa có bản ghi gần đây'}</span></button>
@@ -548,8 +582,22 @@
           </section>}
 
           {tab === 'health' && <section id="family-section-health" className="scroll-mt-24">
-            <ResearchPanel />
-            <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 className="text-xl font-bold">Huyết áp và nhịp tim</h2><p className="text-sm text-slate-500">Lịch sử số đo theo thời gian · thông tin tham khảo, không thay thế tư vấn y tế.</p></div><select value={days} onChange={e => setDays(Number(e.target.value))} className="bg-white border border-slate-300 rounded-lg px-3 py-2"><option value={7}>7 ngày gần đây</option><option value={30}>30 ngày gần đây</option></select></div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-bold">Theo dõi sức khỏe</h2>
+              <label className="flex items-center gap-2 text-sm">Khoảng thời gian
+                <select value={days} onChange={e => setDays(Number(e.target.value))} className="rounded-lg border border-slate-300 bg-white px-3 py-2">
+                  <option value={7}>7 ngày gần đây</option><option value={30}>30 ngày gần đây</option>
+                </select>
+              </label>
+            </div>
+            <CareJournal key={elderId} elderId={elderId} days={days} />
+            <div className="mb-4"><h2 className="text-xl font-bold">Huyết áp và nhịp tim</h2>
+              <p className="text-sm text-slate-500">{!apiAvailable
+                ? 'Chưa tải được snapshot API Myka. App không thay thế bằng số đo mô phỏng.'
+                : healthDataSource === 'third_party_api'
+                  ? 'Snapshot trích xuất từ API lịch sử Myka ngày 23/11/2026; biểu đồ kết thúc ở bản ghi ngày 22/11/2026. App giữ giờ đo do nguồn cung cấp, không tạo giờ đo 09:00/19:00.'
+                  : 'Dữ liệu minh họa của app. Không có số đo mới từ API Myka để hiển thị.'}</p>
+            </div>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
               {[["Lần đo gần nhất", latest ? `${latest.systolic}/${latest.diastolic}` : '—', 'mmHg'], ['Tâm thu trung bình', avg('systolic'), 'mmHg'], ['Tâm trương trung bình', avg('diastolic'), 'mmHg'], ['Nhịp tim trung bình', avgHeartRate, 'lần/phút']].map(([label, value, unit]) => <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm"><p className="text-sm text-slate-500">{label}</p><p className="text-2xl font-bold mt-2 text-slate-800">{value} <span className="text-sm font-normal text-slate-500">{unit}</span></p></div>)}
@@ -557,86 +605,35 @@
             <div className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-6 mb-5 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div>
-                  <h3 className="font-bold text-base sm:text-lg text-slate-900">Biểu đồ xu hướng Huyết áp & Nhịp tim ({days} ngày)</h3>
-                  <p className="text-xs text-slate-500">Thiết kế thích ứng (Responsive) · Vùng tô màu thể hiện khoảng chênh lệch Tâm thu – Tâm trương</p>
+                  <h3 className="text-lg font-bold text-slate-900">Biểu đồ cột theo ngày ({days} ngày)</h3>
+                  <p className="text-sm text-slate-600">Mỗi cột là trung bình các lần đo hợp lệ trong một ngày có dữ liệu. Huyết áp và nhịp tim dùng hai thang đo riêng.</p>
                 </div>
                 <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-semibold">
                   {[['all', 'Tất cả'], ['bp', 'Huyết áp'], ['hr', 'Nhịp tim']].map(([key, label]) => (
-                    <button key={key} type="button" onClick={() => setChartFilter(key)} className={`rounded-lg px-3 py-1.5 transition ${chartFilter === key ? 'bg-white text-blue-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>{label}</button>
+                    <button key={key} type="button" aria-pressed={chartFilter === key} onClick={() => setChartFilter(key)}
+                      className={`rounded-lg px-3 py-1.5 ${chartFilter === key ? 'bg-white text-blue-800 shadow-sm' : 'text-slate-600'}`}>{label}</button>
                   ))}
                 </div>
               </div>
-              {chartData.length ? (() => {
-                const activeLines = chartLines.filter(l => chartFilter === 'all' ? true : chartFilter === 'bp' ? l.key !== 'Nhịp tim' : l.key === 'Nhịp tim');
-                const areaPoints = chartFilter !== 'hr' && chartData.length > 1
-                  ? [
-                      ...chartData.map((pt, idx) => `${chartX(idx)},${chartY(Number(pt['Tâm thu']))}`),
-                      ...chartData.slice().reverse().map((pt, rIdx) => {
-                        const idx = chartData.length - 1 - rIdx;
-                        return `${chartX(idx)},${chartY(Number(pt['Tâm trương']))}`;
-                      })
-                    ].join(' ')
-                  : '';
-                const labelStep = chartData.length > 16 ? 3 : chartData.length > 9 ? 2 : 1;
-                return <>
-                  <div className="w-full overflow-hidden">
-                    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label={`Biểu đồ xu hướng huyết áp và nhịp tim ${days} ngày`} className="w-full h-56 sm:h-72">
-                      <defs>
-                        <linearGradient id="bpRangeGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.18" />
-                          <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.06" />
-                        </linearGradient>
-                      </defs>
-                      {[0, 1, 2, 3, 4].map(index => {
-                        const value = chartMin + (chartMax - chartMin) * index / 4;
-                        const y = chartY(value);
-                        return <g key={index}>
-                          <line x1={chartLeft} x2={chartWidth - chartRight} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="4 4" />
-                          <text x={chartLeft - 8} y={y + 4} textAnchor="end" fontSize="11" fontWeight="600" fill="#64748b">{Math.round(value)}</text>
-                        </g>;
-                      })}
-                      {chartFilter !== 'hr' && chartMax >= 140 && chartMin <= 140 && (
-                        <g>
-                          <line x1={chartLeft} x2={chartWidth - chartRight} y1={chartY(140)} y2={chartY(140)} stroke="#f43f5e" strokeWidth="1.5" strokeDasharray="6 4" />
-                          <text x={chartWidth - chartRight - 4} y={chartY(140) - 5} textAnchor="end" fontSize="10" fontWeight="700" fill="#e11d48">Ngưỡng lưu ý 140 mmHg</text>
-                        </g>
-                      )}
-                      {areaPoints && <polygon points={areaPoints} fill="url(#bpRangeGrad)" />}
-                      {activeLines.map(line => (
-                        <g key={line.key}>
-                          <polyline fill="none" stroke={line.color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" points={chartData.map((point, index) => `${chartX(index)},${chartY(Number(point[line.key]))}`).join(' ')} />
-                          {chartData.map((point, index) => (
-                            <g key={`${line.key}-${index}`}>
-                              <circle cx={chartX(index)} cy={chartY(Number(point[line.key]))} r="4.5" fill="#ffffff" stroke={line.color} strokeWidth="2.5">
-                                <title>{`${point.time}: ${line.key} ${point[line.key]}`}</title>
-                              </circle>
-                            </g>
-                          ))}
-                        </g>
-                      ))}
-                      {chartData.map((point, index) => (index % labelStep === 0 || index === chartData.length - 1) && (
-                        <text key={`date-${index}`} x={chartX(index)} y={chartHeight - 8} textAnchor="middle" fontSize="10" fontWeight="600" fill="#475569">{point.time}</text>
-                      ))}
-                    </svg>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-3 justify-center text-xs font-semibold text-slate-700">
-                    {activeLines.map(line => (
-                      <span key={line.key} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1">
-                        <i className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: line.color }} />
-                        {line.key} ({line.key === 'Nhịp tim' ? 'bpm' : 'mmHg'})
-                      </span>
-                    ))}
-                  </div>
-                </>;
-              })() : <p className="text-sm text-slate-500 py-8 text-center">Chưa có dữ liệu để hiển thị biểu đồ.</p>}
+              {chartFilter !== 'hr' && vitalBars('Huyết áp', 'mmHg', pressureSeries)}
+              {chartFilter !== 'bp' && vitalBars('Nhịp tim', 'lần/phút', pulseSeries)}
             </div>
-            <article className={`rounded-xl border p-4 mb-5 shadow-sm ${trendSummary.tone === 'rose' ? 'bg-rose-50 border-rose-200' : trendSummary.tone === 'amber' ? 'bg-amber-50 border-amber-200' : trendSummary.tone === 'emerald' ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}><h3 className="font-semibold">Tóm tắt xu hướng {days} ngày</h3><p className="font-semibold mt-2">{trendSummary.title}</p><p className="text-sm text-slate-700 mt-1">{trendSummary.detail}</p><p className="text-xs text-slate-500 mt-3">Tóm tắt theo ngưỡng theo dõi đã cài đặt; không phải kết luận sức khỏe hay tư vấn y tế.</p></article>
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"><h3 className="font-semibold p-4">Lịch sử đo huyết áp</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Giờ nhận số đo</th><th className="text-left p-3">Huyết áp</th><th className="text-left p-3">Nhịp tim</th><th className="text-left p-3">Nguồn ghi nhận</th><th className="text-left p-3">Ghi chú</th></tr></thead><tbody>{visibleReadings.slice().reverse().map(row => {
-              return <tr key={row.id} className="border-t border-slate-100"><td className="p-3 whitespace-nowrap">{receiptLabel(row.received_at)}</td><td className="p-3 font-semibold whitespace-nowrap">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3 whitespace-nowrap">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 whitespace-nowrap"><span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">Robot Myka</span></td><td className="p-3 text-slate-500">{row.id?.startsWith('BP-SCHEDULE-') ? 'Robot mô phỏng · gửi theo lịch hằng ngày' : row.note?.startsWith('APP-SYNC-DEMO:') ? 'Đã cập nhật từ mục Trạng thái.' : row.note || '—'}</td></tr>;
+            <article className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
+              <h3 className="font-bold">Mức dao động trong các ngày có số đo</h3>
+              <p className="mt-1 text-sm text-slate-700">Có {observedDays} ngày ghi nhận trong kỳ đang xem. Khoảng dưới đây tính trên các giá trị trung bình ngày.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                {[['Tâm thu', 'systolic', 'mmHg'], ['Tâm trương', 'diastolic', 'mmHg'], ['Nhịp tim', 'pulse', 'lần/phút']].map(([label, key, unit]) =>
+                  <div key={key}><p className="text-sm text-slate-700">{label}</p><p className="text-xl font-bold">{range(key)} <span className="text-sm font-normal">{unit}</span></p></div>)}
+              </div>
+              <p className="mt-3 text-sm text-slate-700">Xem lại lần đo và hỏi thăm Ngoại nếu thấy số đo hoặc sinh hoạt thay đổi so với thường ngày.</p>
+              <button type="button" onClick={() => focusSection('conversations')} className="mt-2 text-sm font-semibold text-blue-800">Mở nhật ký trò chuyện để xem bối cảnh</button>
+            </article>
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"><h3 className="font-semibold p-4">Lịch sử đo huyết áp</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Giờ đo (Việt Nam)</th><th className="text-left p-3">Huyết áp</th><th className="text-left p-3">Nhịp tim</th><th className="text-left p-3">Nguồn ghi nhận</th><th className="text-left p-3">Ghi chú</th></tr></thead><tbody>{visibleReadings.slice().reverse().map(row => {
+              return <tr key={row.id} className="border-t border-slate-100"><td className="p-3 whitespace-nowrap">{receiptLabel(row.timestamp)}</td><td className="p-3 font-semibold whitespace-nowrap">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3 whitespace-nowrap">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 whitespace-nowrap"><span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">{row.source === 'third_party_api' ? 'Snapshot API Myka' : row.source === 'third_party_guide_demo' ? 'Mẫu tài liệu API' : 'Chưa xác minh'}</span></td><td className="p-3 text-slate-500">{row.note || '—'}</td></tr>;
             })}</tbody></table>{!visibleReadings.length && <p className="p-6 text-center text-slate-500">Chưa có bản ghi trong khoảng thời gian này.</p>}</div></div>
           </section>}
 
-          {tab === 'schedule' && <section id="family-section-schedule" className="scroll-mt-24"><div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold mb-1">Lịch uống thuốc và tái khám</h2><p className="text-sm text-slate-500">Lịch chăm sóc sắp tới của Ngoại.</p></div><button onClick={() => { setEditingSchedule(null); setShowScheduleEditor(true); }} className="rounded-xl bg-blue-600 text-white px-4 py-2.5 font-bold shadow-md shadow-blue-200">＋ Thêm lịch</button></div><div className="space-y-3">{scheduleRows.map(row => <article key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap gap-4 items-start"><span className="text-2xl">{row.type === 'checkup' ? '🏥' : '💊'}</span><div className="flex-1 min-w-[12rem]"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{row.title}</h3><span className="text-sm text-slate-500">{dateLabel(row.scheduled_at)}</span></div><p className="text-sm text-slate-600 mt-1">{row.detail || '—'}</p></div><span className={`text-xs px-2 py-1 rounded-full ${scheduleState(row).classes}`}>{scheduleState(row).label}</span><div className="ml-auto flex gap-2"><button type="button" onClick={() => { setEditingSchedule(row); setShowScheduleEditor(true); }} className="rounded-lg border px-3 py-2 text-sm font-semibold text-blue-700">Chỉnh sửa</button><button type="button" onClick={() => deleteSchedule(row)} className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700">Xóa</button></div></article>)}{!scheduleRows.length && <p className="bg-white rounded-xl p-6 text-slate-500">Chưa có lịch chăm sóc.</p>}</div></section>}
+          {tab === 'schedule' && <section id="family-section-schedule" className="scroll-mt-24"><div className="flex flex-wrap items-start justify-between gap-3 mb-4"><div><h2 className="text-xl font-bold mb-1">Lịch chăm sóc của Ngoại</h2><p className="text-sm text-slate-500">Xem lịch thuốc và tái khám để chủ động gọi nhắc Ngoại, liên hệ bác sĩ hoặc sắp xếp về thăm. Trạng thái chỉ cho biết lịch đã đến giờ hay chưa.</p></div><button onClick={() => { setEditingSchedule(null); setShowScheduleEditor(true); }} className="rounded-xl bg-blue-600 text-white px-4 py-2.5 font-bold shadow-md shadow-blue-200">＋ Thêm lịch</button></div><div className="space-y-3">{scheduleRows.map(row => <article key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap gap-4 items-start"><span className="text-2xl">{row.type === 'checkup' ? '🏥' : '💊'}</span><div className="flex-1 min-w-[12rem]"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{row.title}</h3><span className="text-sm text-slate-500">{dateLabel(row.scheduled_at)}</span></div><p className="text-sm text-slate-600 mt-1">{row.detail === 'Robot chưa nhận được xác nhận đã uống thuốc.' ? 'Ghi nhớ giờ để gọi nhắc Ngoại.' : row.detail || '—'}</p></div><span className={`text-xs px-2 py-1 rounded-full ${scheduleState(row).classes}`}>{scheduleState(row).label}</span><div className="ml-auto flex gap-2"><button type="button" onClick={() => { setEditingSchedule(row); setShowScheduleEditor(true); }} className="rounded-lg border px-3 py-2 text-sm font-semibold text-blue-700">Chỉnh sửa</button><button type="button" onClick={() => deleteSchedule(row)} className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700">Xóa</button></div></article>)}{!scheduleRows.length && <p className="bg-white rounded-xl p-6 text-slate-500">Chưa có lịch chăm sóc.</p>}</div></section>}
 
           {tab === 'device' && <section id="family-section-device" className="scroll-mt-24"><h2 className="text-xl font-bold mb-1">Thông báo bảo trì thiết bị</h2><p className="text-sm text-slate-500 mb-4">Các nhắc nhở vận hành thiết bị được gửi từ hệ thống.</p><div className="space-y-3">{maintenance.map(item => <article key={item.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4"><span className="text-2xl">🛠️</span><div className="flex-1"><h3 className="font-semibold">{item.title}</h3><p className="text-sm text-slate-600 mt-1">{item.detail}</p><p className="text-xs text-slate-500 mt-2">Hạn: {item.due_at || 'Chưa xác định'}</p></div><span className="text-xs px-2 py-1 h-fit rounded-full bg-amber-100 text-amber-800">{item.status === 'pending' ? 'Cần chú ý' : 'Đã xử lý'}</span></article>)}{!maintenance.length && <p className="bg-white rounded-xl p-6 text-slate-500">Hiện chưa có thông báo bảo trì.</p>}</div></section>}
           {tab === 'connectivity' && <section id="family-section-connectivity" className="scroll-mt-24">
@@ -667,70 +664,42 @@
             const pairedCount = connectivity?.paired_devices?.length || 0;
             const deviceStatus = pairedCount ? `${pairedCount} thiết bị trong hồ sơ` : 'Chưa thêm thiết bị';
             return <section id="family-section-status" className="scroll-mt-24">
-              <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-semibold text-blue-700">THEO DÕI HỆ THỐNG</p><h2 className="mt-1 text-2xl font-extrabold">Trạng thái thiết bị & dữ liệu</h2><p className="mt-1 max-w-2xl text-sm text-slate-600">Kiểm tra kết nối, thời điểm đo gần nhất và yêu cầu đồng bộ bù số đo theo lịch.</p></div><span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold ${apiAvailable ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}><span className={`h-2 w-2 rounded-full ${apiAvailable ? 'bg-emerald-500' : 'bg-rose-500'}`} />{apiAvailable ? 'Máy chủ đã kết nối' : 'Máy chủ chưa kết nối'}</span></div>
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-semibold text-blue-700">THEO DÕI HỆ THỐNG</p><h2 className="mt-1 text-2xl font-extrabold">Trạng thái API & nguồn dữ liệu</h2><p className="mt-1 max-w-2xl text-sm text-slate-600">Xem app có đọc được snapshot và thời điểm đo gần nhất do nguồn Myka cung cấp.</p></div><span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold ${apiAvailable ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}><span className={`h-2 w-2 rounded-full ${apiAvailable ? 'bg-emerald-500' : 'bg-rose-500'}`} />{apiAvailable ? 'API app đã phản hồi' : 'API app chưa phản hồi'}</span></div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Kết nối máy chủ</p><p className={`mt-2 text-lg font-extrabold ${apiAvailable ? 'text-emerald-700' : 'text-rose-700'}`}>{apiAvailable ? 'Máy chủ đã phản hồi' : 'Đang gián đoạn'}</p><p className="mt-1 text-xs text-slate-500">{statusUpdatedAt ? `Kiểm tra lúc ${statusUpdatedAt.toLocaleTimeString('vi-VN')}` : 'Đang kiểm tra kết nối…'}</p></article>
-                <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Thiết bị trong hồ sơ</p><p className="mt-2 text-lg font-extrabold text-slate-800">{deviceStatus}</p><p className="mt-1 text-xs text-slate-500">Lần truyền dữ liệu gần nhất sẽ được hiển thị tại mục Sức khỏe.</p></article>
+                <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Nguồn số đo đang hiển thị</p><p className="mt-2 text-lg font-extrabold text-slate-800">Snapshot API Myka</p><p className="mt-1 text-xs text-slate-500">{visibleReadings.length} bản ghi trong khoảng đang chọn; app không tự tạo số đo mới.</p></article>
                 <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Số đo gần nhất</p><p className={`mt-2 text-lg font-extrabold ${measurementAgeMinutes === null || measurementAgeMinutes > 30 ? 'text-amber-700' : 'text-emerald-700'}`}>{measurementFreshness}</p><p className="mt-1 text-xs text-slate-500">{measurementTime ? `${newestMeasurement.systolic}/${newestMeasurement.diastolic} mmHg · ${measurementFreshnessDetail}` : measurementFreshnessDetail}</p></article>
               </div>
-              <article className="mt-4 rounded-3xl border border-[#e9dfcf] bg-[#fffaf2] p-5 shadow-sm sm:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#17428f] text-white"><span className="material-symbols-rounded" aria-hidden="true">monitor_heart</span></span><div><h3 className="font-extrabold text-slate-900">Đồng bộ lại số đo từ Myka</h3><p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">Dùng khi chưa thấy số đo của khung 09:00 hoặc 19:00. Chỉ bổ sung khung đã đến giờ còn thiếu; số đo đã có sẽ không được ghi thêm.</p></div></div><button type="button" onClick={recoverScheduledMeasurements} disabled={measurementSyncBusy} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#17428f] px-5 py-3 font-bold text-white shadow-md transition hover:bg-[#103673] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-55"><span className={`material-symbols-rounded ${measurementSyncBusy ? 'animate-spin' : ''}`} aria-hidden="true">{measurementSyncBusy ? 'progress_activity' : 'sync'}</span>{measurementSyncBusy ? 'Đang đồng bộ…' : 'Kiểm tra & đồng bộ'}</button></div>
-                {measurementSyncMessage && <p role="status" aria-live="polite" className={`mt-4 rounded-2xl border p-3 text-sm font-medium ${measurementSyncTone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800' : measurementSyncTone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-blue-200 bg-blue-50 text-blue-900'}`}>{measurementSyncMessage}</p>}
-                {!apiAvailable && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Chưa xác nhận được kết nối máy chủ. Bạn có thể bấm kiểm tra lại; nếu chưa kết nối được thì số đo không được thêm.</p>}
-                <p className="mt-3 text-xs leading-relaxed text-slate-500">Bản minh họa dùng cùng nguồn số đo mô phỏng với lịch tự động, chưa lấy trực tiếp từ robot thật. Nút không yêu cầu đo lại; nếu Myka chưa có kết quả đo thì không thể đồng bộ thay thế.</p>
-              </article>
+              <article className="mt-4 rounded-3xl border border-[#e9dfcf] bg-[#fffaf2] p-5 shadow-sm sm:p-6"><h3 className="font-extrabold text-slate-900">Cách đọc trạng thái</h3><p className="mt-2 text-sm leading-relaxed text-slate-700">App đọc snapshot API Myka cố định, giữ nguyên giờ đo nguồn và làm mới yêu cầu đọc định kỳ. Việc API app phản hồi không có nghĩa là vừa có số đo mới; app không đổi giờ đo, không tạo bản ghi thay thế và không điều khiển robot.</p>{!apiAvailable && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Chưa đọc được dữ liệu từ máy chủ app. Không thêm số đo thay thế.</p>}</article>
             </section>;
           })()}
           {tab === 'conversations' && <section id="family-section-conversations" className="scroll-mt-24">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-5"><div><p className="text-sm text-blue-700 font-semibold">THEO DÕI GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Nhật ký trò chuyện với Myka</h2><p className="text-sm text-slate-500 mt-1">Hồ sơ Bà Hoa · Cách xưng hô trong hội thoại: Ngoại – con. Nhật ký chỉ đọc hoặc hỏi lại Myka qua Chat Group Telegram.</p></div><div className="flex flex-wrap items-center gap-2"><a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-700"><span className="material-symbols-rounded text-base" aria-hidden="true">send</span>Chat Group hỏi Myka ↗</a><span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${conversationData.source === 'telegram' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-600'}`}>{conversationData.source === 'telegram' ? 'Telegram' : 'Nhật ký Myka'}</span></div></div>
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-5"><div><p className="text-sm text-blue-700 font-semibold">THEO DÕI GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Nhật ký trò chuyện với Myka</h2><p className="text-sm text-slate-500 mt-1">Mở nhóm Telegram để hỏi Myka về những điều Ngoại đã trò chuyện theo ngày. Các đoạn hội thoại mẫu bên dưới dùng để minh họa giao diện.</p></div><div className="flex flex-wrap items-center gap-2"><a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-700"><span className="material-symbols-rounded text-base" aria-hidden="true">send</span>Chat Group hỏi Myka ↗</a><span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${conversationData.source === 'telegram' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-600'}`}>{conversationData.source === 'telegram' ? 'Telegram' : ['guide_demo', 'third_party_guide_demo'].includes(conversationData.source) ? 'Hội thoại mẫu' : 'Nhật ký Myka'}</span></div></div>
             <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-3"><div><label htmlFor="conversation-date" className="block text-sm font-semibold">Chọn ngày</label><p className="text-xs text-slate-500 mt-1">Mặc định là hôm nay</p></div><input id="conversation-date" type="date" value={conversationDate} onChange={event => setConversationDate(event.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
             {conversationData.review_needed_count > 0 && <article className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4"><p className="font-semibold text-amber-900">Có {conversationData.review_needed_count} lời nhắn được đánh dấu để gia đình xem lại</p><p className="text-sm text-amber-800 mt-1">Nhãn này giúp gia đình lưu ý nội dung cần xem lại; đây không phải đánh giá hay chẩn đoán sức khỏe.</p></article>}
-            <article className="bg-sky-50 border border-sky-200 rounded-xl p-4 mb-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-sky-900 flex items-center gap-1.5">
-                    <span className="material-symbols-rounded text-sky-600 text-lg">campaign</span>
-                    Bản tin hội thoại mới nhất trong ngày của Ngoại với Robot Myka
-                  </p>
-                  <p className="text-sm text-sky-800 mt-1">
-                    Ngoại đã có tương tác sinh hoạt: xác nhận ngủ ngon 7 tiếng, đo huyết áp sáng (121/74 mmHg), nhắc uống thuốc Amlodipine 5mg và tâm sự bữa trưa ngon miệng.
-                  </p>
-                </div>
-                <a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-sky-700 whitespace-nowrap">
-                  <span className="material-symbols-rounded text-sm">send</span> Hỏi Myka qua Telegram ↗
-                </a>
-              </div>
-            </article>
             <div className="bg-white border border-slate-200 rounded-xl p-4 md:p-5">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <h3 className="font-semibold">Nội dung trong ngày</h3>
-                <span className="text-xs text-slate-500">{(conversationData.messages && conversationData.messages.length > 0 ? conversationData.messages.length : 7)} tin nhắn</span>
+                <span className="text-xs text-slate-500">{conversationData.messages.length} tin nhắn</span>
               </div>
               {conversationLoading ? <p className="py-10 text-center text-sm text-slate-500">Đang tải nhật ký…</p>
                 : conversationError ? <p role="status" className="py-10 text-center text-sm text-rose-700">{conversationError}</p>
-                  : <ConversationHistory messages={(conversationData.messages && conversationData.messages.length > 0) ? conversationData.messages : [
-                      { id: 'fb-01', speaker: 'myka', message_text: 'Dạ con chào Ngoại ạ! Ngoại đêm qua ngủ có ngon giấc không ạ?', timestamp: `${conversationDate}T08:15:00+07:00` },
-                      { id: 'fb-02', speaker: 'elder', message_text: 'Chào con, đêm qua Ngoại ngủ sâu giấc khoảng hơn 7 tiếng, sáng dậy thấy người khỏe khoắn lắm.', timestamp: `${conversationDate}T08:15:45+07:00` },
-                      { id: 'fb-03', speaker: 'myka', message_text: 'Dạ nghe Ngoại khỏe con vui lắm! Đến giờ đo huyết áp buổi sáng rồi, Ngoại ngồi tựa lưng nghỉ ngơi xíu rồi bấm nút trên máy đo nhé ạ.', timestamp: `${conversationDate}T08:16:10+07:00` },
-                      { id: 'fb-04', speaker: 'elder', message_text: 'Ngoại vừa đo xong rồi, máy báo 121 trên 74, nhịp tim 66 con à.', timestamp: `${conversationDate}T08:25:20+07:00` },
-                      { id: 'fb-05', speaker: 'myka', message_text: 'Dạ chỉ số 121/74 mmHg và nhịp tim 66 là hoàn toàn bình thường và rất đẹp ạ! Con đã đồng bộ lên hệ thống cho chị Duyên xem rồi. Ngoại ăn sáng xong nhớ uống 1 viên Amlodipine 5mg nhé.', timestamp: `${conversationDate}T08:25:40+07:00` },
-                      { id: 'fb-06', speaker: 'elder', message_text: 'Ừ, Ngoại nhớ rồi. Trưa nay không biết con Duyên có ghé ăn cơm với Ngoại không ha?', timestamp: `${conversationDate}T11:20:15+07:00` },
-                      { id: 'fb-07', speaker: 'myka', message_text: 'Dạ con đã gửi tin nhắn thông báo lời Ngoại hỏi vào nhóm Chat Group Telegram cho chị Duyên rồi ạ. Ngoại cứ ăn cơm trưa đúng giờ nhé con!', timestamp: `${conversationDate}T11:20:30+07:00` }
-                    ]} loading={false} robotName={preferences.robot_name} />}
+                  : conversationData.messages.length ? <ConversationHistory messages={conversationData.messages} />
+                  : <p className="py-10 text-center text-sm text-slate-500">Chưa có hội thoại cho ngày này. Bạn có thể chọn ngày khác hoặc hỏi Myka qua Telegram.</p>}
             </div>
-            <p className="text-xs text-slate-500 mt-3">Chọn ngày để xem lại các trao đổi đã ghi nhận.</p>
+            <p className="text-xs text-slate-500 mt-3">Chọn ngày để xem các đoạn hội thoại mẫu có sẵn.</p>
           </section>}
           {tab === 'settings' && <section id="family-section-settings" className="scroll-mt-24">
             <div className="mb-5"><p className="text-sm text-blue-700 font-semibold">TÙY CHỈNH CHO GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Cài đặt Myka</h2><p className="text-sm text-slate-500 mt-1">Lựa chọn được lưu theo hồ sơ người thân.</p></div>
             <form onSubmit={savePreferences} className="space-y-5">
               <article id="family-settings-dnd" className="bg-white border border-slate-200 rounded-xl p-4 md:p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">Chế độ Không làm phiền</h3><p className="text-sm text-slate-500 mt-1">Chọn khoảng thời gian tạm tắt thông báo trên ứng dụng.</p></div><span className={`text-xs font-semibold rounded-full px-3 py-1.5 ${preferences.dnd_mode === 'off' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>{preferences.dnd_mode === 'off' ? 'Thông báo đang bật' : 'Không làm phiền đã chọn'}</span></div>
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">Chế độ Không làm phiền</h3><p className="text-sm text-slate-500 mt-1">Thiết lập trạng thái cho tích hợp thông báo robot trong tương lai.</p></div><span className={`text-xs font-semibold rounded-full px-3 py-1.5 ${preferences.dnd_mode === 'off' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>{preferences.dnd_mode === 'off' ? 'Chưa bật Không làm phiền' : 'Không làm phiền đã chọn'}</span></div>
                 <div className="flex flex-wrap gap-3 mt-4"><button type="button" onClick={() => { setPreferences({ ...preferences, dnd_mode: 'off', dnd_until: null }); setSettingsMessage(''); }} className={`rounded-xl border px-4 py-3 font-semibold ${preferences.dnd_mode === 'off' ? 'bg-blue-50 border-blue-400 text-blue-800' : 'border-slate-200'}`}>Bật thông báo lại</button><DndDurationPicker onSelect={(hours, minutes) => { const until = new Date(Date.now() + hours * 3600000 + minutes * 60000); setPreferences({ ...preferences, dnd_mode: 'custom', dnd_until: until.toISOString() }); setSettingsMessage(''); }} /><button type="button" onClick={() => { setPreferences({ ...preferences, dnd_mode: 'until_off', dnd_until: null }); setSettingsMessage(''); }} className={`rounded-xl border px-4 py-3 font-semibold ${preferences.dnd_mode === 'until_off' ? 'bg-amber-50 border-amber-400 text-amber-900' : 'border-slate-200'}`}>Đến khi tôi bật lại</button></div>
                 {preferences.dnd_mode === 'custom' && preferences.dnd_until && <p className="text-sm text-amber-800 mt-3">Tự bật lại lúc {new Date(preferences.dnd_until).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}.</p>}
-                <p className="text-xs text-slate-500 mt-4">Hiện app chưa gửi thông báo đẩy; lựa chọn này được lưu để dùng khi tích hợp thông báo. Khi đó, chế độ này sẽ tắt âm thanh và rung theo cấu hình ứng dụng.</p>
+                <p className="text-xs text-slate-500 mt-4">Cài đặt này được lưu cho tích hợp thông báo robot trong tương lai; hiện không tắt lời nhắc trong trình duyệt của bản demo và không điều khiển âm thanh/rung của hệ điều hành.</p>
               </article>
 
-              <article className="rounded-xl border border-blue-100 bg-[#fffaf2] p-4 md:p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><h3 className="font-semibold text-slate-900">Lịch cập nhật số đo</h3><p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">Mô phỏng robot gửi huyết áp và nhịp tim lúc 09:00 và 19:00 mỗi ngày lên máy chủ. Số đo được lưu vào lịch sử kể cả khi người thân không mở app.</p></div><label className="inline-flex cursor-pointer items-center gap-3 rounded-xl border border-blue-200 bg-white px-4 py-3 font-semibold text-blue-900"><input type="checkbox" checked={Boolean(preferences.bp_demo_schedule_enabled)} onChange={event => { setPreferences({ ...preferences, bp_demo_schedule_enabled: event.target.checked }); setSettingsMessage(''); }} className="h-5 w-5 accent-blue-700" />{preferences.bp_demo_schedule_enabled ? 'Đang bật' : 'Đang tắt'}</label></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="rounded-xl border border-[#e9dfcf] bg-white p-3 text-sm"><span className="block font-semibold text-slate-700">Buổi sáng · giờ Việt Nam</span><input type="time" value={preferences.bp_demo_morning_time || '09:00'} readOnly className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-800" /></label><label className="rounded-xl border border-[#e9dfcf] bg-white p-3 text-sm"><span className="block font-semibold text-slate-700">Buổi tối · giờ Việt Nam</span><input type="time" value={preferences.bp_demo_evening_time || '19:00'} readOnly className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-800" /></label></div><p className="mt-3 text-xs leading-relaxed text-slate-500">Mỗi khung giờ chỉ lưu một số đo. Lịch sử hiển thị giờ hệ thống nhận được số đo. Nếu chưa thấy số đo sau giờ hẹn, chọn Kiểm tra & đồng bộ trong mục Trạng thái. App đang mở tự cập nhật mỗi 30 giây. Đây là dữ liệu mô phỏng, chưa kết nối robot thật. Bật lịch rồi chọn Lưu cài đặt để áp dụng.</p></article>
+              <article className="rounded-xl border border-blue-100 bg-[#fffaf2] p-4 md:p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><h3 className="font-semibold text-slate-900">Lịch nhắc người thân kiểm tra số đo</h3><p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">09:00 và 19:00 là giờ nhắc người thân mở mục Sức khỏe để xem huyết áp, nhịp tim của Ngoại. Đây không phải giờ đo hoặc giờ API nhận dữ liệu.</p></div><label className="inline-flex cursor-pointer items-center gap-3 rounded-xl border border-blue-200 bg-white px-4 py-3 font-semibold text-blue-900"><input type="checkbox" checked={reviewReminder.enabled} onChange={event => updateReviewReminder(event.target.checked)} className="h-5 w-5 accent-blue-700" />{reviewReminder.enabled ? 'Đang bật' : 'Đang tắt'}</label></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><div className="rounded-xl border border-[#e9dfcf] bg-white p-3 text-sm"><span className="block font-semibold text-slate-700">Nhắc buổi sáng · giờ Việt Nam</span><p className="mt-2 text-xl font-extrabold text-blue-900">09:00</p></div><div className="rounded-xl border border-[#e9dfcf] bg-white p-3 text-sm"><span className="block font-semibold text-slate-700">Nhắc buổi tối · giờ Việt Nam</span><p className="mt-2 text-xl font-extrabold text-blue-900">19:00</p></div></div><div className="mt-4 flex flex-wrap items-center gap-3"><button type="button" onClick={enableBrowserNotifications} className="rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-800">{browserNotificationsEnabled ? 'Thông báo trình duyệt đã bật' : 'Cho phép thông báo trình duyệt'}</button><p className="text-xs leading-relaxed text-slate-500">Lời nhắc trong app xuất hiện nếu trang đang mở. Thông báo hệ thống cần bạn cho phép trên trình duyệt và cũng chỉ chạy khi app đang mở; app chưa có push nền khi đã đóng. Lời nhắc chỉ dẫn người thân xem số đo mới nhất, không yêu cầu robot đo hoặc đồng bộ theo hai giờ này.</p></div>{reviewReminderMessage && <p role="status" className="mt-3 text-sm text-blue-800">{reviewReminderMessage}</p>}</article>
 
               <article className="bg-white border border-slate-200 rounded-xl p-4 md:p-5"><h3 className="font-semibold">Tùy chỉnh giọng nói</h3><p className="text-sm text-slate-500 mt-1">Chọn phong cách giọng mà người cao tuổi cảm thấy dễ nghe.</p><div className="grid sm:grid-cols-2 gap-3 mt-4">{voiceOptions.map(voice => <label key={voice.id} className={`cursor-pointer rounded-xl border p-4 transition ${preferences.voice_profile === voice.id ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-300' : 'border-slate-200 hover:border-blue-300'}`}><span className="flex items-center gap-3"><input type="radio" name="voice_profile" value={voice.id} checked={preferences.voice_profile === voice.id} onChange={() => { setPreferences({ ...preferences, voice_profile: voice.id }); setSettingsMessage(''); }} className="accent-blue-600" /><span><span className="block font-semibold">{voice.label}</span><span className="block text-sm text-slate-500">Giọng {voice.detail.toLowerCase()}</span></span></span></label>)}</div><p className="text-xs text-slate-500 mt-4">Cài đặt giọng sẽ được lưu trong hồ sơ; hiện chưa đổi giọng phát ra từ robot vì chưa kết nối phần cứng.</p></article>
 
