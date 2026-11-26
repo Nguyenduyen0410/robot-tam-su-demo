@@ -42,7 +42,8 @@
         if (diff <= 0 || diff > 1440) throw new Error('Kiểm tra giờ thức và lựa chọn ngủ từ hôm trước.');
         minutes = diff;
       } else if (input.sleepMode === 'duration') {
-        minutes = Math.round(number(duration, 1, 1440, 'Nhập thời lượng từ 1 đến 1.440 phút.'));
+        const val = number(duration, 0.5, 1440, 'Nhập thời lượng hợp lệ (từ 0.5 đến 24 giờ).');
+        minutes = val > 24 ? Math.round(val) : Math.round(val * 60);
       } else if (!note) {
         throw new Error('Nếu thiếu giờ, hãy ghi lại điều Ngoại kể trong phần ghi chú.');
       }

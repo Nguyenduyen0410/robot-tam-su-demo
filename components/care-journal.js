@@ -137,13 +137,29 @@
         setMessage('Đã lưu bản ghi trên trình duyệt này.');
       } catch (err) { setError(err.message); }
     };
+    const formRef = React.useRef(null);
     const edit = record => {
       setEditing(record.id);
+      let editDuration = '';
+      if (record.metric === 'activity') {
+        editDuration = record.minutes ?? '';
+      } else if (record.metric === 'sleep') {
+        editDuration = record.value != null ? record.value : (record.duration ? (Number(record.duration) > 24 ? (Number(record.duration)/60).toFixed(1) : record.duration) : '');
+      } else {
+        editDuration = record.duration ?? '';
+      }
       setDraft({ ...empty(), ...record,
-        duration: record.metric === 'activity' ? record.minutes ?? '' : record.duration ?? '',
+        duration: editDuration,
         value: record.value ?? '' });
       setError('');
-      setMessage('');
+      setMessage(`Đang chỉnh sửa bản ghi ngày ${dateLabel(record.day)}. Hãy điều chỉnh và bấm Lưu thay đổi.`);
+      if (formRef.current) {
+        formRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        formRef.current.classList.add('ring-4', 'ring-blue-400');
+        setTimeout(() => {
+          if (formRef.current) formRef.current.classList.remove('ring-4', 'ring-blue-400');
+        }, 1800);
+      }
     };
     const loadExamples = () => {
       setError('');
@@ -224,8 +240,11 @@
         </button>)}
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-        <form onSubmit={save} className="space-y-3 rounded-xl border border-blue-100 bg-blue-50 p-4">
-          <h3 className="font-bold">{editing ? 'Sửa ghi nhận' : 'Thêm ghi nhận'} {metrics[metric].label.toLocaleLowerCase('vi')}</h3>
+        <form ref={formRef} onSubmit={save} className="space-y-3 rounded-2xl border border-blue-200 bg-blue-50/80 p-5 shadow-sm transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-slate-900">{editing ? 'Sửa ghi nhận' : 'Thêm ghi nhận'} {metrics[metric].label.toLocaleLowerCase('vi')}</h3>
+            {editing && <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">Đang sửa</span>}
+          </div>
           <label className="block">{metric === 'sleep' ? 'Ngày thức dậy' : isExternal ? 'Ngày đo' : 'Ngày hoạt động'}
             <input required type="date" max={end} className={fieldStyle} {...field('day')} />
           </label>
@@ -241,7 +260,7 @@
               </div>
               <label className="flex items-center gap-2"><input type="checkbox" checked={draft.previousDay}
                 onChange={e => setDraft({ ...draft, previousDay: e.target.checked })} /> Bắt đầu ngủ từ hôm trước</label>
-            </> : <label className="block">Thời lượng ước tính (phút)<input required type="number" min="1" max="1440" className={fieldStyle} {...field('duration')} /></label>}
+            </> : <label className="block">Thời lượng ước tính (giờ)<input required type="number" step="0.1" min="0.5" max="24" className={fieldStyle} placeholder="Ví dụ: 7 hoặc 7.5" {...field('duration')} /></label>}
           </>}
           {metric === 'activity' && <>
             <p className="text-sm text-slate-700">Nguồn: Ngoại kể khi người thân hỏi thăm.</p>
@@ -265,8 +284,8 @@
             </>}
           </>}
           <label className="block">Ghi chú<textarea className={fieldStyle} rows="2" maxLength="300" {...field('note')} /></label>
-          <div className="flex flex-wrap gap-2"><button className="rounded-xl bg-blue-700 px-4 py-3 font-bold text-white">Lưu ghi nhận</button>
-            {editing && <button type="button" onClick={clear} className="rounded-xl border border-slate-300 px-4 py-3">Hủy sửa</button>}</div>
+          <div className="flex flex-wrap gap-2"><button className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800 transition shadow-sm">{editing ? 'Lưu thay đổi' : 'Lưu ghi nhận'}</button>
+            {editing && <button type="button" onClick={clear} className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition">Hủy sửa</button>}</div>
           {message && <p role="status" className="text-sm text-green-800">{message}</p>}
           {error && <p role="alert" className="text-sm text-rose-800">{error}</p>}
         </form>
