@@ -12,8 +12,30 @@
     unit: 'mmol/L', context: 'unknown', source: ''
   });
 
-  function Trend({ summary, label, unit, days, bar }) {
-    if (!summary.points.length) return <p className="rounded-xl bg-slate-50 p-4 text-slate-600">Chưa có dữ liệu để vẽ biểu đồ trong khoảng này.</p>;
+  function Trend({ summary, label, unit, days, bar, onLoadExamples }) {
+    if (!summary.points.length) return <div className="my-2 rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50/70 p-5 text-center sm:p-6">
+      <div className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-sky-100 text-xl text-sky-700">
+        📊
+      </div>
+      <h4 className="mt-2.5 text-sm sm:text-base font-bold text-slate-900">
+        Chưa có dữ liệu {label ? label.toLowerCase() : ''} để vẽ biểu đồ
+      </h4>
+      <p className="mx-auto mt-2 max-w-md text-xs sm:text-sm text-slate-600 leading-relaxed">
+        <strong>Chỉ dẫn hiển thị:</strong> Nhập từ <strong>1 ngày</strong> để bắt đầu xem biểu đồ cột/đường; nhập từ <strong>2 ngày</strong> để hiển thị khoảng dao động; và tối thiểu <strong>3 ngày/tuần</strong> để phân tích xu hướng ổn định sinh hoạt.
+      </p>
+      {onLoadExamples && <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={onLoadExamples}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-sm hover:bg-sky-700 transition"
+        >
+          <span>✨ Nạp dữ liệu mẫu để xem thử biểu đồ ngay</span>
+        </button>
+      </div>}
+      <p className="mt-2 text-[11px] text-slate-500">
+        Hoặc điền biểu mẫu bên cạnh để lưu kết quả thực tế đầu tiên cho Ngoại.
+      </p>
+    </div>;
     const max = Math.max(1, ...summary.points.map(p => p.value));
     const x = p => {
       const dayIndex = (Date.parse(p.day) - Date.parse(summary.begin)) / 86400000;
@@ -154,14 +176,45 @@
     return <section className="my-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6" aria-label="Nhật ký sức khỏe">
       <h2 className="text-xl font-bold">Nhật ký sức khỏe do người thân ghi</h2>
       <p className="mt-1 text-sm text-slate-600">Hồ sơ {elderId} · Bản trình diễn lưu trên trình duyệt này. Chỉ nhập dữ liệu giả lập.</p>
-      {!records.length && <button type="button" onClick={loadExamples}
-        className="mt-3 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-800">Nạp dữ liệu mẫu để thử</button>}
-      <aside className="mt-4 rounded-xl border border-blue-100 bg-slate-50 p-3 text-sm">
-        <p className="font-semibold">Những gì cần xem lại trong {days} ngày</p>
-        <p className="mt-1 text-slate-700">{missing.length
-          ? `Chưa có số liệu cho: ${missing.join(', ')}.`
-          : 'Đã có ghi nhận giấc ngủ và vận động trong kỳ này.'}</p>
-        <p className="mt-1 text-slate-700">Đường huyết, SpO₂ và cân nặng được ghi khi có kết quả. Nhật ký không đặt lịch hay tính số lần bỏ lỡ cho các chỉ số này.</p>
+      <aside className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex-1 min-w-[16rem]">
+            <p className="font-bold text-sky-950">💡 Hướng dẫn dành cho người thân</p>
+            <p className="mt-1 text-slate-700">
+              Đây là nhật ký sức khỏe do người thân tự ghi nhận sau khi hỏi thăm Ngoại (tách biệt với Huyết áp tự động từ Robot Myka).
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              {missing.length
+                ? `Hiện tại chưa có số liệu cho: ${missing.join(', ')}. Cần tối thiểu 1–2 ngày để vẽ biểu đồ và 3 ngày/tuần để so sánh xu hướng.`
+                : 'Đã có dữ liệu ghi nhận giấc ngủ và vận động trong kỳ này.'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {!records.length ? (
+              <button
+                type="button"
+                onClick={loadExamples}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-700 transition"
+              >
+                <span>✨ Nạp dữ liệu mẫu để thử</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Đặt lại nhật ký về trạng thái trống ban đầu để kiểm tra giao diện?')) {
+                    localStorage.removeItem(storageKey);
+                    setRecords([]);
+                    setMessage('Đã đặt lại dữ liệu nhật ký về trạng thái ban đầu.');
+                  }
+                }}
+                className="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+              >
+                <span>Đặt lại về trống</span>
+              </button>
+            )}
+          </div>
+        </div>
       </aside>
       <div className="my-4 flex flex-wrap gap-2" aria-label="Chọn chỉ số">
         {Object.entries(metrics).map(([key, item]) => <button key={key} type="button" aria-pressed={key === metric}
@@ -239,7 +292,7 @@
               <dd className="font-bold text-blue-950">{value == null || (mixedGlucose && label !== 'Gần nhất') ? '—' : `${format(value)} ${displayUnit}`}</dd>
             </div>)}
           </dl>}
-          <Trend summary={summary} label={metrics[metric].label} days={days} unit={displayUnit} bar={metric === 'activity'} />
+          <Trend summary={summary} label={metrics[metric].label} days={days} unit={displayUnit} bar={metric === 'activity'} onLoadExamples={!records.length ? loadExamples : null} />
           {metric === 'sleep' && <SleepHighlight summary={summary} days={days} />}
           {metric === 'activity' ? <div className="space-y-1 text-sm text-slate-700">
             <p>Số 0 là ngày đã ghi không vận động. Ngày không có cột hoặc số 0 là ngày chưa ghi.</p>
@@ -278,12 +331,12 @@
         {(sleepSummary.points.length > 0 || activitySummary.points.length > 0) && <div className="grid gap-3 xl:grid-cols-2">
           <article className="rounded-xl bg-white p-3">
             <h4 className="font-semibold">Giấc ngủ theo ngày thức dậy</h4>
-            <Trend summary={sleepSummary} label="giấc ngủ" days={days} unit="giờ" />
+            <Trend summary={sleepSummary} label="giấc ngủ" days={days} unit="giờ" onLoadExamples={!records.length ? loadExamples : null} />
             {metric !== 'sleep' && <SleepHighlight summary={sleepSummary} days={days} />}
           </article>
           <article className="rounded-xl bg-white p-3">
             <h4 className="font-semibold">Vận động theo ngày</h4>
-            <Trend summary={activitySummary} label="vận động" days={days} unit="lượt" bar />
+            <Trend summary={activitySummary} label="vận động" days={days} unit="lượt" bar onLoadExamples={!records.length ? loadExamples : null} />
           </article>
         </div>}
         <p className="text-sm">Số 0 trên biểu đồ vận động là ngày đã ghi không vận động. Ngày chưa nhập được để trống.</p>
