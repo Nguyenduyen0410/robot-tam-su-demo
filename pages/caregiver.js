@@ -7,7 +7,7 @@
     const tabs = [
       { id: 'patients', icon: '👥', label: 'Bệnh nhân' },
       { id: 'notifications', icon: '🔔', label: 'Thông báo Robot' },
-      { id: 'robot_chat', icon: '🤖', label: 'Trò chuyện Robot' },
+      { id: 'telegram', icon: '↗', label: 'Telegram' },
       { id: 'alerts', icon: '⚠️', label: 'Cảnh báo' },
       { id: 'schedule', icon: '📅', label: 'Lịch chăm sóc' },
       { id: 'caregroup', icon: '💬', label: 'Nhóm chăm sóc' },
@@ -114,7 +114,7 @@
               <h1 className="text-xl font-bold text-slate-800">
                 {activeTab === 'patients' ? '👥 Danh sách Bệnh nhân' :
                  activeTab === 'notifications' ? '🔔 Thông báo trực tiếp từ Robot' :
-                 activeTab === 'robot_chat' ? '🤖 Lịch sử Trò chuyện Robot' :
+                 activeTab === 'telegram' ? 'Telegram bên ngoài ứng dụng' :
                  activeTab === 'alerts' ? '⚠️ Quản lý Cảnh báo' :
                  activeTab === 'schedule' ? '📅 Lịch Chăm sóc' : '💬 Nhóm Chăm sóc'}
               </h1>
@@ -258,7 +258,7 @@
                   {RTS.getNotifications(user.id).length === 0 ? (
                     <div className="bg-white rounded-xl p-8 text-center text-slate-400">Chưa có thông báo nào</div>
                   ) : RTS.getNotifications(user.id).map(n => {
-                    const icons = { bp_result: '💓', sos: '🚨', bp_alert: '⚠️', chat_summary: '💬', schedule_missed: '📋' };
+                    const icons = { bp_result: '💓', sos: '🚨', bp_alert: '⚠️', schedule_missed: '📋' };
                     const bg = n.type === 'sos' ? 'bg-red-50 border-red-300' : n.type === 'bp_alert' ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200';
                     return (
                       <div key={n.id} className={`p-4 rounded-xl border shadow-sm flex items-start gap-3 ${bg}`}>
@@ -277,46 +277,12 @@
               </div>
             )}
 
-            {activeTab === 'robot_chat' && (
-              <div className="space-y-4 max-w-4xl">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium text-slate-600">Xem trò chuyện của người già:</span>
-                  {elders.map(e => (
-                    <button key={e.id} onClick={() => setSelectedElder(e.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${selectedElder === e.id ? 'bg-blue-600 text-white' : 'bg-white border text-slate-600 hover:bg-slate-50'}`}>
-                      {e.avatar} {e.name}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">🤖</span>
-                      <div>
-                        <div className="font-bold text-slate-800 text-sm">Nhật ký trò chuyện với Robot Companion</div>
-                        <div className="text-slate-500 text-xs">Dữ liệu ghi âm / chuyển thành văn bản từ micro Robot tại phòng {currentElder ? currentElder.room : ''}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-5 space-y-3 max-h-96 overflow-y-auto scrollbar-thin bg-slate-50">
-                    {RTS.getChatHistory(selectedElder).length === 0 ? (
-                      <div className="text-center text-slate-400 py-8">Chưa có bản ghi trò chuyện cho {currentElder ? currentElder.name : 'người này'}</div>
-                    ) : RTS.getChatHistory(selectedElder).map(c => (
-                      <div key={c.id} className={`flex ${c.sender === 'elder' ? 'justify-end' : 'justify-start'} gap-2`}>
-                        {c.sender === 'robot' && <span className="text-xl flex-shrink-0 mt-1">🤖</span>}
-                        <div className={`max-w-md px-4 py-2.5 rounded-2xl text-sm ${c.sender === 'elder' ? 'chat-bubble-user' : 'chat-bubble-robot'}`}>
-                          <div className="font-semibold text-xs mb-1 opacity-75">{c.sender === 'elder' ? (currentElder ? currentElder.name : 'Người cao tuổi') : 'Robot Tâm Sự'}</div>
-                          <div>{c.text}</div>
-                          <div className={`text-xs mt-1 ${c.sender === 'elder' ? 'text-blue-200' : 'text-slate-400'}`}>{RTS.timeAgo(c.timestamp)}</div>
-                        </div>
-                        {c.sender === 'elder' && <span className="text-xl flex-shrink-0 mt-1">{currentElder ? currentElder.avatar : '👵'}</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+            {activeTab === 'telegram' && (
+              <section className="max-w-3xl rounded-2xl border border-sky-200 bg-sky-50 p-6">
+                <h2 className="text-lg font-bold text-slate-900">Lịch sử trò chuyện nằm trên Telegram</h2>
+                <p className="mt-2 text-sm text-slate-700">Ứng dụng chỉ mở nhóm Telegram do dự án chung cung cấp; không lưu hoặc hiển thị bản sao hội thoại.</p>
+                <a className="mt-4 inline-flex rounded-xl bg-sky-700 px-4 py-3 font-bold text-white" href="https://web.telegram.org/a/#-1004358354552" target="_blank" rel="noreferrer">Mở Chat Group Telegram ↗</a>
+              </section>
             )}
 
             {activeTab === 'alerts' && (

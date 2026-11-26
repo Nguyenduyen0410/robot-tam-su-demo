@@ -1,4 +1,3 @@
-import { getReadOnlyChat } from '../lib/third-party-myka.js';
 import { mykaTestReadings } from '../lib/myka-test-readings.js';
 
 const corsHeaders = (request) => {
@@ -412,19 +411,6 @@ export async function onRequest({ request, env, params }) {
 
     if (request.method === 'POST' && ((area === 'demo-scheduler' && section === 'tick') || (area === 'family' && section === 'bp-sync')) && elderId) {
       return json(request, { success: false, code: 'SYNTHETIC_MEASUREMENT_SCHEDULER_DISABLED', message: 'Lịch 09:00/19:00 chỉ dùng để nhắc người thân xem app; hệ thống không tạo hoặc đồng bộ số đo theo lịch.' }, 410);
-    }
-
-    if (request.method === 'GET' && area === 'family' && section === 'conversation-history' && elderId) {
-      if (elderId !== 'E001') return json(request, { error: 'Bản mẫu API guide hiện chỉ được gán cho hồ sơ E001 (Bà Hoa).' }, 404);
-      await ensureBackendDemoData(db, elderId);
-      const requestedDate = new URL(request.url).searchParams.get('date') || new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) return json(request, { error: 'Ngày không hợp lệ.' }, 422);
-      const { messages, source } = await getReadOnlyChat(env, requestedDate);
-      return json(request, {
-        elder_id: elderId, date: requestedDate,
-        source: messages.length ? 'guide_demo' : 'none',
-        demo: source !== 'third_party_api', review_needed_count: 0, messages,
-      });
     }
 
     if (request.method === 'GET' && area === 'family' && section === 'schedules' && elderId) {

@@ -6,7 +6,7 @@
     { icon:'devices', title:'Kết nối thiết bị', desc:'Quản lý thiết bị trong hồ sơ, tên thiết bị và cấu hình Wi-Fi, Bluetooth.', tag:'KẾT NỐI THUẬN TIỆN' },
     { icon:'build', title:'Bảo trì', desc:'Xem những nhắc nhở bảo trì và thời hạn cần lưu ý cho thiết bị Myka.', tag:'ĐỒNG HÀNH LÂU DÀI' },
     { icon:'sync', title:'Trạng thái dữ liệu', desc:'Kiểm tra phản hồi máy chủ và thời gian cập nhật số đo gần nhất.', tag:'THÔNG TIN RÕ RÀNG' },
-    { icon:'forum', title:'Nhật ký Myka', desc:'Đọc lại những cuộc trò chuyện theo ngày, lưu ý nội dung gia đình cần xem lại.', tag:'LẮNG NGHE NHIỀU HƠN' },
+    { icon:'forum', title:'Liên kết Telegram', desc:'Mở kênh Telegram bên ngoài để hỏi Myka hoặc quản trị viên về cuộc trò chuyện.', tag:'KÊNH NGOÀI ỨNG DỤNG' },
     { icon:'tune', title:'Cài đặt', desc:'Chọn thời lượng Không làm phiền, kiểu giọng và tên robot hiển thị.', tag:'THEO CÁCH CỦA GIA ĐÌNH' },
     { icon:'receipt_long', title:'Gói & thanh toán', desc:'Xem phí dịch vụ, kỳ gia hạn và lịch sử thanh toán một cách rõ ràng.', tag:'DỄ DÀNG QUẢN LÝ' },
   ];

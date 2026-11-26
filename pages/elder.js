@@ -365,17 +365,6 @@
         testcase: 'TC-025',
         timestamp: new Date().toISOString()
       });
-      // Push notification to family
-      RTS.addNotification({
-        id: RTS.genId(),
-        toUserId: 'U002',
-        type: 'chat_summary',
-        title: '🎙️ Tin nhắn thoại mới từ Ngoại',
-        detail: `Ngoại vừa gửi lời nhắn qua Myka: "${msgText}"`,
-        elderId: 'E001',
-        timestamp: new Date().toISOString(),
-        read: false
-      });
       setStep('sent');
     }
 

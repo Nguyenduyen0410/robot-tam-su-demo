@@ -369,160 +369,10 @@
     }
   ];
 
-  // ---- Lịch sử trò chuyện chi tiết với Robot Myka trích từ Testcase TC-005 ~ TC-024 ----
-  const CHAT_HISTORY = [
-    {
-      id: 'TC-005-1',
-      elderId: 'E001',
-      sender: 'elder',
-      text: 'Myka ơi, hôm nay Ngoại thấy hơi buồn, con nói chuyện với Ngoại một chút được không?',
-      timestamp: minutesAgo(65),
-      tcRef: 'TC-005',
-      note: 'Ngoại mở đầu trò chuyện bộc lộ cảm xúc buồn.'
-    },
-    {
-      id: 'TC-005-2',
-      elderId: 'E001',
-      sender: 'robot',
-      text: 'Dạ được ạ. Hôm nay Ngoại có muốn kể cho con nghe điều gì làm Ngoại buồn không?',
-      timestamp: minutesAgo(64),
-      tcRef: 'TC-005',
-      note: 'Myka phản hồi ấm áp, khuyến khích tâm sự.'
-    },
-    {
-      id: 'TC-005-3',
-      elderId: 'E001',
-      sender: 'elder',
-      text: 'Ngoại ở nhà một mình nên thấy hơi buồn.',
-      timestamp: minutesAgo(63),
-      tcRef: 'TC-005'
-    },
-    {
-      id: 'TC-005-4',
-      elderId: 'E001',
-      sender: 'robot',
-      text: 'Con hiểu ạ. Ngoại có thể kể cho con nghe về ngày hôm nay của Ngoại. Hôm nay Ngoại đã làm những gì rồi ạ?',
-      timestamp: minutesAgo(62),
-      tcRef: 'TC-005'
-    },
-    {
-      id: 'TC-005-5',
-      elderId: 'E001',
-      sender: 'elder',
-      text: 'Sáng nay Ngoại có tưới cây rồi nấu cơm.',
-      timestamp: minutesAgo(61),
-      tcRef: 'TC-005'
-    },
-    {
-      id: 'TC-005-6',
-      elderId: 'E001',
-      sender: 'robot',
-      text: 'Nghe vui quá ạ. Ngoại chăm cây chắc cây xanh tốt lắm. Ngoại có muốn kể cho con nghe về những cây Ngoại đang trồng không?',
-      timestamp: minutesAgo(60),
-      tcRef: 'TC-005'
-    },
-    {
-      id: 'TC-006-1',
-      elderId: 'E001',
-      sender: 'elder',
-      text: 'Sáng nay Ngoại tưới cây xong thấy hơi mệt mỏi trong người con à.',
-      timestamp: minutesAgo(55),
-      tcRef: 'TC-006'
-    },
-    {
-      id: 'TC-006-2',
-      elderId: 'E001',
-      sender: 'robot',
-      text: 'Dạ, Ngoại chăm cây tốt quá ạ. Ngoại thấy mệt như vậy có chóng mặt hay khó thở không ạ? Ngoại ngồi nghỉ ngơi một chút và uống chút nước ấm nhé.',
-      timestamp: minutesAgo(54),
-      tcRef: 'TC-006'
-    },
-    {
-      id: 'TC-007-1',
-      elderId: 'E001',
-      sender: 'elder',
-      text: 'Myka ơi, hôm nay tôi thấy đau đầu quá.',
-      timestamp: minutesAgo(50),
-      tcRef: 'TC-007'
-    },
-    {
-      id: 'TC-007-2',
-      elderId: 'E001',
-      sender: 'robot',
-      text: 'Ngoại ơi, Ngoại đau đầu chỗ nào ạ? Ngoại nghỉ ngơi một chút nhé, con thương Ngoại lắm. Nếu đau nhiều hơn Ngoại nhấn nút SOS để gọi điều dưỡng Lan đến hỗ trợ ngay nhé.',
-      timestamp: minutesAgo(49),
-      tcRef: 'TC-007'
-    },
-    {
-      id: 'TC-008-1',
-      elderId: 'E001',
-      sender: 'elder',
-      text: 'Myka ơi, hôm nay trời đẹp quá. Con kể tôi nghe một câu chuyện vui đi.',
-      timestamp: minutesAgo(40),
-      tcRef: 'TC-008'
-    },
-    {
-      id: 'TC-008-2',
-      elderId: 'E001',
-      sender: 'robot',
-      text: 'Dạ được ạ! Con kể Ngoại nghe chuyện vui này nhé: Một ông lão 80 tuổi đi khám bệnh, bác sĩ khen: “Huyết áp và sức khỏe cụ tốt thật đấy, nhờ đâu vậy ạ?” Ông lão cười: “Dạ, nhờ mỗi ngày tôi đều cười thật nhiều và nghe lời con cháu ạ!” Chúc Ngoại luôn vui tươi như thế nhé! 🌸',
-      timestamp: minutesAgo(39),
-      tcRef: 'TC-008'
-    },
-    {
-      id: 'TC-009-1',
-      elderId: 'E001',
-      sender: 'elder',
-      text: 'Lâu rồi con trai tôi không gọi. Tôi ở nhà một mình nhớ con quá...',
-      timestamp: minutesAgo(35),
-      tcRef: 'TC-009'
-    },
-    {
-      id: 'TC-009-2',
-      elderId: 'E001',
-      sender: 'robot',
-      text: 'Dạ, con hiểu cảm giác nhớ con mà không dám gọi ạ. Ngoại có muốn con bấm máy gọi cho Chị Duyên hoặc con trai của Ngoại ngay bây giờ không ạ?',
-      timestamp: minutesAgo(34),
-      tcRef: 'TC-009'
-    },
-    {
-      id: 'TC-014-1',
-      elderId: 'E001',
-      sender: 'elder',
-      text: 'Myka ơi, tôi đau ngực, con kết luận giúp tôi bị bệnh gì?',
-      timestamp: minutesAgo(20),
-      tcRef: 'TC-014, TC-015'
-    },
-    {
-      id: 'TC-014-2',
-      elderId: 'E001',
-      sender: 'robot',
-      text: 'Dạ, con không thể tự chẩn đoán bệnh hay kê thuốc cho Ngoại ạ. Với triệu chứng đau ngực, con khuyên Ngoại ngồi nghỉ tĩnh tâm và con xin phép gửi thông báo khẩn cấp tới Bác sĩ Tuấn và Điều dưỡng Lan ngay ạ!',
-      timestamp: minutesAgo(19),
-      tcRef: 'TC-014, TC-015'
-    },
-    {
-      id: 'TC-021-1',
-      elderId: 'E001',
-      sender: 'elder',
-      text: 'Myka ơi, kết quả đo huyết áp gần nhất của tôi là bao nhiêu?',
-      timestamp: minutesAgo(10),
-      tcRef: 'TC-021'
-    },
-    {
-      id: 'TC-021-2',
-      elderId: 'E001',
-      sender: 'robot',
-      text: 'Dạ, kết quả đo gần nhất của Ngoại lúc 8 giờ 30 sáng là: Huyết áp tâm thu 128, huyết áp tâm trương 78 mmHg và nhịp tim 72 lần/phút. Chỉ số rất tốt và bình thường ạ!',
-      timestamp: minutesAgo(9),
-      tcRef: 'TC-021'
-    }
-  ];
 
   // ---- notifications đồng bộ từ các testcase ----
   const NOTIFICATIONS = [
     { id: 'NTF001', toUserId: 'U002', type: 'bp_result', title: '💓 Đo huyết áp thành công (TC-002)', detail: 'Bà Nguyễn Thị Hoa vừa hoàn thành đo: 128/78 mmHg, nhịp tim 72 bpm (Bình thường)', elderId: 'E001', timestamp: todayAt(8, 30), read: true },
-    { id: 'NTF002', toUserId: 'U002', type: 'chat_summary', title: '💬 Dấu hiệu tâm lý từ Robot (TC-005, TC-009)', detail: 'Bà Hoa chia sẻ nhớ con và thấy hơi buồn. Myka đã động viên và an ủi bà.', elderId: 'E001', timestamp: minutesAgo(35), read: false },
     { id: 'NTF003', toUserId: 'U003', type: 'sos', title: '🚨 Cảnh báo khẩn cấp SOS (P101)', detail: 'Ngoại bấm nút SOS trên Myka lúc ' + new Date(Date.now() - 30*60000).toLocaleTimeString('vi-VN') + '. Điều dưỡng Lan đã xử lý ổn định.', elderId: 'E001', timestamp: minutesAgo(30), read: true },
     { id: 'NTF004', toUserId: 'U004', type: 'bp_alert', title: '⚠️ Bệnh nhân có huyết áp dao động (TC-010)', detail: 'Bà Nguyễn Thị Hoa: 145/90 mmHg. Bác sĩ Tuấn đã ghi nhận theo dõi thêm.', elderId: 'E001', timestamp: daysAgo(1), read: true },
     { id: 'NTF005', toUserId: 'U002', type: 'call_summary', title: '📞 Cuộc gọi thoại thành công (TC-034)', detail: 'Cuộc gọi 2 chiều giữa Chị Duyên và Ngoại qua Myka kéo dài 8 phút 15 giây.', elderId: 'E001', timestamp: minutesAgo(45), read: false },
@@ -568,7 +418,6 @@
     LS.set('rts_audit_log', AUDIT_LOG);
     LS.set('rts_operator_tasks', OPERATOR_TASKS);
     LS.set('rts_channels', CHANNELS);
-    LS.set('rts_chat_history', CHAT_HISTORY);
     LS.set('rts_notifications', NOTIFICATIONS);
     LS.set('rts_call_logs', CALL_LOGS);
     LS.set('rts_messages_log', MESSAGES_LOG);
@@ -617,8 +466,8 @@
     addAuditLog: (entry) => { const all = LS.get('rts_audit_log') || []; all.unshift(entry); LS.set('rts_audit_log', all); },
     getOperatorTasks: () => LS.get('rts_operator_tasks') || [],
     getChannels: () => LS.get('rts_channels') || [],
-    getChatHistory: (elderId) => (LS.get('rts_chat_history') || []).filter(c => c.elderId === elderId),
-    addChatHistory: (msg) => { const all = LS.get('rts_chat_history') || []; all.push(msg); LS.set('rts_chat_history', all); },
+    getChatHistory: (_elderId) => [],
+    addChatHistory: (_msg) => {},
     getNotifications: (userId) => (LS.get('rts_notifications') || []).filter(n => !userId || n.toUserId === userId || n.toRole === userId),
     addNotification: (notif) => { const all = LS.get('rts_notifications') || []; all.unshift(notif); LS.set('rts_notifications', all); },
     

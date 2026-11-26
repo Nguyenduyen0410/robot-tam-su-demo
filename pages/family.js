@@ -85,10 +85,6 @@
     const [profileDraft, setProfileDraft] = React.useState({ age: '', address: '', health_notes: '' });
     const [settingsSaving, setSettingsSaving] = React.useState(false);
     const [settingsMessage, setSettingsMessage] = React.useState('');
-    const [conversationDate, setConversationDate] = React.useState(new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10));
-    const [conversationData, setConversationData] = React.useState({ messages: [], review_needed_count: 0, source: 'none' });
-    const [conversationLoading, setConversationLoading] = React.useState(false);
-    const [conversationError, setConversationError] = React.useState('');
     const [dndClock, setDndClock] = React.useState(Date.now());
 
     React.useEffect(() => {
@@ -218,18 +214,6 @@
       const timer = window.setInterval(refreshOperationalStatus, 30000);
       return () => { active = false; window.clearInterval(timer); };
     }, [days]);
-
-    React.useEffect(() => {
-      let active = true;
-      setConversationLoading(true);
-      setConversationError('');
-      fetch(apiUrl(`/family/conversation-history/${elderId}?date=${encodeURIComponent(conversationDate)}`))
-        .then(r => r.ok ? r.json() : Promise.reject())
-        .then(data => { const cData = data?.data || data || {}; if (active) setConversationData({ ...cData, messages: cData.messages || [] }); })
-        .catch(() => { if (active) setConversationError('Chưa tải được nhật ký từ máy chủ.'); })
-        .finally(() => { if (active) setConversationLoading(false); });
-      return () => { active = false; };
-    }, [conversationDate]);
 
     const elder = RTS.getElders().find(e => e.id === elderId);
     const endDay = apiAvailable && snapshotEnd ? snapshotEnd : window.MykaCareJournal.today();
@@ -398,7 +382,7 @@
       { id: 'connectivity', label: 'Kết nối thiết bị', icon: 'devices' },
       { id: 'service', label: 'Gói & thanh toán', icon: 'credit_card' },
       { id: 'status', label: 'Trạng thái', icon: 'sync' },
-      { id: 'conversations', label: 'Nhật ký Myka', icon: 'forum' },
+      { id: 'conversations', label: 'Telegram', icon: 'forum' },
       { id: 'settings', label: 'Cài đặt', icon: 'tune' },
       { id: 'profile', label: 'Hồ sơ', icon: 'account_circle' },
     ];
@@ -465,11 +449,13 @@
       : '';
     if (connectivity === null) return <div className="min-h-screen grid place-items-center bg-slate-50"><p className="text-slate-600">Đang kiểm tra trạng thái thiết bị Myka…</p></div>;
     if (setupMode || (!devicePaired && !setupFinished)) return <DeviceSetupScreen apiUrl={apiUrl} demoMode={Boolean(user?.demoSetupMode)} onPaired={() => {
-      RTS.LS.set(setupCompleteKey, true);
-      RTS.LS.set(`myka_device_paired_${user?.id}`, true);
+      if (!user?.demoSetupMode) {
+        RTS.LS.set(setupCompleteKey, true);
+        RTS.LS.set(`myka_device_paired_${user?.id}`, true);
+        refreshConnectivity();
+      }
       setSetupMode(false);
       setSetupFinished(true);
-      refreshConnectivity();
     }} />;
 
     return (
@@ -532,7 +518,7 @@
                 <div>
                   <span className="inline-block rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold text-sky-800">KÊNH TELEGRAM GIA ĐÌNH & ROBOT MYKA</span>
                   <h3 className="mt-1 text-base font-extrabold text-slate-900">Chat Group Telegram · Hỏi Myka việc Ngoại đã trò chuyện</h3>
-                  <p className="mt-0.5 text-xs sm:text-sm text-slate-600">Người thân vào Chat Group để hỏi trực tiếp Myka ({telegramLinks.bot_username || '@myka_care_p101_bot'}) xem hôm nay Ngoại đã tâm sự những gì với robot và trao đổi chăm sóc.</p>
+                  <p className="mt-0.5 text-xs sm:text-sm text-slate-600">Người thân mở Chat Group trên Telegram để hỏi Myka ({telegramLinks.bot_username || '@myka_care_p101_bot'}) về cuộc trò chuyện của Ngoại và trao đổi chăm sóc. Ứng dụng không lưu hay hiển thị lịch sử chat.</p>
                 </div>
               </div>
               <a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-3.5 text-sm font-bold text-white shadow-md shadow-sky-200 transition hover:bg-sky-700">
@@ -626,7 +612,7 @@
                   <div key={key}><p className="text-sm text-slate-700">{label}</p><p className="text-xl font-bold">{range(key)} <span className="text-sm font-normal">{unit}</span></p></div>)}
               </div>
               <p className="mt-3 text-sm text-slate-700">Xem lại lần đo và hỏi thăm Ngoại nếu thấy số đo hoặc sinh hoạt thay đổi so với thường ngày.</p>
-              <button type="button" onClick={() => focusSection('conversations')} className="mt-2 text-sm font-semibold text-blue-800">Mở nhật ký trò chuyện để xem bối cảnh</button>
+              <button type="button" onClick={() => focusSection('conversations')} className="mt-2 text-sm font-semibold text-sky-800">Mở kênh Telegram để hỏi Myka về bối cảnh ↗</button>
             </article>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"><h3 className="font-semibold p-4">Lịch sử đo huyết áp</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="text-left p-3">Giờ đo (Việt Nam)</th><th className="text-left p-3">Huyết áp</th><th className="text-left p-3">Nhịp tim</th><th className="text-left p-3">Nguồn ghi nhận</th><th className="text-left p-3">Ghi chú</th></tr></thead><tbody>{visibleReadings.slice().reverse().map(row => {
               return <tr key={row.id} className="border-t border-slate-100"><td className="p-3 whitespace-nowrap">{receiptLabel(row.timestamp)}</td><td className="p-3 font-semibold whitespace-nowrap">{row.systolic}/{row.diastolic} mmHg</td><td className="p-3 whitespace-nowrap">{row.heart_rate || row.heartRate} bpm</td><td className="p-3 whitespace-nowrap"><span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">{row.source === 'third_party_api' ? 'Snapshot API Myka' : row.source === 'third_party_guide_demo' ? 'Mẫu tài liệu API' : 'Chưa xác minh'}</span></td><td className="p-3 text-slate-500">{row.note || '—'}</td></tr>;
@@ -649,7 +635,7 @@
           {tab === 'service' && <section id="family-section-service" className="scroll-mt-24">
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[.14em] text-blue-700">MYKA CARE COMPANION</p><h2 className="mt-1 text-2xl font-extrabold">Gói dịch vụ & thanh toán</h2><p className="mt-1 text-sm text-slate-500">Xem quyền lợi, kỳ gia hạn và hướng dẫn thanh toán.</p></div></div>
             <div className="grid gap-4 md:grid-cols-[1.15fr_.85fr]">
-              <article className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1f5ba7] via-[#357eb8] to-[#70a3cf] p-5 text-white shadow-lg shadow-blue-900/10 sm:p-6"><span className="pointer-events-none absolute -right-10 -top-12 h-48 w-48 rounded-full border-[22px] border-white/10" aria-hidden="true" /><div className="relative"><div className="flex items-center justify-between gap-3"><span className="rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-bold">GÓI HÀNG THÁNG</span><span className="material-symbols-rounded" aria-hidden="true">volunteer_activism</span></div><h3 className="mt-4 text-xl font-extrabold">Myka Care Companion</h3><p className="mt-1 text-sm text-blue-50">Đồng hành cùng gia đình trong việc chăm sóc Ngoại.</p><p className="mt-5 text-3xl font-extrabold">{Number(pricing.monthly_fee).toLocaleString('vi-VN')} <span className="text-base font-semibold">đ/tháng</span></p><p className="mt-1 text-sm text-blue-50">Gia hạn vào ngày {pricing.renewal_day} mỗi tháng</p><ul className="mt-5 grid gap-2 text-sm sm:grid-cols-2"><li className="flex items-center gap-2"><span className="material-symbols-rounded text-lg" aria-hidden="true">check_circle</span>Số đo & lịch sử sức khỏe</li><li className="flex items-center gap-2"><span className="material-symbols-rounded text-lg" aria-hidden="true">check_circle</span>Lịch chăm sóc</li><li className="flex items-center gap-2"><span className="material-symbols-rounded text-lg" aria-hidden="true">check_circle</span>Hồ sơ người thân</li><li className="flex items-center gap-2"><span className="material-symbols-rounded text-lg" aria-hidden="true">check_circle</span>Nhật ký Myka</li></ul></div></article>
+              <article className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1f5ba7] via-[#357eb8] to-[#70a3cf] p-5 text-white shadow-lg shadow-blue-900/10 sm:p-6"><span className="pointer-events-none absolute -right-10 -top-12 h-48 w-48 rounded-full border-[22px] border-white/10" aria-hidden="true" /><div className="relative"><div className="flex items-center justify-between gap-3"><span className="rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-bold">GÓI HÀNG THÁNG</span><span className="material-symbols-rounded" aria-hidden="true">volunteer_activism</span></div><h3 className="mt-4 text-xl font-extrabold">Myka Care Companion</h3><p className="mt-1 text-sm text-blue-50">Đồng hành cùng gia đình trong việc chăm sóc Ngoại.</p><p className="mt-5 text-3xl font-extrabold">{Number(pricing.monthly_fee).toLocaleString('vi-VN')} <span className="text-base font-semibold">đ/tháng</span></p><p className="mt-1 text-sm text-blue-50">Gia hạn vào ngày {pricing.renewal_day} mỗi tháng</p><ul className="mt-5 grid gap-2 text-sm sm:grid-cols-2"><li className="flex items-center gap-2"><span className="material-symbols-rounded text-lg" aria-hidden="true">check_circle</span>Số đo & lịch sử sức khỏe</li><li className="flex items-center gap-2"><span className="material-symbols-rounded text-lg" aria-hidden="true">check_circle</span>Lịch chăm sóc</li><li className="flex items-center gap-2"><span className="material-symbols-rounded text-lg" aria-hidden="true">check_circle</span>Hồ sơ người thân</li><li className="flex items-center gap-2"><span className="material-symbols-rounded text-lg" aria-hidden="true">check_circle</span>Liên kết Chat Group Telegram</li></ul></div></article>
               <article className="rounded-3xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-50 text-blue-800"><span className="material-symbols-rounded" aria-hidden="true">smart_toy</span></span><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">MUA MỘT LẦN</p><h3 className="font-bold">Thiết bị Myka</h3></div></div><p className="mt-5 text-2xl font-extrabold text-slate-900">{Number(pricing.device_price).toLocaleString('vi-VN')} <span className="text-sm font-semibold text-slate-500">đ</span></p><p className="mt-1 text-sm leading-relaxed text-slate-600">Gia đình sở hữu thiết bị sau khi mua. Khoản này đã được thanh toán ở lần đăng ký đầu.</p><div className="mt-5 rounded-2xl bg-blue-50 p-4"><p className="flex items-center gap-2 text-sm font-bold text-blue-900"><span className="material-symbols-rounded text-lg" aria-hidden="true">check_circle</span>Đã thanh toán khi mua</p><div className="mt-2 flex justify-between gap-3 text-sm text-slate-700"><span>Thiết bị + tháng dịch vụ đầu</span><strong className="shrink-0 text-slate-900">{Number(pricing.first_payment_total).toLocaleString('vi-VN')} đ</strong></div><p className="mt-1 text-xs text-slate-600">Từ các tháng sau chỉ gia hạn thuê bao.</p></div></article>
             </div>
             <article className="mt-4 rounded-3xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{pendingPayment ? 'HÓA ĐƠN GIA HẠN CẦN THANH TOÁN' : 'KỲ GIA HẠN TIẾP THEO'}</p><p className="mt-1 text-2xl font-extrabold text-slate-900">{Number(pendingPayment?.amount || pricing.monthly_fee).toLocaleString('vi-VN')} đ</p><p className="mt-1 text-sm text-slate-500">{pendingPayment ? (pendingPayment.service_name || 'Myka Care Companion') : 'Myka Care Companion · 1 tháng dịch vụ'}</p></div><div className="rounded-2xl bg-blue-50 px-4 py-3"><p className="text-xs font-bold text-blue-700">{pendingPayment ? 'HẠN THANH TOÁN' : 'NGÀY GIA HẠN TIẾP THEO'}</p><p className="mt-1 font-bold text-blue-950">{pendingPayment?.due_at || pricing.next_renewal_date}</p><p className="mt-1 text-xs text-blue-800">Mức gia hạn {Number(pricing.monthly_fee).toLocaleString('vi-VN')} đ/tháng</p></div></div><div className="mt-4 border-t border-slate-100 pt-4"><p className="text-xs leading-relaxed text-slate-500">Khoản thiết bị và thuê bao tháng đầu đã thanh toán. Từ kỳ sau, gia đình chỉ gia hạn 100.000đ/tháng.</p><button type="button" onClick={() => setShowPaymentCheckout(true)} className="mt-4 w-full rounded-2xl bg-blue-700 px-5 py-3.5 font-bold text-white shadow-md shadow-blue-200 transition hover:bg-blue-800 sm:w-auto">{pendingPayment ? 'Tiếp tục thanh toán' : 'Gia hạn tháng'}</button></div></article>
@@ -674,20 +660,8 @@
             </section>;
           })()}
           {tab === 'conversations' && <section id="family-section-conversations" className="scroll-mt-24">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-5"><div><p className="text-sm text-blue-700 font-semibold">THEO DÕI GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Nhật ký trò chuyện với Myka</h2><p className="text-sm text-slate-500 mt-1">Mở nhóm Telegram để hỏi Myka về những điều Ngoại đã trò chuyện theo ngày. Các đoạn hội thoại mẫu bên dưới dùng để minh họa giao diện.</p></div><div className="flex flex-wrap items-center gap-2"><a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-700"><span className="material-symbols-rounded text-base" aria-hidden="true">send</span>Chat Group hỏi Myka ↗</a><span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${conversationData.source === 'telegram' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-600'}`}>{conversationData.source === 'telegram' ? 'Telegram' : ['guide_demo', 'third_party_guide_demo'].includes(conversationData.source) ? 'Hội thoại mẫu' : 'Nhật ký Myka'}</span></div></div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-3"><div><label htmlFor="conversation-date" className="block text-sm font-semibold">Chọn ngày</label><p className="text-xs text-slate-500 mt-1">Mặc định là hôm nay</p></div><input id="conversation-date" type="date" value={conversationDate} onChange={event => setConversationDate(event.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
-            {conversationData.review_needed_count > 0 && <article className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4"><p className="font-semibold text-amber-900">Có {conversationData.review_needed_count} lời nhắn được đánh dấu để gia đình xem lại</p><p className="text-sm text-amber-800 mt-1">Nhãn này giúp gia đình lưu ý nội dung cần xem lại; đây không phải đánh giá hay chẩn đoán sức khỏe.</p></article>}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 md:p-5">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <h3 className="font-semibold">Nội dung trong ngày</h3>
-                <span className="text-xs text-slate-500">{conversationData.messages.length} tin nhắn</span>
-              </div>
-              {conversationLoading ? <p className="py-10 text-center text-sm text-slate-500">Đang tải nhật ký…</p>
-                : conversationError ? <p role="status" className="py-10 text-center text-sm text-rose-700">{conversationError}</p>
-                  : conversationData.messages.length ? <ConversationHistory messages={conversationData.messages} />
-                  : <p className="py-10 text-center text-sm text-slate-500">Chưa có hội thoại cho ngày này. Bạn có thể chọn ngày khác hoặc hỏi Myka qua Telegram.</p>}
-            </div>
-            <p className="text-xs text-slate-500 mt-3">Chọn ngày để xem các đoạn hội thoại mẫu có sẵn.</p>
+            <div className="mb-5"><p className="text-sm text-blue-700 font-semibold">KÊNH TRAO ĐỔI BÊN NGOÀI</p><h2 className="text-xl font-bold mt-1">Hỏi Myka về cuộc trò chuyện của Ngoại</h2><p className="text-sm text-slate-600 mt-2">Ứng dụng chưa nhận hoặc lưu lịch sử Telegram. Mở nhóm Telegram để hỏi Myka hoặc quản trị viên về nội dung Ngoại đã trò chuyện.</p></div>
+            <article className="rounded-2xl border border-sky-200 bg-sky-50 p-5"><h3 className="font-semibold text-slate-900">Lịch sử trò chuyện nằm trong Telegram</h3><p className="mt-2 text-sm text-slate-700">Ngày và nội dung trong nhóm được xem trực tiếp trên Telegram. Ứng dụng không hiển thị bản sao hội thoại hoặc tự phân tích lời nói.</p><a href={telegramLinks.group_chat_url || defaultTgUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-sky-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-sky-800"><span className="material-symbols-rounded text-base" aria-hidden="true">send</span>Mở Chat Group Telegram ↗</a></article>
           </section>}
           {tab === 'settings' && <section id="family-section-settings" className="scroll-mt-24">
             <div className="mb-5"><p className="text-sm text-blue-700 font-semibold">TÙY CHỈNH CHO GIA ĐÌNH</p><h2 className="text-xl font-bold mt-1">Cài đặt Myka</h2><p className="text-sm text-slate-500 mt-1">Lựa chọn được lưu theo hồ sơ người thân.</p></div>

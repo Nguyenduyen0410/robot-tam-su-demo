@@ -23,7 +23,7 @@
       setSaving(true); setMessage('');
       try {
         await onSaved({ ssid: selected, password });
-        setMessage(demoMode ? `Đã hoàn tất bước kết nối mạng “${selected}”.` : `Đã gửi cấu hình Wi-Fi cho “${selected}”. Mật khẩu không được lưu.`);
+        setMessage(demoMode ? `Đã mô phỏng bước cấu hình mạng “${selected}”; chưa gửi thiết lập đến thiết bị thật.` : `Đã gửi cấu hình Wi-Fi cho “${selected}”. Mật khẩu không được lưu.`);
         setShowPassword(false); setPassword('');
       } catch (error) { setMessage(error.message || 'Không lưu được cấu hình Wi-Fi.'); }
       finally { setSaving(false); }
